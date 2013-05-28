@@ -15,14 +15,22 @@ def getFiberPos(fibID,numFib,fibRad):
         pos=galsim.PositionD(x=rad*np.cos(theta),y=rad*np.sin(theta))
     return pos
 
-def integrand(theta,rad,fiberPos,image):
+def integrand(rad,theta,fiberPos,image):
     pos=galsim.PositionD(x=fiberPos.x+rad*np.cos(theta),y=fiberPos.y+rad*np.sin(theta))
     return rad*image.xValue(pos)
 
-def getFiberFlux(fibID,numFib,fibRad,image):
+def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     fiberPos=getFiberPos(fibID,numFib,fibRad)
-    tol=1.e-2
-    return scipy.integrate.dblquad(integrand,0,fibRad,lambda x: 0,lambda x: 2.*np.pi, args=(fiberPos,image), epsabs=tol, epsrel=tol)
+    return scipy.integrate.dblquad(integrand,tol,2.*np.pi,lambda x: 0,lambda x: fibRad, args=(fiberPos,image), epsabs=tol, epsrel=tol)
+
+def radIntegrand(rad,theta,fiberPos,image):
+    pos=galsim.PositionD(x=fiberPos.x+rad*np.cos(theta),y=fiberPos.y+rad*np.sin(theta))
+    return rad*image.xValue(pos)
+def thetaIntegrand(theta,fiberPos,image,fibRad,tol):
+    return scipy.integrate.quad(radIntegrand,0,fibRad,args=(theta,fiberPos,image),epsabs=tol,epsrel=tol)[0]
+def getFiberFlux2(fibID,numFib,fibRad,image,tol=1.e-4):
+    fiberPos=getFiberPos(fibID,numFib,fibRad)
+    return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
 def showImage(profile,numFib,fibRad):
     pixScale=0.1
@@ -77,10 +85,21 @@ def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib
 
     # Get the flux in each fiber
     fibFlux=np.zeros(numFib)
-    for ii in range(numFib):
-        fibFlux[ii]=getFiberFlux(ii,numFib,fibRad,nopixX)[0]
-
+    if((numFib-1) % 2 != 0):
+        for ii in range(numFib):
+            print "{}/{}".format(ii,numFib)
+            fibFlux[ii], error=getFiberFlux2(ii,numFib,fibRad,nopixX)
+            print fibFlux[ii],error
+    else: # take advantage of symmetry of outer fibers
+        for ii in range(1+(numFib-1)/2):
+            print "{}/{}".format(ii,numFib)
+            fibFlux[ii], error=getFiberFlux2(ii,numFib,fibRad,nopixX)
+            if(ii > 0):
+                print "{}/{}".format(ii+(numFib-1)/2,numFib)
+                fibFlux[ii+(numFib-1)/2]=fibFlux[ii]
+            print fibFlux[ii],error
+        
     return fibFlux
 
 if __name__ == "__main__":
-    main()
+    main(4,1,1,1,0,1,0,1,7)
