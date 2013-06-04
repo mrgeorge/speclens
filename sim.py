@@ -16,6 +16,7 @@ def getFiberPos(fibID,numFib,fibRad):
         pos=galsim.PositionD(x=rad*np.cos(theta),y=rad*np.sin(theta))
     return pos
 
+# These functions take a galsim object <image> and integrate over the area of a fiber
 def radIntegrand(rad,theta,fiberPos,image):
     pos=galsim.PositionD(x=fiberPos.x+rad*np.cos(theta),y=fiberPos.y+rad*np.sin(theta))
     return rad*image.xValue(pos)
@@ -26,6 +27,8 @@ def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
 def showImage(profile,numFib,fibRad):
+# Plot image given by galsim object <profile> with fiber pattern overlaid
+
     pixScale=0.1
     imgSizePix=int(10.*fibRad/pixScale)
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
@@ -50,7 +53,7 @@ def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     gal.setFlux(gal_flux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.radians)
+    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Define atmospheric PSF
@@ -63,12 +66,13 @@ def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     return (nopixX, nopixK)
 
 def getInclination(gal_q):
-    # see http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
+# see http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
     # just give simple flat thin disk case for now
     return np.arccos(gal_q) # radians
 
 def getOmega(rad,pars,option='flat'):
-    # return angular rotation rate, i.e. v(r)/r
+# return angular rotation rate, i.e. v(r)/r
+
     if(option=='flat'): # v(r)=pars[0]
         return pars[0]/rad
     elif(option=='solid'): # v(r)=pars[0]*rad/pars[1]
@@ -81,6 +85,9 @@ def getOmega(rad,pars,option='flat'):
         return pars[0]*vel/rad
 
 def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2):
+# Construct galsim objects for galaxy (image), velocity map, and flux-weighted velocity map
+# with optional lensing shear and PSF convolution
+	
     # Define the galaxy velocity map
     bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
     disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
@@ -89,14 +96,15 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     gal.setFlux(gal_flux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.radians)
+    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
     halfWidth=0.5*imgSizePix*pixScale
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
     galImg=gal.draw(image=imgFrame,dx=pixScale)
-    imgArr=galImg.array
+    imgArr=galImg.array.copy()	# must store these arrays as copies to avoid overwriting with shared imgFrame
+
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
 
@@ -107,6 +115,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     inc=getInclination(gal_q)
     sini=np.sin(inc)
     tani=np.tan(inc)
+    gal_beta_rad=np.deg2rad(gal_beta)
 
     if(rotCurveOpt=='flat'):
         rotCurvePars=np.array([100])
@@ -119,8 +128,8 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     for xx in range(galImg.xmin,galImg.xmax):
         for yy in range(galImg.ymin,galImg.ymax):
             # primed image coordinates centered on galaxy, rotated so xp is major axis
-            xp=(xx-xCen)*np.cos(gal_beta)+(yy-yCen)*np.sin(gal_beta)
-            yp=-(xx-xCen)*np.sin(gal_beta)+(yy-yCen)*np.cos(gal_beta)
+            xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
+            yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
 
             # coordinates in the plane of the galaxy
             radvec=np.array([xp,yp,yp*tani])
@@ -134,8 +143,9 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     vmap=galsim.InterpolatedImage(galsim.ImageViewF(vmapArr,scale=pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
-    galX.applyShear(e1=e1,e2=e2)
-    galK=galX
+    gal.applyShear(e1=e1,e2=e2)
+    galX=gal
+    galK=gal
     fluxVMap.applyShear(e1=e1,e2=e2)
     vmap.applyShear(e1=e1,e2=e2)
 
@@ -148,8 +158,11 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
         # note: real-space convolution with InterpolatedImage doesn't seem to work,
         #       so just use scipy's convolve2d to convolve the arrays
-	fluxVMapArr=scipy.signal.convolve2d(fluxVMap.draw(dx=pixScale).array,atmos.draw(dx=pixScale).array,mode='same')
-	fluxVMap=galsim.InterpolatedImage(galsim.ImageViewF(fluxVMapArr,scale=pixScale))
+	# must store these arrays as copies to avoid overwriting with shared imgFrame
+	fluxVMapArr=fluxVMap.draw(image=imgFrame,dx=pixScale).array.copy()
+	atmosArr=atmos.draw(image=imgFrame,dx=pixScale).array.copy()
+	fluxVMapArrPSF=scipy.signal.convolve2d(fluxVMapArr,atmosArr,mode='same')
+	fluxVMap=galsim.InterpolatedImage(galsim.ImageViewF(fluxVMapArrPSF,scale=pixScale))
         #    fluxVMapPSFK=galsim.Convolve([atmos, fluxVMap],real_space=False) # used fourier-space convolution for faster drawing
     
         galX=galsim.Convolve([atmos, gal],real_space=True) # used real-space convolution for easier real-space integration
@@ -157,13 +170,13 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,galX,galK)
 
-def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,e1,e2,pixScale,fibRad,numFib,plotIm=False):
+def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,e1,e2,pixScale,fibRad,numFib,showPlot=False):
 # get flux-weighted fiber-averaged velocities
 	
     imgSizePix=int(10.*fibRad/pixScale)
     vmap,fluxVMap,gal,galK=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2)
 
-    if(plotIm):
+    if(showPlot):
 	showImage(galK,numFib,fibRad)
 	showImage(vmap,numFib,fibRad)
 	showImage(fluxVMap,numFib,fibRad)
@@ -194,10 +207,10 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 
     return vmapFibFlux/galFibFlux
 
-def vmapModel(pars, xvals):
-# function to fit velocity field
-# pars: 0=gal_beta (PA), 1=gal_q, vmax
-# xvals are the azimuthal angles at which the field is sampled
+def vmapModel(xvals, gal_beta, gal_q, vmax):
+# evaluate velocity field at azimuthal angles around center, called by curve_fit
+# pars: PA in deg., gal_q, vmax
+# xvals are the azimuthal angles (in radians) at which the field is sampled
 	
     fibRad=1.
     rad=2.*fibRad # assume the fibers sample the v field at their center
@@ -206,18 +219,19 @@ def vmapModel(pars, xvals):
     xx=rad*np.cos(xvals)
     yy=rad*np.sin(xvals)    
 
-    # rotated coords aligned with pars[0] guess of major axis
+    # rotated coords aligned with PA guess of major axis
     xCen,yCen=0,0 # assume centroid is well-measured
-    xp=(xx-xCen)*np.cos(pars[0])+(yy-yCen)*np.sin(pars[0])
-    yp=-(xx-xCen)*np.sin(pars[0])+(yy-yCen)*np.cos(pars[0])
+    PArad=np.deg2rad(gal_beta)
+    xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
+    yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
     # projection along apparent major axis in rotated coords
     kvec=np.array([1,0,0])
     
-    inc=getInclination(pars[1])
+    inc=getInclination(gal_q)
     sini=np.sin(inc)
     tani=np.tan(inc)
 
-    rotCurvePars=np.array([pars[2]])
+    rotCurvePars=np.array([vmax])
     nSamp=xvals.size
     vmodel=np.zeros(nSamp)
     for ii in range(xvals.size):
@@ -227,24 +241,35 @@ def vmapModel(pars, xvals):
 
     return vmodel
 
-def vmapFit(vfibFlux):
+def vmapFit(vfibFlux,sigma=30.,showPlot=False):
 # fit model to fiber velocities
 
-    numFib=vfibFlux.size - 1
-    ang=np.linspace(0,2.*np.pi,num=numFib,endpoint=False)
-    vel=vfibFlux[1:] # ignore the central pointing
+    numFib=vfibFlux.size
+    ang=np.linspace(0,2.*np.pi,num=numFib-1,endpoint=False)
+    vel=vfibFlux[1:].copy() # ignore the central pointing
 
-    guess=np.array([np.pi/6,0.1,100.])
+    noise=np.random.randn(numFib-1)*sigma
+    vel+=noise
 
-    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
-    pars, success = scipy.optimize.leastsq(err, guess[:], args=(ang,vel))
-    print "gal_beta={}, gal_q={}, vmax={}. success={}".format(pars[0],pars[1],pars[2],success)
-    fitX=np.linspace(0,2.*np.pi)
-    fitY=vmapModel(pars,fitX)
-    plt.plot(ang,vel,'bo',fitX,fitY,'r-')
-    plt.show()
+    guess=np.array([10,0.1,100.])
+    if(sigma==0):
+	weight=None
+    else:
+	weight=np.repeat(sigma,numFib-1)
 
-def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib,plotIm=False):
+    #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
+    #    pars, success = scipy.optimize.leastsq(err, guess[:], args=(ang,vel))
+    pars, pcov=scipy.optimize.curve_fit(vmapModel, ang, vel, guess, sigma=weight, maxfev=10000)
+    #    print "gal_beta={}, gal_q={}, vmax={}. success={}".format(pars[0],pars[1],pars[2],success)
+    if(showPlot):
+	fitX=np.linspace(0,2.*np.pi)
+	fitY=vmapModel(fitX,pars[0],pars[1],pars[2])
+	plt.plot(ang,vel,'bo',fitX,fitY,'r-')
+	plt.show()
+
+    return pars
+
+def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib,showPlot=False):
 
     #    bulge_n=4.
     #    bulge_r=1. # arcsec
@@ -260,7 +285,7 @@ def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib
     nopixX, nopixK = makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm)
 
     # Plot the image with fibers overlaid
-    if(plotIm):
+    if(showPlot):
         showImage(nopixK,numFib,fibRad)
 
     # Get the flux in each fiber
