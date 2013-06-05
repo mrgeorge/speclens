@@ -5,6 +5,12 @@ import scipy.integrate
 import scipy.signal
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm
+import matplotlib.patches
+
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
+plt.rc('text', usetex=True)
+plt.rc('axes',linewidth=1.5)
 
 def getFiberPos(fibID,numFib,fibRad):
     # returns fiber position relative to center in same units as fibRad (arcsec)
@@ -26,22 +32,44 @@ def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     fiberPos=getFiberPos(fibID,numFib,fibRad)
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
-def showImage(profile,numFib,fibRad):
+def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     pixScale=0.1
     imgSizePix=int(10.*fibRad/pixScale)
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
     img=profile.draw(image=imgFrame,dx=pixScale)
-    halfWidth=0.5*imgSizePix*pixScale
+    halfWidth=0.5*imgSizePix*pixScale # arcsec
     #    img.setCenter(0,0)
-    plt.imshow(img.array,origin='lower',extent=(-halfWidth,halfWidth,-halfWidth,halfWidth),interpolation='nearest')
+
+    if(plotScale=="linear"):
+	plotArr=img.array
+    elif(plotScale=="log"):
+	plotArr=np.log(img.array)
+
+    plt.imshow(plotArr,origin='lower',extent=(-halfWidth,halfWidth,-halfWidth,halfWidth),interpolation='nearest',cmap=cmap)
     for ii in range(numFib):
         pos=getFiberPos(ii,numFib,fibRad)
-        circ=plt.Circle((pos.x,pos.y),radius=fibRad,fill=False)
+        circ=plt.Circle((pos.x,pos.y),radius=fibRad,fill=False,color='white',lw=2)
         ax=plt.gca()
         ax.add_patch(circ)
-    plt.colorbar()
+    if(colorbar):
+	plt.colorbar()
+
+    if(ellipse is not None): # ellipse is either None or np.array([disk_r,gal_q,gal_beta])
+	ax=plt.gca()
+	rscale=2
+	ell=matplotlib.patches.Ellipse(xy=(0,0),width=rscale*ellipse[0]*ellipse[1],height=rscale*ellipse[0],angle=ellipse[2]-90,fill=False,color="white",lw=2)
+	ax.add_artist(ell)
+    
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if(trim>0): # trim all edges by this amount in arcsec
+	plt.xlim((-halfWidth+trim,halfWidth-trim))
+	plt.ylim((-halfWidth+trim,halfWidth-trim))
+
+    if(filename):
+	plt.savefig(filename)
     plt.show()
 
 def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
