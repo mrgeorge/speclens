@@ -53,30 +53,30 @@ sim.showImage(fluxVMap,7,1,trim=trim,colorbar=False,filename="fig2b.pdf")
 
 sigma=30. # velocity unc in km/s
 
-gal_beta, gal_q, vmax = 0, 0.5, 150
+pars = np.array([0, 0.5, 150])
 
 xvals=np.linspace(0,2.*np.pi,num=200)
-yvals=sim.vmapModel(xvals, gal_beta, gal_q, vmax)
-plt.plot(np.rad2deg(xvals),yvals,color="blue",linestyle='-',lw=2,label="Fiducial: PA={}, b/a={}".format(gal_beta,gal_q)+r", v$_{max}$"+"={}".format(vmax))
+yvals=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="blue",linestyle='-',lw=2,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}".format(pars[2]))
 
 xsamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-ysamp=sim.vmapModel(xsamp, gal_beta, gal_q, vmax)
+ysamp=sim.vmapModel(pars, xsamp)
 yerr=np.repeat(sigma,xsamp.size)
 
 plt.errorbar(np.rad2deg(xsamp),ysamp,yerr=yerr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
 
 
-gal_beta, gal_q, vmax = 0, 0.8, 150
-yvals=sim.vmapModel(xvals, gal_beta, gal_q, vmax)
-plt.plot(np.rad2deg(xvals),yvals,color="green",linestyle="--",lw=2,label="b/a={}".format(gal_q))
+pars = np.array([0, 0.8, 150])
+yvals=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
 
-gal_beta, gal_q, vmax = 20, 0.5, 150
-yvals=sim.vmapModel(xvals, gal_beta, gal_q, vmax)
-plt.plot(np.rad2deg(xvals),yvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(gal_beta))
+pars = np.array([20, 0.5, 150])
+yvals=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
 
-gal_beta, gal_q, vmax = 0, 0.5, 200
-yvals=sim.vmapModel(xvals, gal_beta, gal_q, vmax)
-plt.plot(np.rad2deg(xvals),yvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(vmax))
+pars = np.array([0, 0.5, 200])
+yvals=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
 
 plt.legend(loc=9,prop={'size':14},frameon=False)
 
@@ -92,10 +92,36 @@ plt.show()
 # Fig 4
 # parameter constraints from a number of noise realizations
 
+pars = np.array([175, 0.8, 200])
+sigma=30.
 nSim=1000
 xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-yvals=sim.vmapModel(xvals, gal_beta, gal_q, vmax)
-pars=np.array([sim.vmapFit(yvals,sigma=sigma) for ii in xrange(nSim)])
-plt.scatter(pars[:,1],pars[:,0])
+yvals=sim.vmapModel(pars, xvals)
+priors=[None,[0,1],(pars[2],10)]
+sampler=sim.vmapFit(yvals,sigma,priors,addNoise=False)
+maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
+print sampler.flatchain[maxp,:]
+
+priorFuncs,fixed,guess,guessScale = sim.interpretPriors(priors)
+parmat=np.tile(pars,100).reshape(100,3)
+parmat[:,0]=np.linspace(0,360,num=100)
+lnp=sim.lnProbVMapModel()
+
+xarr=np.linspace(0,2*np.pi,num=200)
+yarr=sim.vmapModel(pars,xarr)
+yarr2=sim.vmapModel(sampler.flatchain[maxp,:][0],xarr)
+plt.errorbar(xvals,yvals,yerr=sigma,fmt=None,elinewidth=3)
+plt.plot(xarr,yarr,'b-',xarr,yarr2,'g-')
+plt.show()
+
+good=(sampler.flatlnprobability > -np.Inf)
+plt.hexbin(sampler.flatchain[good,0],sampler.flatchain[good,1])
+plt.show()
+plt.hexbin(sampler.flatchain[good,0],sampler.flatchain[good,2])
+plt.show()
+plt.hexbin(sampler.flatchain[good,1],sampler.flatchain[good,2])
+plt.show()
+
+#pars=np.array([sim.vmapFit(yvals,sigma,priors) for ii in xrange(nSim)])
 plt.savefig("fig4.pdf")
 plt.show()
