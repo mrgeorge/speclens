@@ -92,20 +92,14 @@ plt.show()
 # Fig 4
 # parameter constraints from a number of noise realizations
 
-pars = np.array([175, 0.8, 200])
+pars = np.array([105, 0.5, 200])
 sigma=30.
-nSim=1000
 xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
 yvals=sim.vmapModel(pars, xvals)
 priors=[None,[0,1],(pars[2],10)]
 sampler=sim.vmapFit(yvals,sigma,priors,addNoise=False)
 maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
 print sampler.flatchain[maxp,:]
-
-priorFuncs,fixed,guess,guessScale = sim.interpretPriors(priors)
-parmat=np.tile(pars,100).reshape(100,3)
-parmat[:,0]=np.linspace(0,360,num=100)
-lnp=sim.lnProbVMapModel()
 
 xarr=np.linspace(0,2*np.pi,num=200)
 yarr=sim.vmapModel(pars,xarr)
@@ -114,14 +108,28 @@ plt.errorbar(xvals,yvals,yerr=sigma,fmt=None,elinewidth=3)
 plt.plot(xarr,yarr,'b-',xarr,yarr2,'g-')
 plt.show()
 
+flatchain=sampler.flatchain
+flatlnprobability=sampler.flatlnprobability
 good=(sampler.flatlnprobability > -np.Inf)
-plt.hexbin(sampler.flatchain[good,0],sampler.flatchain[good,1])
-plt.show()
-plt.hexbin(sampler.flatchain[good,0],sampler.flatchain[good,2])
-plt.show()
-plt.hexbin(sampler.flatchain[good,1],sampler.flatchain[good,2])
-plt.show()
 
-#pars=np.array([sim.vmapFit(yvals,sigma,priors) for ii in xrange(nSim)])
-plt.savefig("fig4.pdf")
-plt.show()
+smooth=3
+sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a")
+sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax")
+sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax")
+
+nSim=100
+for ii in xrange(nSim):
+    sampler=sim.vmapFit(yvals,sigma,priors,addNoise=True)
+    if(ii == 0):
+        flatchain=sampler.flatchain
+        flatlnprobability=sampler.flatlnprobability
+    else:
+        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
+        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
+
+good=(flatlnprobability > -np.Inf)
+
+smooth=3
+sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a",filename="fig4a_.pdf")
+sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax",filename="fig4b_.pdf")
+sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax",filename="fig4c_.pdf")
