@@ -73,6 +73,35 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
 	plt.savefig(filename)
     plt.show()
 
+def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel="X",ylabel="Y",filename=None):
+# make a 2d contour plot of parameter posteriors
+
+    n2dbins=300
+    zz,xx,yy=np.histogram2d(xvals,yvals,bins=n2dbins)
+    xxbin=xx[1]-xx[0]
+    yybin=yy[1]-yy[0]
+    xx=xx[1:]+0.5*xxbin
+    yy=yy[1:]+0.5*yybin
+
+    if(smooth > 0):
+	kernSize=int(10*smooth)
+	sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
+	kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
+	zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
+	
+    hist,bins=np.histogram(zz.flatten(),bins=1000)
+    sortzz=np.sort(zz.flatten())
+    cumhist=np.cumsum(sortzz)*1./np.sum(zz)
+    levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
+
+    plt.contour(xx,yy,zz.T,levels=levels,colors=["red","green","blue"])
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    if(filename):
+	plt.savefig(filename)
+    plt.show()
+    
+
 def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
     # Define the galaxy profile
     bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
@@ -386,19 +415,19 @@ def vmapFit(vfibFlux,sigma,priors,addNoise=True,showPlot=False):
 
 
     # RUN MCMC
-    nWalkers=200
+    nWalkers=500
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
     sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[ang, vel, velErr, priorFuncs, fixed])
 
     walkerVals=np.array([lnProbVMapModel(walkerStart[ii,:],ang,vel,velErr,priorFuncs,fixed) for ii in xrange(nWalkers)])
 
     print "emcee burnin"
-    nBurn=100
+    nBurn=10
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
 
     print "emcee running"
-    nSteps=1000
+    nSteps=100
     sampler.run_mcmc(pos, nSteps)
 
     #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
