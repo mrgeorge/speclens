@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
 import matplotlib.patches
+import emcee
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
@@ -235,11 +236,48 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 
     return vmapFibFlux/galFibFlux
 
-def vmapModel(xvals, gal_beta, gal_q, vmax):
+def lnProbVMapModel(pars, xobs, yobs, yerr, priorFuncs, fixed):
+#
+    # wrap PA to fall between 0 and 360
+    if(fixed[0] is None):
+	pars[0]=pars[0] % 360.
+    else:
+	fixed[0]=fixed[0] % 360.
+
+    # First evaluate the prior to see if this set of pars should be ignored
+    chisq_prior=0.
+    if(priorFuncs is not None):
+	for ii in range(len(priorFuncs)):
+	    func=priorFuncs[ii]
+	    if(func is not None):
+		chisq_prior+=func(pars[ii])
+
+    if(chisq_prior == np.Inf):
+	return -np.Inf
+
+    # re-insert any fixed parameters into pars array
+    nPars=len(fixed)
+    fullPars=np.zeros(nPars)
+    parsInd=0
+    for ii in xrange(nPars):
+	if(fixed[ii] is None):
+	    fullPars[ii]=pars[parsInd]
+	    parsInd+=1
+        else:
+            fullPars[ii]=fixed[ii]
+
+    chisq_like=np.sum(((vmapModel(fullPars,xobs)-yobs)/yerr)**2)
+
+    return -0.5*(chisq_like+chisq_prior)
+
+#def vmapModel(xvals, gal_beta, gal_q, vmax):
+def vmapModel(pars, xvals):
 # evaluate velocity field at azimuthal angles around center, called by curve_fit
 # pars: PA in deg., gal_q, vmax
 # xvals are the azimuthal angles (in radians) at which the field is sampled
-	
+
+    gal_beta,gal_q,vmax=pars
+
     fibRad=1.
     rad=2.*fibRad # assume the fibers sample the v field at their center
 
@@ -269,33 +307,112 @@ def vmapModel(xvals, gal_beta, gal_q, vmax):
 
     return vmodel
 
-def vmapFit(vfibFlux,sigma=30.,showPlot=False):
-# fit model to fiber velocities
+def makeFlatPrior(range):
+    return lambda x: priorFlat(x, range)
 
-    numFib=vfibFlux.size
-    ang=np.linspace(0,2.*np.pi,num=numFib-1,endpoint=False)
-    vel=vfibFlux[1:].copy() # ignore the central pointing
-
-    noise=np.random.randn(numFib-1)*sigma
-    vel+=noise
-
-    guess=np.array([10,0.1,100.])
-    if(sigma==0):
-	weight=None
+def priorFlat(arg, range):
+    if((arg >= range[0]) & (arg < range[1])):
+	return 0
     else:
-	weight=np.repeat(sigma,numFib-1)
+	return np.Inf
+
+def makeGaussPrior(mean, sigma):
+    return lambda x: ((x-mean)/sigma)**2
+
+def interpretPriors(priors):
+# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax
+#    None: leave this variable completely free
+#    float: fix the variable to this value
+#    list[a,b]: flat prior between a and b
+#    tuple(a,b): gaussian prior with mean a and stddev b
+
+    guess=np.array([10.,0.1,100.])
+    guessScale=np.array([10.,0.3,50.])
+    nPars=len(guess)
+    fixed=np.repeat(None, nPars)
+    priorFuncs=np.repeat(None, nPars)
+    if(priors is not None):
+	for ii in xrange(nPars):
+	    prior=priors[ii]
+	    # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
+	    if(prior is not None):
+		if((type(prior) is int) | (type(prior) is float)):
+		# entry will be removed from list of pars and guess but value is still sent to evauluate function
+		    fixVal=np.copy(prior)[0]
+		    fixed[ii]=fixVal
+		elif(type(prior) is list):
+		    priorRange=np.copy(prior)
+		    priorFuncs[ii]=makeFlatPrior(priorRange)
+		elif(type(prior) is tuple):
+		    priorMean=np.copy(prior[0])
+		    priorSigma=np.copy(prior[1])
+		    priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+
+    # remove fixed entries from list of pars to fit
+    for ii in xrange(nPars):
+	if(fixed[ii] is not None):
+	    guess=np.delete(guess,ii)
+	    guessScale=np.delete(guess,ii)
+	    priorFuncs=np.delete(priorFuncs,ii)
+	    nPars-=1
+
+    return (priorFuncs,fixed,guess,guessScale)
+
+def vmapFit(vfibFlux,sigma,priors,addNoise=True,showPlot=False):
+# fit model to fiber velocities
+# vfibFlux is the data to be fit
+# sigma is the errorbar on that value (e.g. 30 km/s)
+
+# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax
+#    None: leave this variable completely free
+#    float: fix the variable to this value
+#    list[a,b]: flat prior between a and b
+#    tuple(a,b): gaussian prior with mean a and stddev b
+
+    # SETUP DATA
+    numFib=vfibFlux.size
+    ang=np.linspace(0,2.*np.pi,num=numFib,endpoint=False)
+    vel=vfibFlux.copy()
+    velErr=np.repeat(sigma,numFib)
+
+    if(addNoise): # useful when simulating many realizations to project parameter constraints
+	noise=np.random.randn(numFib)*sigma
+	vel+=noise
+
+
+    # SETUP PARS and PRIORS
+    priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
+    nPars=len(guess)
+
+
+    # RUN MCMC
+    nWalkers=200
+    walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[ang, vel, velErr, priorFuncs, fixed])
+
+    walkerVals=np.array([lnProbVMapModel(walkerStart[ii,:],ang,vel,velErr,priorFuncs,fixed) for ii in xrange(nWalkers)])
+
+    print "emcee burnin"
+    nBurn=100
+    pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
+    sampler.reset()
+
+    print "emcee running"
+    nSteps=1000
+    sampler.run_mcmc(pos, nSteps)
 
     #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
     #    pars, success = scipy.optimize.leastsq(err, guess[:], args=(ang,vel))
-    pars, pcov=scipy.optimize.curve_fit(vmapModel, ang, vel, guess, sigma=weight, maxfev=10000)
+    #    pars, pcov=scipy.optimize.curve_fit(vmapModel, ang, vel, guess, sigma=weight, maxfev=100000)
     #    print "gal_beta={}, gal_q={}, vmax={}. success={}".format(pars[0],pars[1],pars[2],success)
-    if(showPlot):
-	fitX=np.linspace(0,2.*np.pi)
-	fitY=vmapModel(fitX,pars[0],pars[1],pars[2])
-	plt.plot(ang,vel,'bo',fitX,fitY,'r-')
-	plt.show()
 
-    return pars
+    #    if(showPlot):
+    #	fitX=np.linspace(0,2.*np.pi)
+    #	fitY=vmapModel(fitX,pars[0],pars[1])
+    #	plt.plot(ang,vel,'bo',fitX,fitY,'r-')
+    #	plt.show()
+
+    return sampler
 
 def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib,showPlot=False):
 
