@@ -31,8 +31,7 @@ g1=0
 g2=0
 
 ell=[disk_r,gal_q,gal_beta]
-gal_beta_rad=np.deg2rad(gal_beta)
-lines=np.array([[-disk_r*np.cos(gal_beta_rad),disk_r*np.cos(gal_beta_rad),-disk_r*np.sin(gal_beta_rad),disk_r*np.sin(gal_beta_rad)],[-disk_r*gal_q*np.cos(gal_beta_rad+np.pi/2),disk_r*gal_q*np.cos(gal_beta_rad+np.pi/2),-disk_r*gal_q*np.sin(gal_beta_rad+np.pi/2.),disk_r*gal_q*np.sin(gal_beta_rad+np.pi/2.)]])
+lines=sim.getEllipseAxes(ell)
 
 vmap,fluxVMap,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
 trim=1
@@ -42,7 +41,10 @@ g1=0.2
 g2=0.
 
 vmapSheared,fluxVMapSheared,galXSheared,galKSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
-sim.showImage(vmapSheared,0,1,trim=trim,ellipse=sim.shearEllipse(ell,g1,g2),lines=sim.shearLines(lines,g1,g2),filename="fig1b.pdf")
+ellSheared=sim.shearEllipse(ell,g1,g2)
+linesSheared=sim.shearLines(lines,g1,g2)
+linesObs=sim.getEllipseAxes(ellSheared)
+sim.showImage(vmapSheared,0,1,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="fig1b.pdf")
 
 # Fig 2
 # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions

@@ -71,7 +71,19 @@ def shearLines(lines,g1,g2):
 	
     return lines_prime
 
-def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None):
+def getEllipseAxes(ellipse):
+# returns endpoints of major and minor axis of an ellipse
+    disk_r,gal_q,gal_beta=ellipse
+    gal_beta_rad=np.deg2rad(gal_beta)
+    xmaj=disk_r*np.cos(gal_beta_rad)
+    ymaj=disk_r*np.sin(gal_beta_rad)
+    xmin=disk_r*gal_q*np.cos(gal_beta_rad+np.pi/2)
+    ymin=disk_r*gal_q*np.sin(gal_beta_rad+np.pi/2.)
+    lines=np.array([[-xmaj,xmaj,-ymaj,ymaj],[-xmin,xmin,-ymin,ymin]])
+
+    return lines
+
+def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--"):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     pixScale=0.1
@@ -103,10 +115,14 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
     
     if(lines is not None): # lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
 	    if(lines.shape == (4,)): # only one line		
-		plt.plot(lines[0:2],lines[2:4],color="white",lw=2,ls='--')
+		plt.plot(lines[0:2],lines[2:4],color=lcolors,lw=2,ls=lstyles)
             else:
-		for line in lines:
-		    plt.plot(line[0:2],line[2:4],color="white",lw=2,ls='--')
+		if(type(lcolors) is str):
+		    lcolors=np.repeat(lcolors,len(lines))
+		if(type(lstyles) is str):
+		    lstyles=np.repeat(lstyles,len(lines))
+		for line,color,style in zip(lines,lcolors,lstyles):
+		    plt.plot(line[0:2],line[2:4],color=color,lw=2,ls=style)
 		    
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
