@@ -33,7 +33,45 @@ def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     fiberPos=getFiberPos(fibID,numFib,fibRad)
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
-def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None):
+def shearEllipse(ellipse,g1,g2):
+# Following Supri & Harari 1999
+    disk_r,gal_q,gal_beta=ellipse
+    gamma=np.sqrt(g1**2 + g2**2)
+    epsilon=(1-gal_q**2)/(1+gal_q**2)
+    psi=np.deg2rad(gal_beta)
+    phi=0.5*np.arctan2(g2,g1)
+
+    dpsi=0.5*np.arctan2(2*(gamma/epsilon)*np.sin(2.*(phi-psi)), 1.+2*(gamma/epsilon)*np.cos(2*(phi-psi)))
+    epsilon_prime=np.sqrt((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2) / (1.+2.*epsilon*gamma*np.cos(2.*(phi-psi)))
+
+    disk_r_prime=disk_r*(1+gamma)
+    gal_q_prime=np.sqrt((1-epsilon_prime**2)/(1+epsilon_prime)**2)
+    gal_beta_prime=np.rad2deg(psi+dpsi)
+
+    return (disk_r_prime,gal_q_prime,gal_beta_prime)
+
+def shearLines(lines,g1,g2):
+# lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
+    lines_prime=lines.copy()
+    if(lines.shape == (4,)): # only one line		
+	x1,x2,y1,y2=lines
+	x1p=(1+g1)*x1 -     g2*y1
+	y1p=   -g2*x1 + (1-g1)*y1
+	x2p=(1+g1)*x2 -     g2*y2
+	x2p=   -g2*x2 + (1-g1)*y2
+	lines_prime=np.array([x1p,x2p,y1p,y2p])
+    else:
+	for ii in range(len(lines)):
+	    x1,x2,y1,y2=lines[ii]
+	    x1p=(1+g1)*x1 -     g2*y1
+	    y1p=   -g2*x1 + (1-g1)*y1
+	    x2p=(1+g1)*x2 -     g2*y2
+	    y2p=   -g2*x2 + (1-g1)*y2
+	    lines_prime[ii]=np.array([x1p,x2p,y1p,y2p])
+	
+    return lines_prime
+
+def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     pixScale=0.1
@@ -63,6 +101,13 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
 	ell=matplotlib.patches.Ellipse(xy=(0,0),width=rscale*ellipse[0]*ellipse[1],height=rscale*ellipse[0],angle=ellipse[2]-90,fill=False,color="white",lw=2)
 	ax.add_artist(ell)
     
+    if(lines is not None): # lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
+	    if(lines.shape == (4,)): # only one line		
+		plt.plot(lines[0:2],lines[2:4],color="white",lw=2,ls='--')
+            else:
+		for line in lines:
+		    plt.plot(line[0:2],line[2:4],color="white",lw=2,ls='--')
+		    
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if(trim>0): # trim all edges by this amount in arcsec
@@ -142,7 +187,7 @@ def getOmega(rad,pars,option='flat'):
         vel=np.sqrt(mass/rad)
         return pars[0]*vel/rad
 
-def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2):
+def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2):
 # Construct galsim objects for galaxy (image), velocity map, and flux-weighted velocity map
 # with optional lensing shear and PSF convolution
 	
@@ -201,11 +246,11 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     vmap=galsim.InterpolatedImage(galsim.ImageViewF(vmapArr,scale=pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
-    gal.applyShear(e1=e1,e2=e2)
+    gal.applyShear(g1=g1,g2=g2)
     galX=gal
     galK=gal
-    fluxVMap.applyShear(e1=e1,e2=e2)
-    vmap.applyShear(e1=e1,e2=e2)
+    fluxVMap.applyShear(g1=g1,g2=g2)
+    vmap.applyShear(g1=g1,g2=g2)
 
     # Convolve velocity map and galaxy with PSF
     if(atmos_fwhm > 0):
@@ -228,11 +273,11 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,galX,galK)
 
-def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,e1,e2,pixScale,fibRad,numFib,showPlot=False):
+def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,g1,g2,pixScale,fibRad,numFib,showPlot=False):
 # get flux-weighted fiber-averaged velocities
 	
     imgSizePix=int(10.*fibRad/pixScale)
-    vmap,fluxVMap,gal,galK=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2)
+    vmap,fluxVMap,gal,galK=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
 
     if(showPlot):
 	showImage(galK,numFib,fibRad)
