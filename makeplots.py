@@ -20,25 +20,29 @@ bulge_r=1.
 disk_n=1.
 disk_r=2.
 bulge_frac=0.
-gal_q=0.3
+gal_q=0.6
 gal_beta=20.
 gal_flux=1.
 atmos_fwhm=0.
 pixScale=0.1
 imgSizePix=100
 rotCurveOpt='flat'
-e1=0
-e2=0
+g1=0
+g2=0
 
-vmap,fluxVMap,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2)
+ell=[disk_r,gal_q,gal_beta]
+gal_beta_rad=np.deg2rad(gal_beta)
+lines=np.array([[-disk_r*np.cos(gal_beta_rad),disk_r*np.cos(gal_beta_rad),-disk_r*np.sin(gal_beta_rad),disk_r*np.sin(gal_beta_rad)],[-disk_r*gal_q*np.cos(gal_beta_rad+np.pi/2),disk_r*gal_q*np.cos(gal_beta_rad+np.pi/2),-disk_r*gal_q*np.sin(gal_beta_rad+np.pi/2.),disk_r*gal_q*np.sin(gal_beta_rad+np.pi/2.)]])
+
+vmap,fluxVMap,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
 trim=1
-sim.showImage(vmap,0,1,trim=trim,colorbar=False,filename="fig1a.pdf")
+sim.showImage(vmap,0,1,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.pdf")
 
-e1=0.
-e2=0.3
+g1=0.2
+g2=0.
 
-vmapSheared,fluxVMapSheared,galXSheared,galKSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,e1,e2)
-sim.showImage(vmapSheared,0,1,trim=trim,filename="fig1b.pdf")
+vmapSheared,fluxVMapSheared,galXSheared,galKSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+sim.showImage(vmapSheared,0,1,trim=trim,ellipse=sim.shearEllipse(ell,g1,g2),lines=sim.shearLines(lines,g1,g2),filename="fig1b.pdf")
 
 # Fig 2
 # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions
@@ -112,7 +116,7 @@ flatchain=sampler.flatchain
 flatlnprobability=sampler.flatlnprobability
 good=(sampler.flatlnprobability > -np.Inf)
 
-smooth=3
+smooth=0
 sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a")
 sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax")
 sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax")
