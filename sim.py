@@ -50,23 +50,42 @@ def shearEllipse(ellipse,g1,g2):
 
     return (disk_r_prime,gal_q_prime,gal_beta_prime)
 
+def shearPairs(pairs,g1,g2):
+    pairs_prime=pairs.copy()
+    g=np.sqrt(g1**2+g2**2)
+    kappa=g/(1.+g)
+    gamma1=g1*(1-kappa)
+    gamma2=g2*(1-kappa)
+    if(pairs.shape == (2,)): # only one pair
+	x1,y1=pairs
+	x1p=((1+g1)*x1 -     g2*y1)
+	y1p=(   -g2*x1 + (1-g1)*y1)
+	#	x1p=((1-kappa-gamma1)*x1 -           gamma2*y1)
+	#	y1p=(         -gamma2*x1 + (1-kappa+gamma1)*y1)
+	pairs_prime=np.array([x1p,y1p])
+    for ii in range(len(pairs)):
+	x1,y1=pairs[ii]
+	x1p=((1+g1)*x1 -     g2*y1)
+	y1p=(   -g2*x1 + (1-g1)*y1)
+	#	x1p=((1-kappa-gamma1)*x1 -           gamma2*y1)
+	#	y1p=(         -gamma2*x1 + (1-kappa+gamma1)*y1)
+	pairs_prime[ii]=np.array([x1p,y1p])
+
+    return pairs_prime
+ 
 def shearLines(lines,g1,g2):
 # lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
     lines_prime=lines.copy()
     if(lines.shape == (4,)): # only one line		
 	x1,x2,y1,y2=lines
-	x1p=(1+g1)*x1 -     g2*y1
-	y1p=   -g2*x1 + (1-g1)*y1
-	x2p=(1+g1)*x2 -     g2*y2
-	x2p=   -g2*x2 + (1-g1)*y2
+	x1p,y1p=shearPairs(np.array([x1,y1]))
+	x2p,y2p=shearPairs(np.array([x2,y2]))
 	lines_prime=np.array([x1p,x2p,y1p,y2p])
     else:
 	for ii in range(len(lines)):
 	    x1,x2,y1,y2=lines[ii]
-	    x1p=(1+g1)*x1 -     g2*y1
-	    y1p=   -g2*x1 + (1-g1)*y1
-	    x2p=(1+g1)*x2 -     g2*y2
-	    y2p=   -g2*x2 + (1-g1)*y2
+	    x1p,y1p=shearPairs(np.array([x1,y1]))
+	    x2p,y2p=shearPairs(np.array([x2,y2]))
 	    lines_prime[ii]=np.array([x1p,x2p,y1p,y2p])
 	
     return lines_prime
@@ -360,10 +379,9 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, priorFuncs, fixed):
 
     return -0.5*(chisq_like+chisq_prior)
 
-#def vmapModel(xvals, gal_beta, gal_q, vmax):
 def vmapModel(pars, xvals):
 # evaluate velocity field at azimuthal angles around center, called by curve_fit
-# pars: PA in deg., gal_q, vmax
+# pars: PA in deg., gal_q, vmax [PA, gal_q, and vmax are the *unsheared* parameters]
 # xvals are the azimuthal angles (in radians) at which the field is sampled
 
     gal_beta,gal_q,vmax=pars
