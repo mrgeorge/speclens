@@ -59,7 +59,7 @@ sim.showImage(fluxVMap,7,1,trim=trim,colorbar=False,filename="fig2b.pdf")
 
 sigma=30. # velocity unc in km/s
 
-pars = np.array([0, 0.5, 150])
+pars = np.array([0, 0.5, 150, 0, 0])
 
 xvals=np.linspace(0,2.*np.pi,num=200)
 yvals=sim.vmapModel(pars, xvals)
@@ -72,15 +72,15 @@ yerr=np.repeat(sigma,xsamp.size)
 plt.errorbar(np.rad2deg(xsamp),ysamp,yerr=yerr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
 
 
-pars = np.array([0, 0.8, 150])
+pars = np.array([0, 0.8, 150, 0, 0])
 yvals=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
 
-pars = np.array([20, 0.5, 150])
+pars = np.array([20, 0.5, 150, 0, 0])
 yvals=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
 
-pars = np.array([0, 0.5, 200])
+pars = np.array([0, 0.5, 200, 0, 0])
 yvals=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
 
@@ -98,11 +98,11 @@ plt.show()
 # Fig 4
 # parameter constraints from a number of noise realizations
 
-pars = np.array([105, 0.5, 200])
+pars = np.array([105, 0.5, 200, 0, 0])
 sigma=30.
 xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
 yvals=sim.vmapModel(pars, xvals)
-priors=[None,[0,1],(pars[2],10)]
+priors=[None,[0,1],(pars[2],10),[-0.3,0.3],[-0.3,0.3]]
 sampler=sim.vmapFit(yvals,sigma,priors,addNoise=False)
 maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
 print sampler.flatchain[maxp,:]
@@ -121,7 +121,14 @@ good=(sampler.flatlnprobability > -np.Inf)
 smooth=0
 sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a")
 sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax")
+sim.contourPlot(flatchain[good,0],flatchain[good,3],smooth=smooth,xlabel="PA (deg)",ylabel="g1")
+sim.contourPlot(flatchain[good,0],flatchain[good,4],smooth=smooth,xlabel="PA (deg)",ylabel="g2")
 sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax")
+sim.contourPlot(flatchain[good,1],flatchain[good,3],smooth=smooth,xlabel="b/a",ylabel="g1")
+sim.contourPlot(flatchain[good,1],flatchain[good,4],smooth=smooth,xlabel="b/a",ylabel="g2")
+sim.contourPlot(flatchain[good,2],flatchain[good,3],smooth=smooth,xlabel="vmax",ylabel="g1")
+sim.contourPlot(flatchain[good,2],flatchain[good,4],smooth=smooth,xlabel="vmax",ylabel="g2")
+sim.contourPlot(flatchain[good,3],flatchain[good,4],smooth=smooth,xlabel="g1",ylabel="g2")
 
 nSim=100
 for ii in xrange(nSim):
