@@ -176,13 +176,17 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     cumhist=np.cumsum(sortzz)*1./np.sum(zz)
     levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
 
-    plt.contour(xx,yy,zz.T,levels=levels,colors=["red","green","blue"])
+    plt.contour(xx,yy,zz.T,levels=levels,colors=colors)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if(filename):
 	plt.savefig(filename)
     plt.show()
     
+def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,filename=None):
+# make a grid of contour plots for each pair of parameters
+
+
 
 def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
     # Define the galaxy profile
@@ -383,17 +387,22 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, priorFuncs, fixed):
 
 def vmapModel(pars, xvals):
 # evaluate velocity field at azimuthal angles around center, called by curve_fit
-# pars: PA in deg., gal_q, vmax [PA, gal_q, and vmax are the *unsheared* parameters]
-# xvals are the azimuthal angles (in radians) at which the field is sampled
+# pars: PA in deg., gal_q, vmax, g1, g2 [PA, gal_q, and vmax are the *unsheared* parameters]
+# xvals are the azimuthal angles (in radians) at which the *sheared* (observed) field is sampled
 
-    gal_beta,gal_q,vmax=pars
+    gal_beta,gal_q,vmax,g1,g2=pars
 
     fibRad=1.
     rad=2.*fibRad # assume the fibers sample the v field at their center
 
     # Cartesian coords
-    xx=rad*np.cos(xvals)
-    yy=rad*np.sin(xvals)    
+    xobs=rad*np.cos(xvals)
+    yobs=rad*np.sin(xvals)    
+
+    # convert coords to source plane
+    pairs=shearPairs(np.array(zip(xobs,yobs)),-g1,-g2)
+    xx=pairs[:,0]
+    yy=pairs[:,1]
 
     # rotated coords aligned with PA guess of major axis
     xCen,yCen=0,0 # assume centroid is well-measured
@@ -430,14 +439,14 @@ def makeGaussPrior(mean, sigma):
     return lambda x: ((x-mean)/sigma)**2
 
 def interpretPriors(priors):
-# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax
+# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax, g1,g2
 #    None: leave this variable completely free
 #    float: fix the variable to this value
 #    list[a,b]: flat prior between a and b
 #    tuple(a,b): gaussian prior with mean a and stddev b
 
-    guess=np.array([10.,0.1,100.])
-    guessScale=np.array([10.,0.3,50.])
+    guess=np.array([10.,0.1,100.,0.,0.])
+    guessScale=np.array([10.,0.3,50.,0.02,0.02])
     nPars=len(guess)
     fixed=np.repeat(None, nPars)
     priorFuncs=np.repeat(None, nPars)
@@ -462,9 +471,8 @@ def interpretPriors(priors):
     for ii in xrange(nPars):
 	if(fixed[ii] is not None):
 	    guess=np.delete(guess,ii)
-	    guessScale=np.delete(guess,ii)
+	    guessScale=np.delete(guessScale,ii)
 	    priorFuncs=np.delete(priorFuncs,ii)
-	    nPars-=1
 
     return (priorFuncs,fixed,guess,guessScale)
 
