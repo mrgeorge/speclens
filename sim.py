@@ -155,7 +155,7 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
 	plt.savefig(filename)
     plt.show()
 
-def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel="X",ylabel="Y",filename=None):
+def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel=None,ylabel=None,xlim=None,ylim=None,filename=None,show=False):
 # make a 2d contour plot of parameter posteriors
 
     n2dbins=300
@@ -177,15 +177,69 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
 
     plt.contour(xx,yy,zz.T,levels=levels,colors=colors)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+
+    if(xlabel is not None):
+	plt.xlabel(xlabel)
+    if(ylabel is not None):
+	plt.ylabel(ylabel)
+    if(xlim is not None):
+	plt.xlim(xlim)
+    if(ylim is not None):
+	plt.ylim(ylim)
+
     if(filename):
 	plt.savefig(filename)
-    plt.show()
+    if(show):
+	plt.show()
     
-def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,filename=None):
+def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None):
 # make a grid of contour plots for each pair of parameters
 
+    nPars=chain.shape[1]
+    fig,axarr=plt.subplots(nPars,nPars,figsize=figsize)
+    fig.subplots_adjust(hspace=0,wspace=0)
+
+    if(labels is None):
+	labels=np.repeat(None,nPars)
+
+    for row in range(nPars):
+	for col in range(nPars):
+	    fig.sca(axarr[row,col])
+
+	    if(row == nPars-1):
+		xlabel=labels[col]
+            else:
+		xlabel=None
+		plt.setp(axarr[row,col].get_xticklabels(),visible=False)
+	    if(col == 0):
+		ylabel=labels[row]
+            else:
+		ylabel=None
+		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
+
+	    xarr=chain[:,col]
+	    yarr=chain[:,row]
+	    xlim=(np.min(xarr),np.max(xarr))
+	    ylim=(np.min(yarr),np.max(yarr))
+	    if(row == col):
+		axarr[row,col].hist(xarr,bins=50,histtype="step")
+		if(xlabel is not None):
+		    axarr[row,col].set_xlabel(xlabel)
+		if(ylabel is not None):
+		    axarr[row,col].set_ylabel(ylabel)
+		axarr[row,col].set_xlim(xlim)
+		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
+            elif(col < row):
+		contourPlot(xarr,yarr,smooth=smooth,percentiles=percentiles,colors=colors,xlabel=xlabel,ylabel=ylabel)
+		xlim=(np.min(xarr),np.max(xarr))
+		ylim=(np.min(yarr),np.max(yarr))
+		axarr[row,col].set_xlim(xlim)
+		axarr[row,col].set_ylim(ylim)
+            else:
+		axarr[row,col].axis("off")
+
+
+    fig.show()
 
 
 def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
