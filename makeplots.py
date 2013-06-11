@@ -98,11 +98,12 @@ plt.show()
 # Fig 4
 # parameter constraints from a number of noise realizations
 
-pars = np.array([105, 0.5, 200, 0, 0])
+pars = np.array([105, 0.5, 200, 0, 0.15])
+labels=np.array(["PA","b/a","vmax","g1","g2"])
 sigma=30.
 xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
 yvals=sim.vmapModel(pars, xvals)
-priors=[None,[0,1],(pars[2],10),[-0.3,0.3],[-0.3,0.3]]
+priors=[None,[0,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
 sampler=sim.vmapFit(yvals,sigma,priors,addNoise=False)
 maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
 print sampler.flatchain[maxp,:]
@@ -118,17 +119,8 @@ flatchain=sampler.flatchain
 flatlnprobability=sampler.flatlnprobability
 good=(sampler.flatlnprobability > -np.Inf)
 
-smooth=0
-sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a")
-sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax")
-sim.contourPlot(flatchain[good,0],flatchain[good,3],smooth=smooth,xlabel="PA (deg)",ylabel="g1")
-sim.contourPlot(flatchain[good,0],flatchain[good,4],smooth=smooth,xlabel="PA (deg)",ylabel="g2")
-sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax")
-sim.contourPlot(flatchain[good,1],flatchain[good,3],smooth=smooth,xlabel="b/a",ylabel="g1")
-sim.contourPlot(flatchain[good,1],flatchain[good,4],smooth=smooth,xlabel="b/a",ylabel="g2")
-sim.contourPlot(flatchain[good,2],flatchain[good,3],smooth=smooth,xlabel="vmax",ylabel="g1")
-sim.contourPlot(flatchain[good,2],flatchain[good,4],smooth=smooth,xlabel="vmax",ylabel="g2")
-sim.contourPlot(flatchain[good,3],flatchain[good,4],smooth=smooth,xlabel="g1",ylabel="g2")
+smooth=3
+sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels)
 
 nSim=100
 for ii in xrange(nSim):
@@ -143,6 +135,4 @@ for ii in xrange(nSim):
 good=(flatlnprobability > -np.Inf)
 
 smooth=3
-sim.contourPlot(flatchain[good,0],flatchain[good,1],smooth=smooth,xlabel="PA (deg)",ylabel="b/a",filename="fig4a_.pdf")
-sim.contourPlot(flatchain[good,0],flatchain[good,2],smooth=smooth,xlabel="PA (deg)",ylabel="vmax",filename="fig4b_.pdf")
-sim.contourPlot(flatchain[good,1],flatchain[good,2],smooth=smooth,xlabel="b/a",ylabel="vmax",filename="fig4c_.pdf")
+sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4.pdf")
