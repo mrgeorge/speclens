@@ -192,7 +192,7 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(show):
 	plt.show()
     
-def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None):
+def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,show=False):
 # make a grid of contour plots for each pair of parameters
 
     nPars=chain.shape[1]
@@ -243,7 +243,8 @@ def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","gr
     fig.subplots_adjust(bottom=0.15)
     if(filename):
 	fig.savefig(filename)
-    fig.show()
+    if(show):
+	fig.show()
 
 
 def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
@@ -461,9 +462,9 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
 	data=yobs
 	error=yerr
     else: # use both imaging and velocity data
-	model=np.concatenate(vmodel,ellmodel)
-	data=np.concatenate(yobs,ellobs)
-	error=np.concatenate(yerr,ellerr)
+	model=np.concatenate([vmodel,ellmodel])
+	data=np.concatenate([yobs,ellobs])
+	error=np.concatenate([yerr,ellerr])
 	
 
     chisq_like=np.sum(((model-data)/error)**2)
@@ -516,7 +517,7 @@ def vmapModel(pars, fiberAngles):
 
     # compute imaging observable
     disk_r=1. # we're not modeling sizes now
-    ellipse=(disk_r,gal_beta,gal_q) # unsheared ellipse
+    ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
     disk_r_prime,gal_beta_prime,gal_q_prime=shearEllipse(ellipse,g1,g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
@@ -584,18 +585,30 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
 #    tuple(a,b): gaussian prior with mean a and stddev b
 
     # SETUP DATA
-    numFib=vfibFlux.size
-    ang=np.linspace(0,2.*np.pi,num=numFib,endpoint=False)
-    vel=vfibFlux.copy()
-    velErr=np.repeat(sigma,numFib)
-    ellObs=imObs.copy()
-    ellErr=imErr.copy()
-
+    if(vfibFlux is not None):
+	numFib=vfibFlux.size
+	ang=np.linspace(0,2.*np.pi,num=numFib,endpoint=False)
+	vel=vfibFlux.copy()
+	velErr=np.repeat(sigma,numFib)
+    else:
+	ang=None
+	vel=None
+	velErr=None
+    if(imObs is not None):
+	ellObs=imObs.copy()
+	ellErr=imErr.copy()
+    else:
+	ellObs=None
+	ellErr=None
+	
     if(addNoise): # useful when simulating many realizations to project parameter constraints
-	specNoise=np.random.randn(numFib)*sigma
-	vel+=specNoise
-	imNoise=np.random.randn(ellObs.size)*ellErr
-	ellObs+=imNoise
+	if(vfibFlux is not None):
+	    specNoise=np.random.randn(numFib)*sigma
+	    vel+=specNoise
+	if(imObs is not None):
+	    imNoise=np.random.randn(ellObs.size)*ellErr
+	    ellObs+=imNoise
+
 
     # SETUP PARS and PRIORS
     priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
