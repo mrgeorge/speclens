@@ -208,11 +208,13 @@ def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","gr
 
 	    if(row == nPars-1):
 		xlabel=labels[col]
+		plt.setp(axarr[row,col].get_xticklabels(), rotation="vertical", fontsize="xx-small")
             else:
 		xlabel=None
 		plt.setp(axarr[row,col].get_xticklabels(),visible=False)
 	    if(col == 0):
 		ylabel=labels[row]
+		plt.setp(axarr[row,col].get_yticklabels(), fontsize="xx-small")
             else:
 		ylabel=None
 		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
@@ -238,6 +240,7 @@ def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","gr
             else:
 		axarr[row,col].axis("off")
 
+    fig.subplots_adjust(bottom=0.15)
     if(filename):
 	fig.savefig(filename)
     fig.show()
