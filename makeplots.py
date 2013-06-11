@@ -59,30 +59,43 @@ sim.showImage(fluxVMap,7,1,trim=trim,colorbar=False,filename="fig2b.pdf")
 
 sigma=30. # velocity unc in km/s
 
-pars = np.array([0, 0.5, 150, 0, 0])
+gal_beta=105.
+gal_q=0.5
+vmax=200.
+g1=0.
+g2=0.
+pars = np.array([gal_beta, gal_q, vmax, g1, g2])
 
 xvals=np.linspace(0,2.*np.pi,num=200)
-yvals=sim.vmapModel(pars, xvals)
-plt.plot(np.rad2deg(xvals),yvals,color="blue",linestyle='-',lw=2,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}".format(pars[2]))
+yvals,ellObs=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="blue",linestyle='-',lw=2,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}, g1={}, g2={}".format(pars[2],pars[3],pars[4]))
 
 xsamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-ysamp=sim.vmapModel(pars, xsamp)
+ysamp,ellSamp=sim.vmapModel(pars, xsamp)
 yerr=np.repeat(sigma,xsamp.size)
 
 plt.errorbar(np.rad2deg(xsamp),ysamp,yerr=yerr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
 
 
-pars = np.array([0, 0.8, 150, 0, 0])
-yvals=sim.vmapModel(pars, xvals)
+pars = np.array([gal_beta, gal_q+0.2, vmax, g1, g2])
+yvals,ellObs=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
 
-pars = np.array([20, 0.5, 150, 0, 0])
-yvals=sim.vmapModel(pars, xvals)
+pars = np.array([gal_beta+20, gal_q, vmax, g1, g2])
+yvals,ellObs=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
 
-pars = np.array([0, 0.5, 200, 0, 0])
-yvals=sim.vmapModel(pars, xvals)
+pars = np.array([gal_beta, gal_q, vmax+50, g1, g2])
+yvals,ellObs=sim.vmapModel(pars, xvals)
 plt.plot(np.rad2deg(xvals),yvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
+
+pars = np.array([gal_beta, gal_q, vmax, g1+0.1, g2])
+yvals,ellObs=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="yellow",linestyle="-",lw=2,label="g1"+"={}".format(pars[3]))
+
+pars = np.array([gal_beta, gal_q, vmax+50, g1, g2+0.1])
+yvals,ellObs=sim.vmapModel(pars, xvals)
+plt.plot(np.rad2deg(xvals),yvals,color="magenta",linestyle="--",lw=2,label="g2"+"={}".format(pars[4]))
 
 plt.legend(loc=9,prop={'size':14},frameon=False)
 
@@ -102,18 +115,12 @@ pars = np.array([105, 0.5, 200, 0, 0.15])
 labels=np.array(["PA","b/a","vmax","g1","g2"])
 sigma=30.
 xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-yvals=sim.vmapModel(pars, xvals)
+yvals,ellObs=sim.vmapModel(pars, xvals)
+ellErr=np.array([0.1,10])
 priors=[None,[0,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
-sampler=sim.vmapFit(yvals,sigma,priors,addNoise=False)
+sampler=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=False)
 maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
 print sampler.flatchain[maxp,:]
-
-xarr=np.linspace(0,2*np.pi,num=200)
-yarr=sim.vmapModel(pars,xarr)
-yarr2=sim.vmapModel(sampler.flatchain[maxp,:][0],xarr)
-plt.errorbar(xvals,yvals,yerr=sigma,fmt=None,elinewidth=3)
-plt.plot(xarr,yarr,'b-',xarr,yarr2,'g-')
-plt.show()
 
 flatchain=sampler.flatchain
 flatlnprobability=sampler.flatlnprobability
@@ -122,9 +129,10 @@ good=(sampler.flatlnprobability > -np.Inf)
 smooth=3
 sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels)
 
+#imaging+spectro
 nSim=100
 for ii in xrange(nSim):
-    sampler=sim.vmapFit(yvals,sigma,priors,addNoise=True)
+    sampler=sim.vmapFit(yvals,sigma,ellObs,ellErr,priors,addNoise=True)
     if(ii == 0):
         flatchain=sampler.flatchain
         flatlnprobability=sampler.flatlnprobability
@@ -135,4 +143,36 @@ for ii in xrange(nSim):
 good=(flatlnprobability > -np.Inf)
 
 smooth=3
-sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4.pdf")
+sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_imsp.pdf")
+
+#imaging only
+nSim=100
+for ii in xrange(nSim):
+    sampler=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=True)
+    if(ii == 0):
+        flatchain=sampler.flatchain
+        flatlnprobability=sampler.flatlnprobability
+    else:
+        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
+        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
+
+good=(flatlnprobability > -np.Inf)
+
+smooth=3
+sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_im.pdf")
+
+#spectro only
+nSim=100
+for ii in xrange(nSim):
+    sampler=sim.vmapFit(yvals,sigma,None,ellErr,priors,addNoise=True)
+    if(ii == 0):
+        flatchain=sampler.flatchain
+        flatlnprobability=sampler.flatlnprobability
+    else:
+        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
+        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
+
+good=(flatlnprobability > -np.Inf)
+
+smooth=3
+sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_sp.pdf")
