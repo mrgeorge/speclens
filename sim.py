@@ -159,24 +159,51 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
 # make a 2d contour plot of parameter posteriors
 
     n2dbins=300
-    zz,xx,yy=np.histogram2d(xvals,yvals,bins=n2dbins)
-    xxbin=xx[1]-xx[0]
-    yybin=yy[1]-yy[0]
-    xx=xx[1:]+0.5*xxbin
-    yy=yy[1:]+0.5*yybin
 
-    if(smooth > 0):
-	kernSize=int(10*smooth)
-	sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
-	kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
-	zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
+    # if it's a single ndarray wrapped in a list, convert to ndarray to use full color list
+    if((type(xvals) is list) & (len(xvals) ==1)):
+	xvals=xvals[0]
+	yvals=yvals[0]
 	
-    hist,bins=np.histogram(zz.flatten(),bins=1000)
-    sortzz=np.sort(zz.flatten())
-    cumhist=np.cumsum(sortzz)*1./np.sum(zz)
-    levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
+    if(type(xvals) is list):
+	for ii in range(len(xvals)):
+	    zz,xx,yy=np.histogram2d(xvals[ii],yvals[ii],bins=n2dbins)
+	    xxbin=xx[1]-xx[0]
+	    yybin=yy[1]-yy[0]
+	    xx=xx[1:]+0.5*xxbin
+	    yy=yy[1:]+0.5*yybin
 
-    plt.contour(xx,yy,zz.T,levels=levels,colors=colors)
+	    if(smooth > 0):
+		kernSize=int(10*smooth)
+		sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
+		kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
+		zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
+	
+	    hist,bins=np.histogram(zz.flatten(),bins=1000)
+	    sortzz=np.sort(zz.flatten())
+	    cumhist=np.cumsum(sortzz)*1./np.sum(zz)
+	    levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
+
+	    plt.contour(xx,yy,zz.T,levels=levels,colors=colors[ii])
+    else: #we just have single ndarrays for xvals and yvals
+        zz,xx,yy=np.histogram2d(xvals,yvals,bins=n2dbins)
+	xxbin=xx[1]-xx[0]
+	yybin=yy[1]-yy[0]
+	xx=xx[1:]+0.5*xxbin
+	yy=yy[1:]+0.5*yybin
+
+	if(smooth > 0):
+	    kernSize=int(10*smooth)
+	    sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
+	    kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
+	    zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
+	
+	    hist,bins=np.histogram(zz.flatten(),bins=1000)
+	    sortzz=np.sort(zz.flatten())
+	    cumhist=np.cumsum(sortzz)*1./np.sum(zz)
+	    levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
+
+	    plt.contour(xx,yy,zz.T,levels=levels,colors=colors)
 
     if(xlabel is not None):
 	plt.xlabel(xlabel)
@@ -192,20 +219,43 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(show):
 	plt.show()
     
-def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,show=False):
+def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,show=False):
 # make a grid of contour plots for each pair of parameters
+# chain is actually a list of 1 or more chains from emcee sampler
 
-    nPars=chain.shape[1]
+    nChains=len(chains)
+    nPars=chains[0].shape[1]
+
     fig,axarr=plt.subplots(nPars,nPars,figsize=figsize)
     fig.subplots_adjust(hspace=0,wspace=0)
 
     if(labels is None):
 	labels=np.repeat(None,nPars)
 
+    # find max and min for all pars across chains
+    limArr=np.tile((np.Inf,-np.Inf),nPars).reshape(nPars,2)
+    for ch in chains:
+	for par in range(nPars):
+	    lo,hi=np.min(ch[:,par]), np.max(ch[:,par])
+	    if(lo < limArr[par,0]):
+		limArr[par,0]=lo.copy()
+	    if(hi > limArr[par,1]):
+		limArr[par,1]=hi
+
+    # handle colors
+    if(len(colors) == len(chains)):
+	histColors=colors
+	contourColors=colors
+    if((nChains == 1) & (len(colors) == len(percentiles))):
+	histColors=colors[0]
+	contourColors=colors
+	    
+    # fill plot panels
     for row in range(nPars):
 	for col in range(nPars):
 	    fig.sca(axarr[row,col])
 
+	    # setup axis labels
 	    if(row == nPars-1):
 		xlabel=labels[col]
 		plt.setp(axarr[row,col].get_xticklabels(), rotation="vertical", fontsize="xx-small")
@@ -218,26 +268,24 @@ def contourPlotAll(chain,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","gr
             else:
 		ylabel=None
 		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
-
-	    xarr=chain[:,col]
-	    yarr=chain[:,row]
-	    xlim=(np.min(xarr),np.max(xarr))
-	    ylim=(np.min(yarr),np.max(yarr))
+		    
+	    xarrs=[chain[:,col] for chain in chains]
+	    yarrs=[chain[:,row] for chain in chains]
+	    xlim=limArr[col]
+	    ylim=limArr[row]
 	    if(row == col):
-		axarr[row,col].hist(xarr,bins=50,histtype="step")
+		axarr[row,col].hist(xarrs,bins=50,range=xlim,histtype="step",color=histColors)
 		if(xlabel is not None):
 		    axarr[row,col].set_xlabel(xlabel)
 		if(ylabel is not None):
 		    axarr[row,col].set_ylabel(ylabel)
 		axarr[row,col].set_xlim(xlim)
 		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
-            elif(col < row):
-		contourPlot(xarr,yarr,smooth=smooth,percentiles=percentiles,colors=colors,xlabel=xlabel,ylabel=ylabel)
-		xlim=(np.min(xarr),np.max(xarr))
-		ylim=(np.min(yarr),np.max(yarr))
+	    elif(col < row):
+		contourPlot(xarrs,yarrs,smooth=smooth,percentiles=percentiles,colors=contourColors,xlabel=xlabel,ylabel=ylabel)
 		axarr[row,col].set_xlim(xlim)
 		axarr[row,col].set_ylim(ylim)
-            else:
+	    else:
 		axarr[row,col].axis("off")
 
     fig.subplots_adjust(bottom=0.15)
@@ -451,23 +499,27 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
         else:
             fullPars[ii]=fixed[ii]
 
-    vmodel,ellmodel=vmapModel(fullPars,xobs)
 
-    if(xobs is None): # use only imaging data
-	model=ellmodel
-	data=ellobs
-	error=ellerr
-    elif(ellobs is None): # use only velocity data
-	model=vmodel
-	data=yobs
-	error=yerr
-    else: # use both imaging and velocity data
-	model=np.concatenate([vmodel,ellmodel])
-	data=np.concatenate([yobs,ellobs])
-	error=np.concatenate([yerr,ellerr])
-	
 
-    chisq_like=np.sum(((model-data)/error)**2)
+    if((xobs is None) & (ellobs is None)): # no data, only priors
+	chisq_like=0.
+    else:
+	vmodel,ellmodel=vmapModel(fullPars,xobs)
+
+        if((xobs is None) & (ellobs is not None)): # use only imaging data
+	    model=ellmodel
+	    data=ellobs
+	    error=ellerr
+	elif((xobs is not None) & (ellobs is None)): # use only velocity data
+	    model=vmodel
+	    data=yobs
+	    error=yerr
+        elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
+	    model=np.concatenate([vmodel,ellmodel])
+	    data=np.concatenate([yobs,ellobs])
+	    error=np.concatenate([yerr,ellerr])
+
+	chisq_like=np.sum(((model-data)/error)**2)
 
     return -0.5*(chisq_like+chisq_prior)
 
@@ -616,17 +668,17 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
 
 
     # RUN MCMC
-    nWalkers=500
+    nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
     sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[ang, vel, velErr, ellObs, ellErr, priorFuncs, fixed])
 
     print "emcee burnin"
-    nBurn=10
+    nBurn=500
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
 
     print "emcee running"
-    nSteps=100
+    nSteps=1000
     sampler.run_mcmc(pos, nSteps)
 
     #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
