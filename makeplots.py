@@ -127,52 +127,32 @@ flatlnprobability=sampler.flatlnprobability
 good=(sampler.flatlnprobability > -np.Inf)
 
 smooth=3
-sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels)
+sim.contourPlotAll([flatchain[good]],smooth=smooth,colors=["red"],labels=labels,show=True)
 
-#imaging+spectro
+# compare imaging vs spectro vs combined
 nSim=100
 for ii in xrange(nSim):
-    sampler=sim.vmapFit(yvals,sigma,ellObs,ellErr,priors,addNoise=True)
+    samplerIS=sim.vmapFit(yvals,sigma,ellObs,ellErr,priors,addNoise=True)
+    samplerI=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=True)
+    samplerS=sim.vmapFit(yvals,sigma,None,ellErr,priors,addNoise=True)
     if(ii == 0):
-        flatchain=sampler.flatchain
-        flatlnprobability=sampler.flatlnprobability
+        flatchainIS=samplerIS.flatchain
+        flatlnprobIS=samplerIS.flatlnprobability
+        flatchainI=samplerI.flatchain
+        flatlnprobI=samplerI.flatlnprobability
+        flatchainS=samplerS.flatchain
+        flatlnprobS=samplerS.flatlnprobability
     else:
-        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
-        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
+        flatchainIS=np.append(flatchainIS,samplerIS.flatchain,axis=0)
+        flatlnprobIS=np.append(flatlnprobIS,samplerIS.flatlnprobability,axis=0)
+        flatchainI=np.append(flatchainI,samplerI.flatchain,axis=0)
+        flatlnprobI=np.append(flatlnprobI,samplerI.flatlnprobability,axis=0)
+        flatchainS=np.append(flatchainS,samplerS.flatchain,axis=0)
+        flatlnprobS=np.append(flatlnprobS,samplerS.flatlnprobability,axis=0)
 
-good=(flatlnprobability > -np.Inf)
+goodIS=(flatlnprobIS > -np.Inf)
+goodI=(flatlnprobI > -np.Inf)
+goodS=(flatlnprobS > -np.Inf)
 
 smooth=3
-sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_imsp.pdf")
-
-#imaging only
-nSim=100
-for ii in xrange(nSim):
-    sampler=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=True)
-    if(ii == 0):
-        flatchain=sampler.flatchain
-        flatlnprobability=sampler.flatlnprobability
-    else:
-        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
-        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
-
-good=(flatlnprobability > -np.Inf)
-
-smooth=3
-sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_im.pdf")
-
-#spectro only
-nSim=100
-for ii in xrange(nSim):
-    sampler=sim.vmapFit(yvals,sigma,None,ellErr,priors,addNoise=True)
-    if(ii == 0):
-        flatchain=sampler.flatchain
-        flatlnprobability=sampler.flatlnprobability
-    else:
-        flatchain=np.append(flatchain,sampler.flatchain,axis=0)
-        flatlnprobability=np.append(flatlnprobability,sampler.flatlnprobability,axis=0)
-
-good=(flatlnprobability > -np.Inf)
-
-smooth=3
-sim.contourPlotAll(flatchain[good],smooth=smooth,labels=labels,filename="fig4_sp.pdf")
+sim.contourPlotAll([flatchainIS[goodIS],flatchainI[goodI],flatchainS[goodS]],smooth=smooth,labels=labels,filename="fig4.pdf",show=True)
