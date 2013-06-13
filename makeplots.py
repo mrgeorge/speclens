@@ -124,7 +124,7 @@ if __name__ == "__main__":
     pars = np.array([105, 0.5, 200, 0, 0.15])
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     sigma=30.
-    xvals=np.linspace(0,2.*np.pi,num=50,endpoint=False)
+    xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
     yvals,ellObs=sim.vmapModel(pars, xvals)
     ellErr=np.array([0.1,10])
     priors=[None,[0,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
@@ -158,4 +158,4 @@ if __name__ == "__main__":
     
     smooth=3
     plt.clf()
-    sim.contourPlotAll([flatchainIS[goodIS],flatchainI[goodI],flatchainS[goodS]],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4_50fibers.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll([flatchainIS[goodIS],flatchainI[goodI],flatchainS[goodS]],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4.{}".format(figExt),showPlot=showPlot)
