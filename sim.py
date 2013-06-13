@@ -42,10 +42,15 @@ def shearEllipse(ellipse,g1,g2):
     phi=0.5*np.arctan2(g2,g1)
 
     dpsi=0.5*np.arctan2(2*(gamma/epsilon)*np.sin(2.*(phi-psi)), 1.+2*(gamma/epsilon)*np.cos(2*(phi-psi)))
+    assert((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2 >= 0)
     epsilon_prime=np.sqrt((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2) / (1.+2.*epsilon*gamma*np.cos(2.*(phi-psi)))
 
     disk_r_prime=disk_r*(1+gamma)
-    gal_q_prime=np.sqrt((1-epsilon_prime**2)/(1+epsilon_prime)**2)
+    #    assert(epsilon_prime < 1.1)
+    if(epsilon_prime>1):
+	epsilon_prime=1.
+    assert(epsilon_prime <= 1.)
+    gal_q_prime=np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime))
     gal_beta_prime=np.rad2deg(psi+dpsi)
 
     return (disk_r_prime,gal_q_prime,gal_beta_prime)
@@ -53,6 +58,7 @@ def shearEllipse(ellipse,g1,g2):
 def shearPairs(pairs,g1,g2):
     pairs_prime=pairs.copy()
     gSq=g1**2+g2**2
+    assert(gSq < 1)
     if(pairs.shape == (2,)): # only one pair
 	x1,y1=pairs
 	#	x1p=((1+g1)*x1 -     g2*y1)
@@ -104,7 +110,7 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--"):
+def showImage(profile,numFib,fibRad,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     pixScale=0.1
@@ -126,7 +132,9 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
         ax=plt.gca()
         ax.add_patch(circ)
     if(colorbar):
-	plt.colorbar()
+	cbar=plt.colorbar()
+	if(colorbarLabel is not None):
+	    cbar.set_label(colorbarLabel)
 
     if(ellipse is not None): # ellipse is either None or np.array([disk_r,gal_q,gal_beta])
 	ax=plt.gca()
@@ -153,9 +161,10 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,cmap=matplotlib.
 
     if(filename):
 	plt.savefig(filename)
-    plt.show()
+    if(showPlot):
+	plt.show()
 
-def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel=None,ylabel=None,xlim=None,ylim=None,filename=None,show=False):
+def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel=None,ylabel=None,xlim=None,ylim=None,filename=None,showPlot=False):
 # make a 2d contour plot of parameter posteriors
 
     n2dbins=300
@@ -216,10 +225,10 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
 
     if(filename):
 	plt.savefig(filename)
-    if(show):
+    if(showPlot):
 	plt.show()
     
-def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,show=False):
+def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
 # make a grid of contour plots for each pair of parameters
 # chain is actually a list of 1 or more chains from emcee sampler
 
@@ -291,7 +300,7 @@ def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","g
     fig.subplots_adjust(bottom=0.15)
     if(filename):
 	fig.savefig(filename)
-    if(show):
+    if(showPlot):
 	fig.show()
 
 
@@ -428,9 +437,9 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
     vmap,fluxVMap,gal,galK=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
 
     if(showPlot):
-	showImage(galK,numFib,fibRad)
-	showImage(vmap,numFib,fibRad)
-	showImage(fluxVMap,numFib,fibRad)
+	showImage(galK,numFib,fibRad,showPlot=True)
+	showImage(vmap,numFib,fibRad,showPlot=True)
+	showImage(fluxVMap,numFib,fibRad,showPlot=True)
 
     # Get the flux in each fiber
     galFibFlux=np.zeros(numFib)
@@ -673,12 +682,12 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
     sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[ang, vel, velErr, ellObs, ellErr, priorFuncs, fixed])
 
     print "emcee burnin"
-    nBurn=500
+    nBurn=200
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
 
     print "emcee running"
-    nSteps=1000
+    nSteps=500
     sampler.run_mcmc(pos, nSteps)
 
     #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
@@ -711,7 +720,7 @@ def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib
 
     # Plot the image with fibers overlaid
     if(showPlot):
-        showImage(nopixK,numFib,fibRad)
+        showImage(nopixK,numFib,fibRad,showPlot=True)
 
     # Get the flux in each fiber
     fibFlux=np.zeros(numFib)
