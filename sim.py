@@ -368,10 +368,16 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 # with optional lensing shear and PSF convolution
 	
     # Define the galaxy velocity map
-    bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
-    disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
+    if(0 < bulge_frac < 1):
+        bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+        disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
 
-    gal=bulge_frac * bulge + (1.-bulge_frac) * disk
+        gal=bulge_frac * bulge + (1.-bulge_frac) * disk
+    elif(bulge_frac == 0):
+        gal=galsim.Sersic(disk_n, half_light_radius=disk_r)
+    elif(bulge_frac == 1):
+        gal=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+
     gal.setFlux(gal_flux)
     
     # Set shape of galaxy from axis ratio and position angle
@@ -403,23 +409,19 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     elif(rotCurveOpt=='nfw'):
         rotCurvePars=np.array([100,5])
 
-    # Fill velocity map array pixel by pixel
-    for xx in range(galImg.xmin,galImg.xmax):
-        for yy in range(galImg.ymin,galImg.ymax):
-            # primed image coordinates centered on galaxy, rotated so xp is major axis
-            xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
-            yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
-
-            # coordinates in the plane of the galaxy
-            radvec=np.array([xp,yp,yp*tani])
-            kvec=np.array([1,0,0])
-            vmapArr[yy,xx]=getOmega(np.linalg.norm(radvec),rotCurvePars,option=rotCurveOpt) * sini * np.dot(radvec,kvec)
+    # Fill velocity map array
+    xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
+    xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
+    yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
+    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
+    vmapArr=getOmega(radNorm,rotCurvePars,option=rotCurveOpt) * sini * xp
+    vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
 
     # Weight velocity map by galaxy flux and make galsim object
     fluxVMapArr=vmapArr*imgArr
-    fluxVMapImg=galsim.ImageViewF(fluxVMapArr,scale=pixScale)
+    fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=pixScale)
     fluxVMap=galsim.InterpolatedImage(fluxVMapImg)
-    vmap=galsim.InterpolatedImage(galsim.ImageViewF(vmapArr,scale=pixScale)) # not flux-weighted
+    vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
     gal.applyShear(g1=g1,g2=g2)
