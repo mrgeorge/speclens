@@ -27,7 +27,7 @@ if __name__ == "__main__":
     gal_q=0.6
     gal_beta=20.
     gal_flux=1.
-    atmos_fwhm=0.
+    atmos_fwhm=1.
     pixScale=0.1
     imgSizePix=100
     rotCurveOpt='flat'
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     # (unsheared)
     
     plt.clf()
-    sim.showImage(galK,7,1,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="fig2a.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(gal,7,1,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="fig2a.{}".format(figExt),showPlot=showPlot)
     plt.clf()
     sim.showImage(fluxVMap,7,1,trim=trim,colorbar=False,filename="fig2b.{}".format(figExt),showPlot=showPlot)
     
