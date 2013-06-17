@@ -128,34 +128,112 @@ if __name__ == "__main__":
     yvals,ellObs=sim.vmapModel(pars, xvals)
     ellErr=np.array([0.1,10])
     priors=[None,[0,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
-    sampler=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=False)
-    maxp=(sampler.flatlnprobability == np.max(sampler.flatlnprobability))
-    print sampler.flatchain[maxp,:]
-    
-    flatchain=sampler.flatchain
-    flatlnprobability=sampler.flatlnprobability
-    good=(sampler.flatlnprobability > -np.Inf)
-    
-    smooth=3
-    plt.clf()
-    sim.contourPlotAll([flatchain[good]],smooth=smooth,labels=labels,showPlot=showPlot)
-    
+
     # compare imaging vs spectro vs combined
-    samplerIS=sim.vmapFit(yvals,sigma,ellObs,ellErr,priors,addNoise=False)
-    samplerI=sim.vmapFit(None,sigma,ellObs,ellErr,priors,addNoise=False)
-    samplerS=sim.vmapFit(yvals,sigma,None,ellErr,priors,addNoise=False)
-    
-    flatchainIS=samplerIS.flatchain
-    flatlnprobIS=samplerIS.flatlnprobability
-    flatchainI=samplerI.flatchain
-    flatlnprobI=samplerI.flatlnprobability
-    flatchainS=samplerS.flatchain
-    flatlnprobS=samplerS.flatlnprobability
-    
-    goodIS=(flatlnprobIS > -np.Inf)
-    goodI=(flatlnprobI > -np.Inf)
-    goodS=(flatlnprobS > -np.Inf)
-    
+    chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,priors,addNoise=False,showPlot=False)
     smooth=3
     plt.clf()
-    sim.contourPlotAll([flatchainIS[goodIS],flatchainI[goodI],flatchainS[goodS]],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4.{}".format(figExt),showPlot=showPlot)
+
+
+    # Fig 5
+    # shear error distribution for ensemble
+    nGal=100
+    inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
+    obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
+    pars=sim.generateEnsemble(nGal,inputPriors,shearOpt=None)
+    xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
+    sigma=30.
+    ellErr=np.array([0.1,10])
+    errI=np.zeros(nGal)
+    errS=np.zeros_like(errI)
+    errIS=np.zeros_like(errI)
+    
+    for ii in range(nGal):
+        print "************Running Galaxy {}".format(ii)
+        yvals,ellObs=sim.vmapModel(pars[ii,:], xvals)
+        chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,obsPriors,addNoise=False,showPlot=False)
+        gI=np.linalg.norm(sim.getMaxProb(chains[0],lnprobs[0]))
+        gS=np.linalg.norm(sim.getMaxProb(chains[1],lnprobs[1]))
+        gIS=np.linalg.norm(sim.getMaxProb(chains[2],lnprobs[2]))
+
+        errI[ii]=gI-np.linalg.norm(pars[ii,-2:])
+        errS[ii]=gS-np.linalg.norm(pars[ii,-2:])
+        errIS[ii]=gIS-np.linalg.norm(pars[ii,-2:])
+
+        print sim.getMaxProb(chains[0],lnprobs[0]), sim.getMaxProb(chains[1],lnprobs[1]), sim.getMaxProb(chains[1],lnprobs[2]), pars[ii,-2:]
+        
+    plt.hist((errI,errS,errIS),colors=["red","green","blue"],bins=50)
+    print np.std(errI),np.std(errS),np.std(errIS)
+
+
+
+
+
+    bulge_n=4.
+    bulge_r=1.
+    disk_n=1.
+    disk_r=2.
+    bulge_frac=0.
+    gal_q=0.2
+    gal_beta=20.
+    gal_flux=1.
+    atmos_fwhm=1.
+    pixScale=0.1
+    imgSizePix=100
+    rotCurveOpt='flat'
+    g1=0
+    g2=0
+    
+    ell=[disk_r,gal_q,gal_beta]
+    lines=sim.getEllipseAxes(ell)
+    
+    vmap,fluxVMapX,fluxVMapK,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    trim=1
+
+    fibRad=1.
+    
+    plt.clf()
+    sim.showImage(galK,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+
+    circ=sim.galsim.Moffat(beta=0,scale_radius=10.,trunc=fibRad)
+    conv1=sim.galsim.Convolve([circ,galK])
+
+    numFib=7
+    ff1=np.zeros(numFib)
+    vf1=np.zeros(numFib)
+    print "starting FF1"
+    for fibID in range(numFib):
+        ff1[fibID],err=sim.getFiberFlux(fibID,numFib,fibRad,galX)
+        vf1[fibID],err=sim.getFiberFlux(fibID,numFib,fibRad,fluxVMapX)
+    print "starting FF2"
+    ff2=sim.getFiberFluxes(numFib,fibRad,galK)
+    vf2=sim.getFiberFluxes(numFib,fibRad,fluxVMapK)
+
+    print ff1/ff1[0]
+    print ff2/ff2[0]
+    print vf1/vf1[0]
+    print vf2/vf2[0]
+
+    print vf1/ff1
+    print vf2/ff2
+
+    sim.showImage(conv1,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+    sim.showImage(galK,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+    sim.showImage(fluxVMapK,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+    
+    pixScale=0.1
+    imgSizePix=int(10.*fibRad/pixScale)
+    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
+    circArr=circ.draw(image=imgFrame,dx=pixScale).array.copy()
+    galArr=galK.draw(image=imgFrame,dx=pixScale).array.copy()
+    conv2Arr=scipy.signal.convolve2d(circArr,galArr,mode="same")
+    conv2=sim.galsim.InterpolatedImage(sim.galsim.ImageViewF(conv2Arr,scale=pixScale))
+    sim.showImage(conv1,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+    sim.showImage(conv2,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
+
+    conv1Arr=conv1.draw(image=imgFrame,dx=pixScale).array.copy()
+    plt.imshow((conv2Arr-conv1Arr)/conv2Arr,interpolation="nearest")
+    plt.colorbar()
+    plt.show()
+    
