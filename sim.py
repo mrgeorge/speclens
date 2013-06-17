@@ -3,6 +3,7 @@
 import galsim
 import scipy.integrate
 import scipy.signal
+import scipy.ndimage
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
@@ -33,6 +34,24 @@ def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     fiberPos=getFiberPos(fibID,numFib,fibRad)
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
+def getFiberFluxes(numFib,fibRad,image):
+    pixScale=0.1
+    imgSizePix=int(10.*fibRad/pixScale)
+    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
+
+    scale_radius=10.*fibRad
+    beta=0.
+    fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=fibRad) # a kludgy way to get a circular tophat
+
+    fibImage=galsim.Convolve([fiber,image])
+    fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array
+
+    fiberPos=np.array([getFiberPos(fibID,numFib,fibRad) for fibID in range(numFib)])
+    coords=np.array([np.array([fiberPos[ii].x,fiberPos[ii].y]) for ii in range(numFib)]).T # ndarr of x, y values in arcsec
+    coordsPix=coords/pixScale + 0.5*imgSizePix # converted to pixels
+
+    return scipy.ndimage.map_coordinates(fibImageArr.T,coordsPix)
+    
 def shearEllipse(ellipse,g1,g2):
 # Following Supri & Harari 1999
     disk_r,gal_q,gal_beta=ellipse
@@ -407,6 +426,8 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     galX=gal
     galK=gal
     fluxVMap.applyShear(g1=g1,g2=g2)
+    fluxVMapX=fluxVMap
+    fluxVMapK=fluxVMap
     vmap.applyShear(g1=g1,g2=g2)
 
     # Convolve velocity map and galaxy with PSF
@@ -422,13 +443,13 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 	fluxVMapArr=fluxVMap.draw(image=imgFrame,dx=pixScale).array.copy()
 	atmosArr=atmos.draw(image=imgFrame,dx=pixScale).array.copy()
 	fluxVMapArrPSF=scipy.signal.convolve2d(fluxVMapArr,atmosArr,mode='same')
-	fluxVMap=galsim.InterpolatedImage(galsim.ImageViewF(fluxVMapArrPSF,scale=pixScale))
-        #    fluxVMapPSFK=galsim.Convolve([atmos, fluxVMap],real_space=False) # used fourier-space convolution for faster drawing
+	fluxVMapX=galsim.InterpolatedImage(galsim.ImageViewF(fluxVMapArrPSF,scale=pixScale))
+        fluxVMapK=galsim.Convolve([atmos, fluxVMap],real_space=False) # used fourier-space convolution for faster drawing
     
         galX=galsim.Convolve([atmos, gal],real_space=True) # used real-space convolution for easier real-space integration
-        galX=galsim.Convolve([atmos, gal],real_space=False) # used real-space convolution for easier real-space integration
+        galK=galsim.Convolve([atmos, gal],real_space=False) # used real-space convolution for easier real-space integration
 
-    return (vmap,fluxVMap,galX,galK)
+    return (vmap,fluxVMapX,fluxVMapK,galX,galK)
 
 def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,g1,g2,pixScale,fibRad,numFib,showPlot=False):
 # get flux-weighted fiber-averaged velocities
@@ -442,6 +463,7 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 	showImage(fluxVMap,numFib,fibRad,showPlot=True)
 
     # Get the flux in each fiber
+    print "starting gal 1"
     galFibFlux=np.zeros(numFib)
     if((numFib-1) % 2 != 0):
         for ii in range(numFib):
@@ -457,13 +479,22 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
                 galFibFlux[ii+(numFib-1)/2]=galFibFlux[ii]
             print galFibFlux[ii],error
 
+    print "starting vmap 1"
     vmapFibFlux=np.zeros(numFib)
     for ii in range(numFib):
         print "{}/{}".format(ii,numFib)
         vmapFibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,fluxVMap)
         print vmapFibFlux[ii],error
 
+    print "starting gal 2"
+    galFibFlux2=getFiberFluxes(numFib,fibRad,gal)
+    print "starting vmap 2"
+    vmapFibFlux2=getFiberFluxes(numFib,fibRad,fluxVMap)
+
     print vmapFibFlux/galFibFlux
+    print vmapFibFlux2/galFibFlux2
+    print vmapFibFlux, vmapFibFlux2
+    print galFibFlux, galFibFlux2
 
     return vmapFibFlux/galFibFlux
 
@@ -615,7 +646,7 @@ def interpretPriors(priors):
 	    if(prior is not None):
 		if((type(prior) is int) | (type(prior) is float)):
 		# entry will be removed from list of pars and guess but value is still sent to evauluate function
-		    fixVal=np.copy(prior)[0]
+		    fixVal=np.copy(prior)
 		    fixed[ii]=fixVal
 		elif(type(prior) is list):
 		    priorRange=np.copy(prior)
@@ -634,6 +665,51 @@ def interpretPriors(priors):
 
     return (priorFuncs,fixed,guess,guessScale)
 
+def generateEnsemble(nGal,priors,shearOpt="PS"):
+# generate a set of galaxies with intrinsic shapes following the prior distribution
+# (priors follow same convention as used by interpretPriors but must not be None)
+# and generate shear parameters following an approach set by shearOpt
+#     shearOpt="PS", "NFW", None - shears can also be defined using uniform or gaussian priors
+
+    nPars=5
+    pars=np.zeros((nGal,nPars))
+    for ii in xrange(nPars):
+        prior=priors[ii]
+        # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
+        if((type(prior) is int) | (type(prior) is float)): # fixed
+            fixVal=np.copy(prior)
+            pars[:,ii]=fixVal
+        elif(type(prior) is list): # flat prior
+            priorRange=np.copy(prior)
+            pars[:,ii]=np.random.rand(nGal)*(priorRange[1]-priorRange[0]) + priorRange[0]
+        elif(type(prior) is tuple): # gaussian
+            priorMean=np.copy(prior[0])
+            priorSigma=np.copy(prior[1])
+            pars[:,ii]=np.random.randn(nGal)*priorSigma + priorMean
+
+    if(shearOpt is not None):
+        # define area
+        density=150./3600 # 150/sq deg in /sq arcsec (~BOSS target density)
+        area=nGal/density # sq arcsec
+        gridLength=np.ceil(np.sqrt(area)) # arcsec
+        gridSpacing=1. # arcsec
+
+        # assign random uniform positions with origin at center
+        xpos=np.random.rand(nGal)*gridLength - 0.5*gridLength
+        ypos=np.random.rand(nGal)*gridLength - 0.5*gridLength
+        
+        if(shearOpt == "PS"):
+            ps=galsim.PowerSpectrum(lambda k: k**2)
+            ps.buildGrid(grid_spacing=gridSpacing, ngrid=gridLength)
+            g1, g2 = ps.getShear((xpos,ypos))
+            pars[:,-2]=g1
+            pars[:,-1]=g2
+
+        elif(shearOpt == "NFW"):
+            pass
+
+    return pars
+    
 def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
 # fit model to fiber velocities
 # vfibFlux is the data to be fit
@@ -690,18 +766,33 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
     nSteps=500
     sampler.run_mcmc(pos, nSteps)
 
-    #    err= lambda pars, xvals, yvals: vmapModel(pars, xvals) - yvals
-    #    pars, success = scipy.optimize.leastsq(err, guess[:], args=(ang,vel))
-    #    pars, pcov=scipy.optimize.curve_fit(vmapModel, ang, vel, guess, sigma=weight, maxfev=100000)
-    #    print "gal_beta={}, gal_q={}, vmax={}. success={}".format(pars[0],pars[1],pars[2],success)
-
-    #    if(showPlot):
-    #	fitX=np.linspace(0,2.*np.pi)
-    #	fitY=vmapModel(fitX,pars[0],pars[1])
-    #	plt.plot(ang,vel,'bo',fitX,fitY,'r-')
-    #	plt.show()
-
     return sampler
+
+def fitObs(specObs,specErr,imObs,imErr,priors,addNoise=False,showPlot=False):
+# wrapper to vmapFit to compare chains with imaging, spectroscopy, and combined observables
+
+    samplerI=vmapFit(None,specErr,imObs,imErr,priors,addNoise=addNoise,showPlot=showPlot)
+    samplerS=vmapFit(specObs,specErr,None,imErr,priors,addNoise=addNoise,showPlot=showPlot)
+    samplerIS=vmapFit(specObs,specErr,imObs,imErr,priors,addNoise=addNoise,showPlot=showPlot)
+    
+    flatchainI=samplerI.flatchain
+    flatlnprobI=samplerI.flatlnprobability
+    flatchainS=samplerS.flatchain
+    flatlnprobS=samplerS.flatlnprobability
+    flatchainIS=samplerIS.flatchain
+    flatlnprobIS=samplerIS.flatlnprobability
+    
+    goodI=(flatlnprobI > -np.Inf)
+    goodS=(flatlnprobS > -np.Inf)
+    goodIS=(flatlnprobIS > -np.Inf)
+
+    chains=[flatchainI[goodI], flatchainS[goodS], flatchainIS[goodIS]]
+    lnprobs=[flatlnprobI[goodI],flatlnprobS[goodS],flatlnprobIS[goodIS]]
+    return (chains,lnprobs)
+
+def getMaxProb(chain,lnprob):
+    maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
+    return chain[maxP,-2:]
 
 def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib,showPlot=False):
 
