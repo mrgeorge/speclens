@@ -37,7 +37,7 @@ if __name__ == "__main__":
     ell=[disk_r,gal_q,gal_beta]
     lines=sim.getEllipseAxes(ell)
     
-    vmap,fluxVMap,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
     trim=1
     plt.clf()
     sim.showImage(vmap,0,1,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.{}".format(figExt),showPlot=showPlot)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     g1=0.2
     g2=0.
     
-    vmapSheared,fluxVMapSheared,galXSheared,galKSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
     ellSheared=sim.shearEllipse(ell,g1,g2)
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
@@ -165,75 +165,3 @@ if __name__ == "__main__":
         
     plt.hist((errI,errS,errIS),colors=["red","green","blue"],bins=50)
     print np.std(errI),np.std(errS),np.std(errIS)
-
-
-
-
-
-    bulge_n=4.
-    bulge_r=1.
-    disk_n=1.
-    disk_r=2.
-    bulge_frac=0.
-    gal_q=0.2
-    gal_beta=20.
-    gal_flux=1.
-    atmos_fwhm=1.
-    pixScale=0.1
-    imgSizePix=100
-    rotCurveOpt='flat'
-    g1=0
-    g2=0
-    
-    ell=[disk_r,gal_q,gal_beta]
-    lines=sim.getEllipseAxes(ell)
-    
-    vmap,fluxVMapX,fluxVMapK,galX,galK = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
-    trim=1
-
-    fibRad=1.
-    
-    plt.clf()
-    sim.showImage(galK,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-
-    circ=sim.galsim.Moffat(beta=0,scale_radius=10.,trunc=fibRad)
-    conv1=sim.galsim.Convolve([circ,galK])
-
-    numFib=7
-    ff1=np.zeros(numFib)
-    vf1=np.zeros(numFib)
-    print "starting FF1"
-    for fibID in range(numFib):
-        ff1[fibID],err=sim.getFiberFlux(fibID,numFib,fibRad,galX)
-        vf1[fibID],err=sim.getFiberFlux(fibID,numFib,fibRad,fluxVMapX)
-    print "starting FF2"
-    ff2=sim.getFiberFluxes(numFib,fibRad,galK)
-    vf2=sim.getFiberFluxes(numFib,fibRad,fluxVMapK)
-
-    print ff1/ff1[0]
-    print ff2/ff2[0]
-    print vf1/vf1[0]
-    print vf2/vf2[0]
-
-    print vf1/ff1
-    print vf2/ff2
-
-    sim.showImage(conv1,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-    sim.showImage(galK,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-    sim.showImage(fluxVMapK,7,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-    
-    pixScale=0.1
-    imgSizePix=int(10.*fibRad/pixScale)
-    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
-    circArr=circ.draw(image=imgFrame,dx=pixScale).array.copy()
-    galArr=galK.draw(image=imgFrame,dx=pixScale).array.copy()
-    conv2Arr=scipy.signal.convolve2d(circArr,galArr,mode="same")
-    conv2=sim.galsim.InterpolatedImage(sim.galsim.ImageViewF(conv2Arr,scale=pixScale))
-    sim.showImage(conv1,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-    sim.showImage(conv2,0,1,trim=trim,ellipse=ell,lines=lines,showPlot=True)
-
-    conv1Arr=conv1.draw(image=imgFrame,dx=pixScale).array.copy()
-    plt.imshow((conv2Arr-conv1Arr)/conv2Arr,interpolation="nearest")
-    plt.colorbar()
-    plt.show()
-    
