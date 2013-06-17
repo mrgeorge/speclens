@@ -463,38 +463,8 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 	showImage(fluxVMap,numFib,fibRad,showPlot=True)
 
     # Get the flux in each fiber
-    print "starting gal 1"
-    galFibFlux=np.zeros(numFib)
-    if((numFib-1) % 2 != 0):
-        for ii in range(numFib):
-            print "{}/{}".format(ii,numFib)
-            galFibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,gal)
-            print galFibFlux[ii],error
-    else: # take advantage of symmetry of outer fibers
-        for ii in range(1+(numFib-1)/2):
-            print "{}/{}".format(ii,numFib)
-            galFibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,gal)
-            if(ii > 0):
-                print "{}/{}".format(ii+(numFib-1)/2,numFib)
-                galFibFlux[ii+(numFib-1)/2]=galFibFlux[ii]
-            print galFibFlux[ii],error
-
-    print "starting vmap 1"
-    vmapFibFlux=np.zeros(numFib)
-    for ii in range(numFib):
-        print "{}/{}".format(ii,numFib)
-        vmapFibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,fluxVMap)
-        print vmapFibFlux[ii],error
-
-    print "starting gal 2"
-    galFibFlux2=getFiberFluxes(numFib,fibRad,gal)
-    print "starting vmap 2"
-    vmapFibFlux2=getFiberFluxes(numFib,fibRad,fluxVMap)
-
-    print vmapFibFlux/galFibFlux
-    print vmapFibFlux2/galFibFlux2
-    print vmapFibFlux, vmapFibFlux2
-    print galFibFlux, galFibFlux2
+    galFibFlux=getFiberFluxes(numFib,fibRad,gal)
+    vmapFibFlux=getFiberFluxes(numFib,fibRad,fluxVMap)
 
     return vmapFibFlux/galFibFlux
 
