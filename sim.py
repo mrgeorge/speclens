@@ -423,11 +423,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     # Apply lensing shear to galaxy and velocity maps
     gal.applyShear(g1=g1,g2=g2)
-    galX=gal
-    galK=gal
     fluxVMap.applyShear(g1=g1,g2=g2)
-    fluxVMapX=fluxVMap
-    fluxVMapK=fluxVMap
     vmap.applyShear(g1=g1,g2=g2)
 
     # Convolve velocity map and galaxy with PSF
@@ -436,29 +432,19 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
         # Define atmospheric PSF
         #    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
 	atmos=galsim.Gaussian(fwhm=atmos_fwhm)
+        fluxVMap=galsim.Convolve([atmos, fluxVMap])
+        gal=galsim.Convolve([atmos, gal])
 
-        # note: real-space convolution with InterpolatedImage doesn't seem to work,
-        #       so just use scipy's convolve2d to convolve the arrays
-	# must store these arrays as copies to avoid overwriting with shared imgFrame
-	fluxVMapArr=fluxVMap.draw(image=imgFrame,dx=pixScale).array.copy()
-	atmosArr=atmos.draw(image=imgFrame,dx=pixScale).array.copy()
-	fluxVMapArrPSF=scipy.signal.convolve2d(fluxVMapArr,atmosArr,mode='same')
-	fluxVMapX=galsim.InterpolatedImage(galsim.ImageViewF(fluxVMapArrPSF,scale=pixScale))
-        fluxVMapK=galsim.Convolve([atmos, fluxVMap],real_space=False) # used fourier-space convolution for faster drawing
-    
-        galX=galsim.Convolve([atmos, gal],real_space=True) # used real-space convolution for easier real-space integration
-        galK=galsim.Convolve([atmos, gal],real_space=False) # used real-space convolution for easier real-space integration
-
-    return (vmap,fluxVMapX,fluxVMapK,galX,galK)
+    return (vmap,fluxVMap,gal)
 
 def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,g1,g2,pixScale,fibRad,numFib,showPlot=False):
 # get flux-weighted fiber-averaged velocities
 	
     imgSizePix=int(10.*fibRad/pixScale)
-    vmap,fluxVMap,gal,galK=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
 
     if(showPlot):
-	showImage(galK,numFib,fibRad,showPlot=True)
+	showImage(gal,numFib,fibRad,showPlot=True)
 	showImage(vmap,numFib,fibRad,showPlot=True)
 	showImage(fluxVMap,numFib,fibRad,showPlot=True)
 
