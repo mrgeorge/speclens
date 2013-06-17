@@ -558,10 +558,8 @@ def vmapModel(pars, fiberAngles):
 	rotCurvePars=np.array([vmax])
 	nSamp=fiberAngles.size
 	vmodel=np.zeros(nSamp)
-	for ii in range(nSamp):
-	    # coordinates in the plane of the galaxy
-	    radvec=np.array([xp[ii],yp[ii],yp[ii]*tani])
-	    vmodel[ii]=getOmega(np.linalg.norm(radvec),rotCurvePars,option='flat') * sini * np.dot(radvec,kvec)
+        radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
+        vmodel=getOmega(radNorm,rotCurvePars,option="flat") * sini * xp
     else:
 	vmodel=None
 
