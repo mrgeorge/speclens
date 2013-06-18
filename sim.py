@@ -28,6 +28,13 @@ def getFiberPos(numFib,fibRad,fibConfig):
         pos[0,1:]=rad*np.cos(theta)
         pos[1,1:]=rad*np.sin(theta)
         return pos
+    elif(fibConfig=="hexNoCen"):
+        pos=np.zeros((2,numFib))
+        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
+        rad=2.*fibRad
+        pos[0,:]=rad*np.cos(theta)
+        pos[1,:]=rad*np.sin(theta)
+        return pos
     else:
         # TO DO - add other configs - line, box, circle. and extend hex for MaNGA style
         pass 
@@ -666,7 +673,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hex",addNoise=True,showPlot=False):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,showPlot=False):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
