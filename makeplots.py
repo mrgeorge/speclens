@@ -78,37 +78,44 @@ if __name__ == "__main__":
     g1=0.
     g2=0.
     pars = np.array([gal_beta, gal_q, vmax, g1, g2])
+    numFib=7
+    fibRad=1.
+    fibConfig="hex"
+    xfib,yfib=sim.getFiberPos(numFib,fibRad,fibConfig)
     
-    xvals=np.linspace(0,2.*np.pi,num=200)
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="blue",linestyle='-',lw=3,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}, g1={}, g2={}".format(pars[2],pars[3],pars[4]))
+    theta=np.linspace(0,2.*np.pi,num=200)
+    xvals=2.*fibRad*np.cos(theta)
+    yvals=2.*fibRad*np.sin(theta)
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="blue",linestyle='-',lw=3,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}, g1={}, g2={}".format(pars[2],pars[3],pars[4]))
     
-    xsamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-    ysamp=sim.vmapModel(pars, xsamp)
-    yerr=np.repeat(sigma,xsamp.size)
+    thetasamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
+    xsamp=2.*fibRad*np.cos(thetasamp)
+    ysamp=2.*fibRad*np.sin(thetasamp)
+    vsamp=sim.vmapModel(pars, xsamp, ysamp)
+    verr=np.repeat(sigma,xsamp.size)
     
-    plt.errorbar(np.rad2deg(xsamp),ysamp,yerr=yerr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
-    
+    plt.errorbar(np.rad2deg(thetasamp),vsamp,yerr=verr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
     
     pars = np.array([gal_beta, gal_q+0.2, vmax, g1, g2])
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
     
     pars = np.array([gal_beta+20, gal_q, vmax, g1, g2])
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
     
     pars = np.array([gal_beta, gal_q, vmax+50, g1, g2])
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
     
     pars = np.array([gal_beta, gal_q, vmax, g1+0.1, g2])
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="yellow",linestyle="-",lw=2,label="g1"+"={}".format(pars[3]))
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="yellow",linestyle="-",lw=2,label="g1"+"={}".format(pars[3]))
     
     pars = np.array([gal_beta, gal_q, vmax+50, g1, g2+0.1])
-    yvals=sim.vmapModel(pars, xvals)
-    plt.plot(np.rad2deg(xvals),yvals,color="magenta",linestyle="--",lw=2,label="g2"+"={}".format(pars[4]))
+    vvals=sim.vmapModel(pars, xvals, yvals)
+    plt.plot(np.rad2deg(theta),vvals,color="magenta",linestyle="--",lw=2,label="g2"+"={}".format(pars[4]))
     
     plt.legend(loc="upper right",prop={'size':14},frameon=False)
     
