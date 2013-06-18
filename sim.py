@@ -42,17 +42,23 @@ def getFiberFlux(fibID,numFib,fibRad,fibConfig,image,tol=1.e-4):
     fiberPos=getFiberPos(numFib,fibRad,fibConfig)[:,fibID]
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
-def getFiberFluxes(xobs,yobs,fibRad,image):
+def getFiberFluxes(xobs,yobs,fibRad,fibConvolve,image):
+# convolve image with fiber area and return fiber flux
+# if fibConvolve is False, just sample the image at central position without convolving
+ 
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
 
-    scale_radius=10.*fibRad
-    beta=0.
-    fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=fibRad) # a kludgy way to get a circular tophat
-
-    fibImage=galsim.Convolve([fiber,image])
-    fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array.copy()
-
     coordsPix=np.array([xobs,yobs])/pixScale + 0.5*imgSizePix # converted to pixels
+
+    if(fibConvolve):
+        scale_radius=10.*fibRad
+        beta=0.
+        fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=fibRad) # a kludgy way to get a circular tophat
+
+        fibImage=galsim.Convolve([fiber,image])
+        fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array.copy()
+    else:
+        fibImageArr=image.draw(image=imgFrame,dx=pixScale).array.copy()
 
     return scipy.ndimage.map_coordinates(fibImageArr.T,coordsPix)
     
@@ -414,7 +420,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,showPlot=False):
+def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False):
 # get flux-weighted fiber-averaged velocities
 	
     gal_beta,gal_q,vmax,g1,g2=pars
@@ -437,8 +443,8 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,showPlot=False):
 	showImage(fluxVMap,xobs,yobs,fibRad,showPlot=True)
 
     # Get the flux in each fiber
-    galFibFlux=getFiberFluxes(xobs,yobs,fibRad,gal)
-    vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fluxVMap)
+    galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
+    vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
 
     return vmapFibFlux/galFibFlux
 
@@ -490,15 +496,15 @@ def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fi
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-            if(atmos_fwhm | fibConvolve):
-                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad)
+            if((atmos_fwhm > 0) | fibConvolve):
+                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve)
             else: # this is faster if we don't need to convolve with psf or fiber
                 model=vmapModel(fullPars,xobs,yobs)
 	    data=vobs
 	    error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-            if(atmos_fwhm | fibConvolve):
-                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad)
+            if((atmos_fwhm > 0) | fibConvolve):
+                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve)
             else: # this is faster if we don't need to convolve with psf or fiber
                 vmodel=vmapModel(fullPars,xobs,yobs)
 	    model=np.concatenate([vmodel,ellModel(fullPars)])
