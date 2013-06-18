@@ -408,8 +408,15 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     # Weight velocity map by galaxy flux and make galsim object
     fluxVMapArr=vmapArr*imgArr
+
+    sumFVM=np.sum(fluxVMapArr)
+    if(np.abs(sumFVM) < 0.01):
+        print "experimental renorm"
+        fluxVMapArr/=sumFVM
+        gal.scaleFlux(1./sumFVM)
+
     fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=pixScale)
-    fluxVMap=galsim.InterpolatedImage(fluxVMapImg)
+    fluxVMap=galsim.InterpolatedImage(fluxVMapImg,pad_factor=6.)
     vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
@@ -438,7 +445,7 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False):
     disk_n=1.
     disk_r=1.
     bulge_frac=0.
-    gal_flux=1.
+    gal_flux=1.e6
     rotCurveOpt="flat"
     rotCurvePars=np.array([vmax])
 
@@ -673,7 +680,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,showPlot=False):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
