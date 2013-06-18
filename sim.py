@@ -14,6 +14,9 @@ plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
 plt.rc('axes',linewidth=1.5)
 
+pixScale=0.1
+imgSizePix=100
+
 def getFiberPos(fibID,numFib,fibRad):
     # returns fiber position relative to center in same units as fibRad (arcsec)
     if(fibID == 0):
@@ -35,8 +38,6 @@ def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
 def getFiberFluxes(numFib,fibRad,image):
-    pixScale=0.1
-    imgSizePix=int(10.*fibRad/pixScale)
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
 
     scale_radius=10.*fibRad
@@ -132,8 +133,6 @@ def getEllipseAxes(ellipse):
 def showImage(profile,numFib,fibRad,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
-    pixScale=0.1
-    imgSizePix=int(10.*fibRad/pixScale)
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
     img=profile.draw(image=imgFrame,dx=pixScale)
     halfWidth=0.5*imgSizePix*pixScale # arcsec
@@ -322,28 +321,6 @@ def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","g
     if(showPlot):
 	fig.show()
 
-
-def makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm):
-    # Define the galaxy profile
-    bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
-    disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
-
-    gal=bulge_frac * bulge + (1.-bulge_frac) * disk
-    gal.setFlux(gal_flux)
-    
-    # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
-    gal.applyShear(gal_shape)
-
-    # Define atmospheric PSF
-    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
-
-    # Convolve galaxy with PSF
-    nopixX=galsim.Convolve([atmos, gal],real_space=True) # used real-space convolution for easier real-space integration
-    nopixK=galsim.Convolve([atmos, gal],real_space=False) # used fourier-space convolution for faster drawing
-
-    return (nopixX, nopixK)
-
 def getInclination(gal_q):
 # see http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
     # just give simple flat thin disk case for now
@@ -363,7 +340,7 @@ def getOmega(rad,pars,option='flat'):
         vel=np.sqrt(mass/rad)
         return pars[0]*vel/rad
 
-def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2):
+def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
 # Construct galsim objects for galaxy (image), velocity map, and flux-weighted velocity map
 # with optional lensing shear and PSF convolution
 	
@@ -402,13 +379,6 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     tani=np.tan(inc)
     gal_beta_rad=np.deg2rad(gal_beta)
 
-    if(rotCurveOpt=='flat'):
-        rotCurvePars=np.array([100])
-    elif(rotCurveOpt=='solid'):
-        rotCurvePars=np.array([100,5])
-    elif(rotCurveOpt=='nfw'):
-        rotCurvePars=np.array([100,5])
-
     # Fill velocity map array
     xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
     xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
@@ -439,11 +409,22 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,g1,g2,pixScale,fibRad,numFib,showPlot=False):
+def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,showPlot=False):
 # get flux-weighted fiber-averaged velocities
 	
-    imgSizePix=int(10.*fibRad/pixScale)
-    vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    gal_beta,gal_q,vmax,g1,g2=pars
+    
+    numFib=xobs.size
+    bulge_n=4.
+    bulge_r=1.
+    disk_n=1.
+    disk_r=1.
+    bulge_frac=0.
+    gal_flux=1.
+    rotCurveOpt="flat"
+    rotCurvePars=np.array([vmax])
+
+    vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
     if(showPlot):
 	showImage(gal,numFib,fibRad,showPlot=True)
@@ -456,7 +437,7 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 
     return vmapFibFlux/galFibFlux
 
-def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed):
+def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, atmos_fwhm, fibArg):
 # pars are the free parameters to be fit (some or all of [PA, b/a, vmax, g1, g2])
 # xobs, yobs are the fiber positions for velocity measurements
 # vobs are the measured velocities
@@ -504,11 +485,18 @@ def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fi
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-	    model=vmapModel(fullPars,xobs,yobs)
+            if(atmos_fwhm | fibArg):
+                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibArg)
+            else: # this is faster if we don't need to convolve with psf or fiber
+                model=vmapModel(fullPars,xobs,yobs)
 	    data=vobs
 	    error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-	    model=np.concatenate([vmapModel(fullPars,xobs,yobs),ellModel(fullPars)])
+            if(atmos_fwhm | fibArg):
+                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibArg)
+            else: # this is faster if we don't need to convolve with psf or fiber
+                vmodel=vmapModel(fullPars,xobs,yobs)
+	    model=np.concatenate([vmodel,ellModel(fullPars)])
 	    data=np.concatenate([vobs,ellobs])
 	    error=np.concatenate([verr,ellerr])
 
@@ -667,7 +655,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,fibRad=1.,fiberConfig="hex",addNoise=True,showPlot=False):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibConvolve=False,fibRad=1.,fiberConfig="hex",addNoise=True,showPlot=False):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -709,11 +697,16 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,fibRad=1.,fiberConfig="hex",addNoise=T
     priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
     nPars=len(guess)
 
+    # decide whether to convolve with fiber area or not
+    if(fibConvolve):
+        fibArg=fibRad
+    else:
+        fibArg=None
 
     # RUN MCMC
     nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed])
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, atmos_fwhm, fibArg])
 
     print "emcee burnin"
     nBurn=200
@@ -752,42 +745,7 @@ def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP,-2:]
 
-def main(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,numFib,showPlot=False):
-
-    #    bulge_n=4.
-    #    bulge_r=1. # arcsec
-    #    disk_n=1
-    #    disk_r=2. # arcsec
-    #    bulge_frac=0.3
-    #    gal_q=0.1 # axis ratio 0<q<1 (1 for circular)
-    #    gal_beta=30.*np.pi/180 # radians (position angle on the sky)
-    atmos_fwhm=1.5 # arcsec
-    fibRad=1. # fiber radius in arcsec
-    #    numFib=7 # number of fibers, symmetric with one in center
-
-    nopixX, nopixK = makeGalImage(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm)
-
-    # Plot the image with fibers overlaid
-    if(showPlot):
-        showImage(nopixK,numFib,fibRad,showPlot=True)
-
-    # Get the flux in each fiber
-    fibFlux=np.zeros(numFib)
-    if((numFib-1) % 2 != 0):
-        for ii in range(numFib):
-            print "{}/{}".format(ii,numFib)
-            fibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,nopixX)
-            print fibFlux[ii],error
-    else: # take advantage of symmetry of outer fibers
-        for ii in range(1+(numFib-1)/2):
-            print "{}/{}".format(ii,numFib)
-            fibFlux[ii], error=getFiberFlux(ii,numFib,fibRad,nopixX)
-            if(ii > 0):
-                print "{}/{}".format(ii+(numFib-1)/2,numFib)
-                fibFlux[ii+(numFib-1)/2]=fibFlux[ii]
-            print fibFlux[ii],error
-        
-    return fibFlux
 
 if __name__ == "__main__":
-    main(4,1,1,1,0,1,0,1,7)
+    print "use one of the functions - no main written"
+    
