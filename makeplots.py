@@ -40,7 +40,7 @@ if __name__ == "__main__":
     vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     trim=1
     plt.clf()
-    sim.showImage(vmap,0,1,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(vmap,None,None,None,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.{}".format(figExt),showPlot=showPlot)
     
     g1=0.2
     g2=0.
@@ -50,16 +50,20 @@ if __name__ == "__main__":
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
     plt.clf()
-    sim.showImage(vmapSheared,0,1,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="fig1b.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="fig1b.{}".format(figExt),showPlot=showPlot)
     
     # Fig 2
     # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions
     # (unsheared)
     
     plt.clf()
-    sim.showImage(gal,7,1,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="fig2a.{}".format(figExt),showPlot=showPlot)
+    numFib=7
+    fibRad=1.
+    fibConfig="hex"
+    xfib,yfib=sim.getFiberPos(numFib,fibRad,fibConfig)
+    sim.showImage(gal,xfib,yfib,fibRad,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="fig2a.{}".format(figExt),showPlot=showPlot)
     plt.clf()
-    sim.showImage(fluxVMap,7,1,trim=trim,colorbar=False,filename="fig2b.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(fluxVMap,xfib,yfib,fibRad,trim=trim,colorbar=False,filename="fig2b.{}".format(figExt),showPlot=showPlot)
     
     
     # Fig 3
