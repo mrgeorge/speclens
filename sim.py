@@ -482,7 +482,6 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
 	    func=priorFuncs[ii]
 	    if(func is not None):
 		chisq_prior+=func(pars[ii])
-
     if(chisq_prior == np.Inf):
 	return -np.Inf
 
@@ -497,23 +496,19 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
         else:
             fullPars[ii]=fixed[ii]
 
-
-
     if((xobs is None) & (ellobs is None)): # no data, only priors
 	chisq_like=0.
     else:
-	vmodel,ellmodel=vmapModel(fullPars,xobs)
-
         if((xobs is None) & (ellobs is not None)): # use only imaging data
-	    model=ellmodel
+	    model=ellModel(fullPars)
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-	    model=vmodel
+	    model=vmapModel(fullPars,xobs)
 	    data=yobs
 	    error=yerr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-	    model=np.concatenate([vmodel,ellmodel])
+	    model=np.concatenate([vmapModel(fullPars,xobs),ellModel(fullPars)])
 	    data=np.concatenate([yobs,ellobs])
 	    error=np.concatenate([yerr,ellerr])
 
@@ -569,7 +564,18 @@ def vmapModel(pars, fiberAngles):
     disk_r_prime,gal_beta_prime,gal_q_prime=shearEllipse(ellipse,g1,g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
-    return (vmodel,ellmodel)
+    return vmodel
+
+def ellModel(pars):
+    # compute imaging observable
+    gal_beta,gal_q,vmax,g1,g2=pars
+
+    disk_r=1. # we're not modeling sizes now
+    ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
+    disk_r_prime,gal_beta_prime,gal_q_prime=shearEllipse(ellipse,g1,g2)
+    ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
+
+    return ellmodel
 
 def makeFlatPrior(range):
     return lambda x: priorFlat(x, range)
