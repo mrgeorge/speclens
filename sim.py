@@ -23,10 +23,10 @@ def getFiberPos(numFib,fibRad,fibConfig):
     if(fibConfig=="hex"):
         pos=np.zeros((2,numFib))
         pos[:,0]=np.array([0.,0.])
-        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
+        theta=np.linspace(0,2*np.pi,num=numFib-1,endpoint=False)
         rad=2.*fibRad
-        pos[0,:]=rad*np.cos(theta)
-        pos[1,:]=rad*np.sin(theta)
+        pos[0,1:]=rad*np.cos(theta)
+        pos[1,1:]=rad*np.sin(theta)
         return pos
     else:
         # TO DO - add other configs - line, box, circle. and extend hex for MaNGA style
@@ -133,7 +133,7 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-def showImage(profile,numFib,fibRad,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
+def showImage(profile,xfib,yfib,fibRad,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
@@ -147,11 +147,14 @@ def showImage(profile,numFib,fibRad,filename=None,colorbar=True,colorbarLabel=r"
 	plotArr=np.log(img.array)
 
     plt.imshow(plotArr,origin='lower',extent=(-halfWidth,halfWidth,-halfWidth,halfWidth),interpolation='nearest',cmap=cmap)
-    for ii in range(numFib):
-        pos=getFiberPos(ii,numFib,fibRad)
-        circ=plt.Circle((pos.x,pos.y),radius=fibRad,fill=False,color='white',lw=2)
-        ax=plt.gca()
-        ax.add_patch(circ)
+
+    if(xfib is not None):
+        numFib=xfib.size
+        for pos in zip(xfib,yfib):
+            circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=2)
+            ax=plt.gca()
+            ax.add_patch(circ)
+
     if(colorbar):
 	cbar=plt.colorbar()
 	if(colorbarLabel is not None):
@@ -429,9 +432,9 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,showPlot=False):
     vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
     if(showPlot):
-	showImage(gal,numFib,fibRad,showPlot=True)
-	showImage(vmap,numFib,fibRad,showPlot=True)
-	showImage(fluxVMap,numFib,fibRad,showPlot=True)
+	showImage(gal,xobs,yobs,fibRad,showPlot=True)
+	showImage(vmap,xobs,yobs,fibRad,showPlot=True)
+	showImage(fluxVMap,xobs,yobs,fibRad,showPlot=True)
 
     # Get the flux in each fiber
     galFibFlux=getFiberFluxes(xobs,yobs,fibRad,gal)
