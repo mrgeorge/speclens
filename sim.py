@@ -17,27 +17,32 @@ plt.rc('axes',linewidth=1.5)
 pixScale=0.1
 imgSizePix=100
 
-def getFiberPos(fibID,numFib,fibRad):
-    # returns fiber position relative to center in same units as fibRad (arcsec)
-    if(fibID == 0):
-        pos=galsim.PositionD(x=0,y=0)
-    else:
-        theta=(fibID-1.)/(numFib-1.) * 2.*np.pi
+def getFiberPos(numFib,fibRad,fibConfig):
+# returns fiber center positions relative to origin in same units as fibRad (arcsec)
+
+    if(fibConfig=="hex"):
+        pos=np.zeros((2,numFib))
+        pos[:,0]=np.array([0.,0.])
+        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
         rad=2.*fibRad
-        pos=galsim.PositionD(x=rad*np.cos(theta),y=rad*np.sin(theta))
-    return pos
+        pos[0,:]=rad*np.cos(theta)
+        pos[1,:]=rad*np.sin(theta)
+        return pos
+    else:
+        # TO DO - add other configs - line, box, circle. and extend hex for MaNGA style
+        pass 
 
 # These functions take a galsim object <image> and integrate over the area of a fiber
 def radIntegrand(rad,theta,fiberPos,image):
-    pos=galsim.PositionD(x=fiberPos.x+rad*np.cos(theta),y=fiberPos.y+rad*np.sin(theta))
+    pos=galsim.PositionD(x=fiberPos[0]+rad*np.cos(theta),y=fiberPos[1]+rad*np.sin(theta))
     return rad*image.xValue(pos)
 def thetaIntegrand(theta,fiberPos,image,fibRad,tol):
     return scipy.integrate.quad(radIntegrand,0,fibRad,args=(theta,fiberPos,image),epsabs=tol,epsrel=tol)[0]
-def getFiberFlux(fibID,numFib,fibRad,image,tol=1.e-4):
-    fiberPos=getFiberPos(fibID,numFib,fibRad)
+def getFiberFlux(fibID,numFib,fibRad,fibConfig,image,tol=1.e-4):
+    fiberPos=getFiberPos(numFib,fibRad,fibConfig)[:,fibID]
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
-def getFiberFluxes(numFib,fibRad,image):
+def getFiberFluxes(xobs,yobs,fibRad,image):
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
 
     scale_radius=10.*fibRad
@@ -45,11 +50,9 @@ def getFiberFluxes(numFib,fibRad,image):
     fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=fibRad) # a kludgy way to get a circular tophat
 
     fibImage=galsim.Convolve([fiber,image])
-    fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array
+    fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array.copy()
 
-    fiberPos=np.array([getFiberPos(fibID,numFib,fibRad) for fibID in range(numFib)])
-    coords=np.array([np.array([fiberPos[ii].x,fiberPos[ii].y]) for ii in range(numFib)]).T # ndarr of x, y values in arcsec
-    coordsPix=coords/pixScale + 0.5*imgSizePix # converted to pixels
+    coordsPix=np.array([xobs,yobs])/pixScale + 0.5*imgSizePix # converted to pixels
 
     return scipy.ndimage.map_coordinates(fibImageArr.T,coordsPix)
     
@@ -400,7 +403,6 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     # Convolve velocity map and galaxy with PSF
     if(atmos_fwhm > 0):
-
         # Define atmospheric PSF
         #    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
 	atmos=galsim.Gaussian(fwhm=atmos_fwhm)
@@ -432,12 +434,12 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,showPlot=False):
 	showImage(fluxVMap,numFib,fibRad,showPlot=True)
 
     # Get the flux in each fiber
-    galFibFlux=getFiberFluxes(numFib,fibRad,gal)
-    vmapFibFlux=getFiberFluxes(numFib,fibRad,fluxVMap)
+    galFibFlux=getFiberFluxes(xobs,yobs,fibRad,gal)
+    vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fluxVMap)
 
     return vmapFibFlux/galFibFlux
 
-def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, atmos_fwhm, fibArg):
+def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, atmos_fwhm, fibRad, fibConvolve):
 # pars are the free parameters to be fit (some or all of [PA, b/a, vmax, g1, g2])
 # xobs, yobs are the fiber positions for velocity measurements
 # vobs are the measured velocities
@@ -485,15 +487,15 @@ def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fi
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-            if(atmos_fwhm | fibArg):
-                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibArg)
+            if(atmos_fwhm | fibConvolve):
+                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad)
             else: # this is faster if we don't need to convolve with psf or fiber
                 model=vmapModel(fullPars,xobs,yobs)
 	    data=vobs
 	    error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-            if(atmos_fwhm | fibArg):
-                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibArg)
+            if(atmos_fwhm | fibConvolve):
+                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad)
             else: # this is faster if we don't need to convolve with psf or fiber
                 vmodel=vmapModel(fullPars,xobs,yobs)
 	    model=np.concatenate([vmodel,ellModel(fullPars)])
@@ -655,7 +657,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibConvolve=False,fibRad=1.,fiberConfig="hex",addNoise=True,showPlot=False):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hex",addNoise=True,showPlot=False):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -669,7 +671,7 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibConvolv
     # SETUP DATA
     if(vobs is not None):
 	numFib=vobs.size
-        xobs,yobs=getFiberPos(numFib,fibRad,fiberConfig)
+        xobs,yobs=getFiberPos(numFib,fibRad,fibConfig)
 	vel=vobs.copy()
 	velErr=np.repeat(sigma,numFib)
     else:
@@ -697,16 +699,10 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibConvolv
     priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
     nPars=len(guess)
 
-    # decide whether to convolve with fiber area or not
-    if(fibConvolve):
-        fibArg=fibRad
-    else:
-        fibArg=None
-
     # RUN MCMC
     nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, atmos_fwhm, fibArg])
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, atmos_fwhm, fibRad, fibConvolve])
 
     print "emcee burnin"
     nBurn=200
@@ -719,12 +715,13 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibConvolv
 
     return sampler
 
-def fitObs(specObs,specErr,imObs,imErr,priors,addNoise=False,showPlot=False):
+def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
 # wrapper to vmapFit to compare chains with imaging, spectroscopy, and combined observables
+# passes kwargs to vmapFit
 
-    samplerI=vmapFit(None,specErr,imObs,imErr,priors,addNoise=addNoise,showPlot=showPlot)
-    samplerS=vmapFit(specObs,specErr,None,imErr,priors,addNoise=addNoise,showPlot=showPlot)
-    samplerIS=vmapFit(specObs,specErr,imObs,imErr,priors,addNoise=addNoise,showPlot=showPlot)
+    samplerI=vmapFit(None,specErr,imObs,imErr,priors,**kwargs)
+    samplerS=vmapFit(specObs,specErr,None,imErr,priors,**kwargs)
+    samplerIS=vmapFit(specObs,specErr,imObs,imErr,priors,**kwargs)
     
     flatchainI=samplerI.flatchain
     flatlnprobI=samplerI.flatlnprobability
