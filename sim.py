@@ -456,11 +456,11 @@ def vmapObs(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atm
 
     return vmapFibFlux/galFibFlux
 
-def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
+def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed):
 # pars are the free parameters to be fit (some or all of [PA, b/a, vmax, g1, g2])
-# xobs are the fiber position angles for velocity measurements
-# yobs are the measured velocities
-# yerr are the uncertainties in measured velocities
+# xobs, yobs are the fiber positions for velocity measurements
+# vobs are the measured velocities
+# verr are the uncertainties in measured velocities
 # ellobs are the imaging observables sheared (PA, b/a)
 # ellerr are the uncertainties on the imaging observables
 # priorFuncs are the functions that define the priors (from interpretPriors)
@@ -504,35 +504,30 @@ def lnProbVMapModel(pars, xobs, yobs, yerr, ellobs, ellerr, priorFuncs, fixed):
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-	    model=vmapModel(fullPars,xobs)
-	    data=yobs
-	    error=yerr
+	    model=vmapModel(fullPars,xobs,yobs)
+	    data=vobs
+	    error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-	    model=np.concatenate([vmapModel(fullPars,xobs),ellModel(fullPars)])
-	    data=np.concatenate([yobs,ellobs])
-	    error=np.concatenate([yerr,ellerr])
+	    model=np.concatenate([vmapModel(fullPars,xobs,yobs),ellModel(fullPars)])
+	    data=np.concatenate([vobs,ellobs])
+	    error=np.concatenate([verr,ellerr])
 
 	chisq_like=np.sum(((model-data)/error)**2)
 
     return -0.5*(chisq_like+chisq_prior)
 
-def vmapModel(pars, fiberAngles):
+def vmapModel(pars, xobs, yobs):
 # evaluate velocity field at azimuthal angles around center, called by curve_fit
 # pars: PA in deg., gal_q, vmax, g1, g2 [PA, gal_q, and vmax are the *unsheared* parameters]
-# fiberAngles are the N azimuthal angles (in radians) at which the *sheared* (observed) field is sampled
-# returns (vmodel, ellmodel), where vmodel is an N array of fiber velocities, ellmodel is the sheared (gal_beta,gal_q)
+# xobs, yobs are the N positions (in arcsec) relative to the center at which
+#    the *sheared* (observed) field is sampled
+# returns (vmodel, ellmodel), where vmodel is an N array of fiber velocities,
+#    ellmodel is the array of sheared imaging observables (gal_beta,gal_q)
 
     gal_beta,gal_q,vmax,g1,g2=pars
 
     # compute spectroscopic observable
-    if(fiberAngles is not None):
-	fibRad=1.
-	rad=2.*fibRad # assume the fibers sample the v field at their center
-
-	# Cartesian coords
-	xobs=rad*np.cos(fiberAngles)
-	yobs=rad*np.sin(fiberAngles)    
-
+    if(xobs is not None):
 	# convert coords to source plane
 	pairs=shearPairs(np.array(zip(xobs,yobs)),-g1,-g2)
 	xx=pairs[:,0]
@@ -551,7 +546,7 @@ def vmapModel(pars, fiberAngles):
 	tani=np.tan(inc)
 
 	rotCurvePars=np.array([vmax])
-	nSamp=fiberAngles.size
+	nSamp=xobs.size
 	vmodel=np.zeros(nSamp)
         radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
         vmodel=getOmega(radNorm,rotCurvePars,option="flat") * sini * xp
@@ -672,9 +667,9 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
+def vmapFit(vobs,sigma,imObs,imErr,priors,fibRad=1.,fiberConfig="hex",addNoise=True,showPlot=False):
 # fit model to fiber velocities
-# vfibFlux is the data to be fit
+# vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
 
 # priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax
@@ -684,13 +679,14 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
 #    tuple(a,b): gaussian prior with mean a and stddev b
 
     # SETUP DATA
-    if(vfibFlux is not None):
-	numFib=vfibFlux.size
-	ang=np.linspace(0,2.*np.pi,num=numFib,endpoint=False)
-	vel=vfibFlux.copy()
+    if(vobs is not None):
+	numFib=vobs.size
+        xobs,yobs=getFiberPos(numFib,fibRad,fiberConfig)
+	vel=vobs.copy()
 	velErr=np.repeat(sigma,numFib)
     else:
-	ang=None
+	xobs=None
+        yobs=None
 	vel=None
 	velErr=None
     if(imObs is not None):
@@ -701,7 +697,7 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
 	ellErr=None
 	
     if(addNoise): # useful when simulating many realizations to project parameter constraints
-	if(vfibFlux is not None):
+	if(vobs is not None):
 	    specNoise=np.random.randn(numFib)*sigma
 	    vel+=specNoise
 	if(imObs is not None):
@@ -717,7 +713,7 @@ def vmapFit(vfibFlux,sigma,imObs,imErr,priors,addNoise=True,showPlot=False):
     # RUN MCMC
     nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[ang, vel, velErr, ellObs, ellErr, priorFuncs, fixed])
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed])
 
     print "emcee burnin"
     nBurn=200
