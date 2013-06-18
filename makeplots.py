@@ -135,17 +135,31 @@ if __name__ == "__main__":
     pars = np.array([105, 0.5, 200, 0, 0.15])
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     sigma=30.
-    xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-    yvals=sim.vmapModel(pars, xvals)
+    numFib=6
+    fibRad=1
+    fibConfig="hexNoCen"
+    xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
+    vvals=sim.vmapModel(pars, xvals, yvals)
     ellObs=sim.ellModel(pars)
     ellErr=np.array([0.1,10])
-    priors=[None,[0,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
+    priors=[None,[0.1,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
 
     # compare imaging vs spectro vs combined
-    chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,priors,addNoise=False,showPlot=False)
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False)
     smooth=3
     plt.clf()
-    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4a.{}".format(figExt),showPlot=showPlot)
+
+    # now try with PSF and fiber convolution
+    atmos_fwhm=1.5
+    disk_r=1.
+    fibConvolve=True
+
+    sampler=sim.vmapFit(vvals,sigma,None,None,priors,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig="hexNoCen",addNoise=False)
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=False)
+    smooth=3
+    plt.clf()
+    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4b.{}".format(figExt),showPlot=showPlot)
 
 
     # Fig 5
@@ -165,7 +179,7 @@ if __name__ == "__main__":
         print "************Running Galaxy {}".format(ii)
         yvals=sim.vmapModel(pars[ii,:], xvals)
         ellObs=sim.ellModel(pars[ii,:])
-        chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,obsPriors,addNoise=False,showPlot=False)
+        chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,obsPriors,addNoise=False)
         gI=np.linalg.norm(sim.getMaxProb(chains[0],lnprobs[0]))
         gS=np.linalg.norm(sim.getMaxProb(chains[1],lnprobs[1]))
         gIS=np.linalg.norm(sim.getMaxProb(chains[2],lnprobs[2]))
@@ -174,7 +188,12 @@ if __name__ == "__main__":
         errS[ii]=gS-np.linalg.norm(pars[ii,-2:])
         errIS[ii]=gIS-np.linalg.norm(pars[ii,-2:])
 
-        print sim.getMaxProb(chains[0],lnprobs[0]), sim.getMaxProb(chains[1],lnprobs[1]), sim.getMaxProb(chains[1],lnprobs[2]), pars[ii,-2:]
+        print sim.getMaxProb(chains[0],lnprobs[0]), sim.getMaxProb(chains[1],lnprobs[1]), sim.getMaxProb(chains[2],lnprobs[2]), pars[ii,-2:]
         
-    plt.hist((errI,errS,errIS),colors=["red","green","blue"],bins=50)
-    print np.std(errI),np.std(errS),np.std(errIS)
+    plt.hist((errI,errS,errIS),color=["red","green","blue"],label=["Imaging","Spectroscopy","Combined"],bins=20)
+    plt.legend()
+    plt.xlabel(r"g$_{obs}$-g$_{true}$")
+    plt.ylabel("N")
+    plt.savefig("fig5.{}".format(figExt))
+    if(showPlot):
+        plt.show()
