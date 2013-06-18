@@ -9,7 +9,7 @@ import numpy as np
 if __name__ == "__main__":
 
     figExt="png" # pdf or png
-    showPlot=False
+    showPlot=True
 
     plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
     plt.rc('text', usetex=True)
@@ -28,16 +28,16 @@ if __name__ == "__main__":
     gal_beta=20.
     gal_flux=1.
     atmos_fwhm=1.
-    pixScale=0.1
-    imgSizePix=100
     rotCurveOpt='flat'
+    vmax=100.
+    rotCurvePars=np.array([vmax])
     g1=0
     g2=0
     
     ell=[disk_r,gal_q,gal_beta]
     lines=sim.getEllipseAxes(ell)
     
-    vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     trim=1
     plt.clf()
     sim.showImage(vmap,0,1,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.{}".format(figExt),showPlot=showPlot)
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     g1=0.2
     g2=0.
     
-    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,pixScale,imgSizePix,rotCurveOpt,g1,g2)
+    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     ellSheared=sim.shearEllipse(ell,g1,g2)
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
