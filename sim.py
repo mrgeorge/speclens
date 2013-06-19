@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm
 import matplotlib.patches
 import emcee
+import fitsio
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
@@ -265,7 +266,7 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(showPlot):
 	plt.show()
     
-def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
+def contourPlotAll(chains,inputPars=None,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
 # make a grid of contour plots for each pair of parameters
 # chain is actually a list of 1 or more chains from emcee sampler
 
@@ -286,7 +287,7 @@ def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","g
 	    if(lo < limArr[par,0]):
 		limArr[par,0]=lo.copy()
 	    if(hi > limArr[par,1]):
-		limArr[par,1]=hi
+		limArr[par,1]=hi.copy()
 
     # handle colors
     if(len(colors) == len(chains)):
@@ -327,10 +328,17 @@ def contourPlotAll(chains,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","g
 		    axarr[row,col].set_ylabel(ylabel)
 		axarr[row,col].set_xlim(xlim)
 		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
+                if(inputPars is not None):
+                    # add vertical lines marking the input value
+                    plt.plot(np.repeat(inputPars[col],2),np.array(plt.gca().get_ylim()),color="yellow",ls="--")
 	    elif(col < row):
 		contourPlot(xarrs,yarrs,smooth=smooth,percentiles=percentiles,colors=contourColors,xlabel=xlabel,ylabel=ylabel)
 		axarr[row,col].set_xlim(xlim)
 		axarr[row,col].set_ylim(ylim)
+                if(inputPars is not None):
+                    # add lines marking the input values
+                    plt.plot(np.repeat(inputPars[col],2),ylim,color="yellow",ls="--")
+                    plt.plot(xlim,np.repeat(inputPars[row],2),color="yellow",ls="--")
 	    else:
 		axarr[row,col].axis("off")
 
@@ -434,7 +442,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False):
+def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,opt="old"):
 # get flux-weighted fiber-averaged velocities
 	
     gal_beta,gal_q,vmax,g1,g2=pars
@@ -449,16 +457,20 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False):
     rotCurveOpt="flat"
     rotCurvePars=np.array([vmax])
 
-    vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+    if(opt=="old"):
+        vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
-    if(showPlot):
-	showImage(gal,xobs,yobs,fibRad,showPlot=True)
-	showImage(vmap,xobs,yobs,fibRad,showPlot=True)
-	showImage(fluxVMap,xobs,yobs,fibRad,showPlot=True)
+        if(showPlot):
+            showImage(gal,xobs,yobs,fibRad,showPlot=True)
+            showImage(vmap,xobs,yobs,fibRad,showPlot=True)
+            showImage(fluxVMap,xobs,yobs,fibRad,showPlot=True)
 
-    # Get the flux in each fiber
-    galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
-    vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
+        # Get the flux in each fiber
+        galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
+        vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
+
+    elif(opt=="new"):
+        pass
 
     return vmapFibFlux/galFibFlux
 
@@ -763,8 +775,33 @@ def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
 
 def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
-    return chain[maxP,-2:]
+    return chain[maxP]
 
+def parsToRec(pars):
+    rec=np.recarray(len(pars),dtype=[("PA",float),("BA",float),("VMAX",float),("G1",float),("G2",float)])
+    rec['PA']=pars[:,0]
+    rec['BA']=pars[:,1]
+    rec['VMAX']=pars[:,2]
+    rec['G1']=pars[:,3]
+    rec['G2']=pars[:,4]
+    return rec
+
+def writeRec(rec,filename):
+    fitsio.write(filename,rec)
+
+def readRec(filename):
+    rec=fitsio.read(filename)
+    return rec
+
+def recToPars(rec):
+    nPars=5
+    pars=np.zeros((len(a),nPars))
+    pars[:,0]=rec['PA']
+    pars[:,1]=rec['BA']
+    pars[:,2]=rec['VMAX']
+    pars[:,3]=rec['G1']
+    pars[:,4]=rec['G2']
+    return pars
 
 if __name__ == "__main__":
     print "use one of the functions - no main written"
