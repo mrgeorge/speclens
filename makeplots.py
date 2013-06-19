@@ -148,7 +148,7 @@ if __name__ == "__main__":
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False)
     smooth=3
     plt.clf()
-    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4a.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4a.{}".format(figExt),showPlot=showPlot)
 
     # now try with PSF and fiber convolution
     atmos_fwhm=1.5
@@ -159,37 +159,47 @@ if __name__ == "__main__":
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=False)
     smooth=3
     plt.clf()
-    sim.contourPlotAll(chains,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4b.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4b.{}".format(figExt),showPlot=showPlot)
 
 
     # Fig 5
     # shear error distribution for ensemble
     nGal=100
+    labels=np.array(["PA","b/a","vmax","g1","g2"])
     inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
     obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
-    pars=sim.generateEnsemble(nGal,inputPriors,shearOpt=None)
-    xvals=np.linspace(0,2.*np.pi,num=6,endpoint=False)
+    inputPars=sim.generateEnsemble(nGal,inputPriors,shearOpt=None)
+    numFib=6
+    fibRad=1
+    fibConfig="hexNoCen"
+    xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
     sigma=30.
     ellErr=np.array([0.1,10])
-    errI=np.zeros(nGal)
-    errS=np.zeros_like(errI)
-    errIS=np.zeros_like(errI)
+    smooth=3
+
+    obsParsI=np.zeros_like(inputPars)
+    obsParsS=np.zeros_like(inputPars)
+    obsParsIS=np.zeros_like(inputPars)
     
     for ii in range(nGal):
         print "************Running Galaxy {}".format(ii)
-        yvals=sim.vmapModel(pars[ii,:], xvals)
-        ellObs=sim.ellModel(pars[ii,:])
-        chains,lnprobs=sim.fitObs(yvals,sigma,ellObs,ellErr,obsPriors,addNoise=False)
-        gI=np.linalg.norm(sim.getMaxProb(chains[0],lnprobs[0]))
-        gS=np.linalg.norm(sim.getMaxProb(chains[1],lnprobs[1]))
-        gIS=np.linalg.norm(sim.getMaxProb(chains[2],lnprobs[2]))
+        vvals=sim.vmapModel(inputPars[ii,:], xvals, yvals)
+        ellObs=sim.ellModel(inputPars[ii,:])
+        chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,fibRad=fibRad,addNoise=True)
+        obsParsI[ii,:]=sim.getMaxProb(chains[0],lnprobs[0])
+        obsParsS[ii,:]=sim.getMaxProb(chains[1],lnprobs[1])
+        obsParsIS[ii,:]=sim.getMaxProb(chains[2],lnprobs[2])
+        print inputPars[ii,:]
+        print obsParsI[ii,:]
+        print obsParsS[ii,:]
+        print obsParsIS[ii,:]
+        sim.contourPlotAll(chains,inputPars=inputPars[ii,:],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig5_gal{}.{}".format(ii,figExt),showPlot=showPlot)
 
-        errI[ii]=gI-np.linalg.norm(pars[ii,-2:])
-        errS[ii]=gS-np.linalg.norm(pars[ii,-2:])
-        errIS[ii]=gIS-np.linalg.norm(pars[ii,-2:])
-
-        print sim.getMaxProb(chains[0],lnprobs[0]), sim.getMaxProb(chains[1],lnprobs[1]), sim.getMaxProb(chains[2],lnprobs[2]), pars[ii,-2:]
-        
+    sim.writeRec(sim.parsToRec(inputPars),"fig5_inputPars.fits")
+    sim.writeRec(sim.parsToRec(obsParsI),"fig5_obsParsI.fits")
+    sim.writeRec(sim.parsToRec(obsParsS),"fig5_obsParsS.fits")
+    sim.writeRec(sim.parsToRec(obsParsIS),"fig5_obsParsIS.fits")
+    
     plt.hist((errI,errS,errIS),color=["red","green","blue"],label=["Imaging","Spectroscopy","Combined"],bins=20)
     plt.legend()
     plt.xlabel(r"g$_{obs}$-g$_{true}$")
