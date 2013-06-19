@@ -442,7 +442,89 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,opt="old"):
+def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
+    # Define the galaxy velocity map
+    if(0 < bulge_frac < 1):
+        bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+        disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
+
+        gal=bulge_frac * bulge + (1.-bulge_frac) * disk
+    elif(bulge_frac == 0):
+        gal=galsim.Sersic(disk_n, half_light_radius=disk_r)
+    elif(bulge_frac == 1):
+        gal=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+
+    gal.setFlux(gal_flux)
+    
+    # Set shape of galaxy from axis ratio and position angle
+    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
+    gal.applyShear(gal_shape)
+
+    # Generate galaxy image and empty velocity map array
+    halfWidth=0.5*imgSizePix*pixScale
+    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
+    galImg=gal.draw(image=imgFrame,dx=pixScale)
+    imgArr=galImg.array.copy()	# must store these arrays as copies to avoid overwriting with shared imgFrame
+
+    vmapArr=np.zeros_like(imgArr)
+    fluxVMapArr=np.zeros_like(imgArr)
+
+    # Set up velocity map parameters
+    xCen=0.5*(galImg.xmax-galImg.xmin)
+    yCen=0.5*(galImg.ymax-galImg.ymin)
+
+    inc=getInclination(gal_q)
+    sini=np.sin(inc)
+    tani=np.tan(inc)
+    gal_beta_rad=np.deg2rad(gal_beta)
+
+    # Fill velocity map array
+    xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
+    xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
+    yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
+    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
+    vmapArr=getOmega(radNorm,rotCurvePars,option=rotCurveOpt) * sini * xp
+    vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
+
+    # Weight velocity map by galaxy flux and make galsim object
+    fluxVMapArr=vmapArr*imgArr
+
+    sumFVM=np.sum(fluxVMapArr)
+    if(np.abs(sumFVM) < 0.01):
+        print "experimental renorm"
+        fluxVMapArr/=sumFVM
+        imgArr/=sumFVM
+
+    return (fluxVMapArr,imgArr)
+
+def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve):
+# construct the fiber x PSF convolution kernel
+# this saves time since you only need to calculate it once and can multiply it by the flux map,
+#    rather than conolving each model galaxy and sampling at a position
+
+    numFib=xobs.size
+    half=imgSizePix/2
+    xx,yy=np.meshgrid((np.arange(imgSizePix)-half)*pixScale,(np.arange(imgSizePix)-half)*pixScale)
+    if(atmos_fwhm > 0):
+        atmos_sigma=atmos_fwhm/(2.*np.sqrt(2.*np.log(2.)))
+        if(fibConvolve): # PSF and Fiber convolution
+            psfArr=np.exp(-(xx**2 + yy**2)/(2.*atmos_sigma**2))
+            fibArrs=np.zeros((numFib,imgSizePix,imgSizePix))
+            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+            fibArrs[sel]=1.
+            kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(numFib)])
+        else:
+            # this is basically the psf convolved with 6 delta functions
+            kernel=np.array([np.exp(-((xx-pos[0])**2 + (yy-pos[1])**2)/(2.*atmos_sigma**2)) for ii in range(numFib)])
+    else:
+        # Fiber only
+        kernel=np.zeros((numFib,imgSizePix,imgSizePix))
+        sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+        kernel[sel]=1.
+        
+    return kernel
+
+def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,opt="galsim",kernel=None):
 # get flux-weighted fiber-averaged velocities
 	
     gal_beta,gal_q,vmax,g1,g2=pars
@@ -457,7 +539,7 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,o
     rotCurveOpt="flat"
     rotCurvePars=np.array([vmax])
 
-    if(opt=="old"):
+    if(opt=="galsim"):
         vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
         if(showPlot):
@@ -469,8 +551,10 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,o
         galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
         vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
 
-    elif(opt=="new"):
-        pass
+    elif(opt=="pixel"):
+        fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+        vmapFibFlux=np.array([np.sum(kernel[ii]*fluxVMapArr) for ii in range(numFib)])
+        galFibFlux=np.array([np.sum(kernel[ii]*imgArr) for ii in range(numFib)])
 
     return vmapFibFlux/galFibFlux
 
