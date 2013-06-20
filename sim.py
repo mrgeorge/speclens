@@ -740,7 +740,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 # and generate shear parameters following an approach set by shearOpt
 #     shearOpt="PS", "NFW", None - shears can also be defined using uniform or gaussian priors
 
-    nPars=5
+    nPars=len(priors)
     pars=np.zeros((nGal,nPars))
     for ii in xrange(nPars):
         prior=priors[ii]
@@ -779,7 +779,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=200,nSteps=500):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -828,16 +828,13 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
         kernel=None
 
     # RUN MCMC
-    nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
     sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel])
     print "emcee burnin"
-    nBurn=200
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
 
     print "emcee running"
-    nSteps=500
     sampler.run_mcmc(pos, nSteps)
 
     return sampler
@@ -846,8 +843,11 @@ def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
 # wrapper to vmapFit to compare chains with imaging, spectroscopy, and combined observables
 # passes kwargs to vmapFit
 
+    print "Imaging"
     samplerI=vmapFit(None,specErr,imObs,imErr,priors,**kwargs)
+    print "Spectroscopy"
     samplerS=vmapFit(specObs,specErr,None,imErr,priors,**kwargs)
+    print "Combined"
     samplerIS=vmapFit(specObs,specErr,imObs,imErr,priors,**kwargs)
     
     flatchainI=samplerI.flatchain
@@ -869,7 +869,7 @@ def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP]
 
-def parsToRec(pars,labels):
+def parsToRec(pars,labels=np.array(["PA","b/a","vmax","g1","g2"])):
     dtype=[(label,float) for label in labels]
     rec=np.recarray(len(pars),dtype=dtype)
     for ii in range(len(labels)):
