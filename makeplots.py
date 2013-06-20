@@ -9,7 +9,7 @@ import numpy as np
 if __name__ == "__main__":
 
     figExt="png" # pdf or png
-    showPlot=True
+    showPlot=False
 
     plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
     plt.rc('text', usetex=True)
@@ -154,9 +154,9 @@ if __name__ == "__main__":
     atmos_fwhm=1.5
     disk_r=1.
     fibConvolve=True
+    convOpt="pixel"
 
-    sampler=sim.vmapFit(vvals,sigma,None,None,priors,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig="hexNoCen",addNoise=False)
-    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=False)
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=True,convOpt=convOpt)
     smooth=3
     plt.clf()
     sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4b.{}".format(figExt),showPlot=showPlot)
