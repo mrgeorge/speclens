@@ -428,9 +428,10 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
-    gal.applyShear(g1=g1,g2=g2)
-    fluxVMap.applyShear(g1=g1,g2=g2)
-    vmap.applyShear(g1=g1,g2=g2)
+    if((g1 != 0.) | (g2 != 0.)):
+        gal.applyShear(g1=g1,g2=g2)
+        fluxVMap.applyShear(g1=g1,g2=g2)
+        vmap.applyShear(g1=g1,g2=g2)
 
     # Convolve velocity map and galaxy with PSF
     if(atmos_fwhm > 0):
@@ -489,7 +490,12 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     fluxVMapArr=vmapArr*imgArr
 
     # Apply lensing shear to galaxy and velocity maps
-    
+    if((g1 != 0.) | (g2 != 0.)):
+        shear=np.array([[1+g1,-g2],[-g2,1-g1]])/np.sqrt(1.-g1**2-g2**2)
+        xs=shear[0,0]*xx + shear[0,1]*yy + 0.5*imgSizePix
+        ys=shear[1,0]*xx + shear[1,1]*yy + 0.5*imgSizePix
+        fluxVMapArr=scipy.ndimage.map_coordinates(fluxVMapArr,(xs,ys))
+        imgArr=scipy.ndimage.map_coordinates(imgArr,(xs,ys))
 
     return (fluxVMapArr,imgArr)
 
