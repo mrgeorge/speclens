@@ -442,7 +442,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
+def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2):
     # Define the galaxy velocity map
     if(0 < bulge_frac < 1):
         bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
@@ -484,16 +484,12 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
     vmapArr=getOmega(radNorm,rotCurvePars,option=rotCurveOpt) * sini * xp
-    vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
 
-    # Weight velocity map by galaxy flux and make galsim object
+    # Weight velocity map by galaxy flux
     fluxVMapArr=vmapArr*imgArr
 
-    sumFVM=np.sum(fluxVMapArr)
-    if(np.abs(sumFVM) < 0.01):
-        print "experimental renorm"
-        fluxVMapArr/=sumFVM
-        imgArr/=sumFVM
+    # Apply lensing shear to galaxy and velocity maps
+    
 
     return (fluxVMapArr,imgArr)
 
@@ -524,8 +520,10 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve):
         
     return kernel
 
-def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,opt="galsim",kernel=None):
+def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=None,fibRad=None,fibConvolve=False,kernel=None):
 # get flux-weighted fiber-averaged velocities
+#for convOpt=galsim, need to specify atmos_fwhm,fibRad,fibConvolve
+#for convOpt=pixel, need to specify kernel
 	
     gal_beta,gal_q,vmax,g1,g2=pars
     
@@ -533,13 +531,12 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,o
     bulge_n=4.
     bulge_r=1.
     disk_n=1.
-    disk_r=1.
     bulge_frac=0.
     gal_flux=1.e6
     rotCurveOpt="flat"
     rotCurvePars=np.array([vmax])
 
-    if(opt=="galsim"):
+    if(convOpt=="galsim"):
         vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
         if(showPlot):
@@ -551,14 +548,14 @@ def vmapObs(pars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve,showPlot=False,o
         galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
         vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
 
-    elif(opt=="pixel"):
-        fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+    elif(convOpt=="pixel"):
+        fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
         vmapFibFlux=np.array([np.sum(kernel[ii]*fluxVMapArr) for ii in range(numFib)])
         galFibFlux=np.array([np.sum(kernel[ii]*imgArr) for ii in range(numFib)])
 
     return vmapFibFlux/galFibFlux
 
-def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, atmos_fwhm, fibRad, fibConvolve):
+def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel):
 # pars are the free parameters to be fit (some or all of [PA, b/a, vmax, g1, g2])
 # xobs, yobs are the fiber positions for velocity measurements
 # vobs are the measured velocities
@@ -606,15 +603,15 @@ def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fi
 	    data=ellobs
 	    error=ellerr
 	elif((xobs is not None) & (ellobs is None)): # use only velocity data
-            if((atmos_fwhm > 0) | fibConvolve):
-                model=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve)
+            if(convOpt is not None):
+                model=vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
             else: # this is faster if we don't need to convolve with psf or fiber
                 model=vmapModel(fullPars,xobs,yobs)
 	    data=vobs
 	    error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-            if((atmos_fwhm > 0) | fibConvolve):
-                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,atmos_fwhm,fibRad,fibConvolve)
+            if(convOpt is not None):
+                vmodel=vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
             else: # this is faster if we don't need to convolve with psf or fiber
                 vmodel=vmapModel(fullPars,xobs,yobs)
 	    model=np.concatenate([vmodel,ellModel(fullPars)])
@@ -776,7 +773,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -818,11 +815,16 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,atmos_fwhm=None,fibRad=1.,
     priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
     nPars=len(guess)
 
+    # SETUP CONVOLUTION KERNEL
+    if(convOpt=="pixel"):
+        kernel=makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve)
+    else: #convOpt is "galsim" or None
+        kernel=None
+
     # RUN MCMC
     nWalkers=2000
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, atmos_fwhm, fibRad, fibConvolve])
-
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel])
     print "emcee burnin"
     nBurn=200
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
