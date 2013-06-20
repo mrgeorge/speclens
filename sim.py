@@ -869,14 +869,19 @@ def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP]
 
-def parsToRec(pars):
-    rec=np.recarray(len(pars),dtype=[("PA",float),("BA",float),("VMAX",float),("G1",float),("G2",float)])
-    rec['PA']=pars[:,0]
-    rec['BA']=pars[:,1]
-    rec['VMAX']=pars[:,2]
-    rec['G1']=pars[:,3]
-    rec['G2']=pars[:,4]
+def parsToRec(pars,labels):
+    dtype=[(label,float) for label in labels]
+    rec=np.recarray(len(pars),dtype=dtype)
+    for ii in range(len(labels)):
+        rec[labels[ii]]=pars[:,ii]
     return rec
+
+def recToPars(rec):
+    labels=rec.dtype.fields.keys()
+    pars=np.zeros((len(rec),len(labels)))
+    for ii in range(len(labels)):
+        pars[:,ii]=rec[labels[ii]]
+    return pars
 
 def writeRec(rec,filename):
     fitsio.write(filename,rec)
@@ -884,16 +889,6 @@ def writeRec(rec,filename):
 def readRec(filename):
     rec=fitsio.read(filename)
     return rec
-
-def recToPars(rec):
-    nPars=5
-    pars=np.zeros((len(a),nPars))
-    pars[:,0]=rec['PA']
-    pars[:,1]=rec['BA']
-    pars[:,2]=rec['VMAX']
-    pars[:,3]=rec['G1']
-    pars[:,4]=rec['G2']
-    return pars
 
 if __name__ == "__main__":
     print "use one of the functions - no main written"
