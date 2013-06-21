@@ -796,11 +796,19 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
         xobs,yobs=getFiberPos(numFib,fibRad,fibConfig)
 	vel=vobs.copy()
 	velErr=np.repeat(sigma,numFib)
+
+        # SETUP CONVOLUTION KERNEL
+        if(convOpt=="pixel"):
+            kernel=makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve)
+        else: #convOpt is "galsim" or None
+            kernel=None
     else:
 	xobs=None
         yobs=None
 	vel=None
 	velErr=None
+        kernel=None
+
     if(imObs is not None):
 	ellObs=imObs.copy()
 	ellErr=imErr.copy()
@@ -820,12 +828,6 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
     # SETUP PARS and PRIORS
     priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
     nPars=len(guess)
-
-    # SETUP CONVOLUTION KERNEL
-    if(convOpt=="pixel"):
-        kernel=makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve)
-    else: #convOpt is "galsim" or None
-        kernel=None
 
     # RUN MCMC
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
@@ -876,8 +878,8 @@ def parsToRec(pars,labels=np.array(["PA","b/a","vmax","g1","g2"])):
         rec[labels[ii]]=pars[:,ii]
     return rec
 
-def recToPars(rec):
-    labels=rec.dtype.fields.keys()
+def recToPars(rec,labels=np.array(["PA","b/a","vmax","g1","g2"])):
+    recLabels=rec.dtype.fields.keys() # note, this list is unordered since rec is a dict, so we need to use parsLabels (which should be sorted to match the order of columns in pars array)
     pars=np.zeros((len(rec),len(labels)))
     for ii in range(len(labels)):
         pars[:,ii]=rec[labels[ii]]
