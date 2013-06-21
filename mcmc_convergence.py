@@ -41,6 +41,7 @@ def recToObs(rec):
 if __name__ == "__main__":
 
     if(sys.argv[1]=="first"):
+        print "creating new input files"
         nGal=int(sys.argv[2])
         numFib=6.
         fibRad=1.
@@ -48,36 +49,45 @@ if __name__ == "__main__":
         ellErr=np.array([0.1,10])
         xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,numFib=numFib,fibRad=fibRad)
         recObs=obsToRec(xvals,yvals,vvals,ellObs)
-        recPars=sim.parsToRec(inputPars)
+        labels=np.array(["PA","b/a","vmax","g1","g2"])
+        recPars=sim.parsToRec(inputPars,labels=labels)
         sim.writeRec(recObs,"mcmc_convergence_obs.fits")
         sim.writeRec(recPars,"mcmc_convergence_inputPars.fits")
     else:
+        print "opening old input files"
+        fibRad=1.
+        sigma=30.
+        ellErr=np.array([0.1,10])
         recObs=sim.readRec("mcmc_convergence_obs.fits")
         recPars=sim.readRec("mcmc_convergence_inputPars.fits")
         xvals,yvals,vvals,ellObs=recToObs(recObs)
-        inputPars=sim.recToPars(recPars)
+        labels=np.array(["PA","b/a","vmax","g1","g2"])
+        inputPars=sim.recToPars(recPars,labels=labels)
 
     obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
 
     numFib=len(xvals)
     nGal=len(vvals)
     nPars=len(obsPriors)
-    labels=np.array(["PA","b/a","vmax","g1","g2"])
     figExt="pdf"
-
-    nBurn=np.array([5,5,10,100,200])
-    nSteps=np.array([5,10,50,500,1000])
+    nBurn=np.array([20,50,50,100,100])
+    nSteps=np.array([100,200,300,500,700])
     nMCMC=len(nBurn)
 
     obsParsI=np.zeros((nMCMC,nGal,nPars))
     obsParsS=np.zeros_like(obsParsI)
     obsParsIS=np.zeros_like(obsParsI)
+
+    atmos_fwhm=1.5
+    disk_r=1.
+    fibConvolve=True
+    convOpt="pixel"
     
     for mm in range(nMCMC):
         print "************MCMC {}".format(mm)
         for ii in range(nGal):
             print "************Running Galaxy {}".format(ii)
-            chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,fibRad=fibRad,addNoise=False,nBurn=nBurn[mm],nSteps=nSteps[mm])
+            chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,fibRad=fibRad,addNoise=False,nBurn=nBurn[mm],nSteps=nSteps[mm],atmos_fwhm=atmos_fwhm,disk_r=disk_r,fibConvolve=fibConvolve,convOpt=convOpt)
             obsParsI[mm,ii,:]=sim.getMaxProb(chains[0],lnprobs[0])
             obsParsS[mm,ii,:]=sim.getMaxProb(chains[1],lnprobs[1])
             obsParsIS[mm,ii,:]=sim.getMaxProb(chains[2],lnprobs[2])
@@ -86,5 +96,5 @@ if __name__ == "__main__":
             print obsParsS[mm,ii,:]
             print obsParsIS[mm,ii,:]
 
-            sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename="mcmc_{}_{}.{}".format(nSteps[mm],ii,figExt))
+            sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename="mcmc_{}_{}_conv.{}".format(ii,nSteps[mm],figExt))
 
