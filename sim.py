@@ -491,7 +491,7 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
 
     # Apply lensing shear to galaxy and velocity maps
     if((g1 != 0.) | (g2 != 0.)):
-        shear=np.array([[1+g1,-g2],[-g2,1-g1]])/np.sqrt(1.-g1**2-g2**2)
+        shear=np.array([[1-g1,-g2],[-g2,1+g1]])/np.sqrt(1.-g1**2-g2**2)
         xs=shear[0,0]*(xx-xCen) + shear[0,1]*(yy-yCen) + xCen
         ys=shear[1,0]*(xx-xCen) + shear[1,1]*(yy-yCen) + yCen
         fluxVMapArr=scipy.ndimage.map_coordinates(fluxVMapArr.T,(xs,ys))
