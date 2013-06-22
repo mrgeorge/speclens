@@ -9,6 +9,8 @@ import numpy as np
 if __name__ == "__main__":
 
     figExt="png" # pdf or png
+    plotDir="/data/mgeorge/speclens/plots"
+    dataDir="/data/mgeorge/speclens/data"
     showPlot=False
 
     plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
@@ -40,7 +42,7 @@ if __name__ == "__main__":
     vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     trim=1
     plt.clf()
-    sim.showImage(vmap,None,None,None,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="fig1a.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(vmap,None,None,None,trim=trim,colorbar=False,ellipse=ell,lines=lines,filename="{}/fig1a.{}".format(plotDir,figExt),showPlot=showPlot)
     
     g1=0.2
     g2=0.
@@ -50,7 +52,7 @@ if __name__ == "__main__":
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
     plt.clf()
-    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="fig1b.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="{}/fig1b.{}".format(plotDir,figExt),showPlot=showPlot)
     
     # Fig 2
     # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions
@@ -61,9 +63,9 @@ if __name__ == "__main__":
     fibRad=1.
     fibConfig="hex"
     xfib,yfib=sim.getFiberPos(numFib,fibRad,fibConfig)
-    sim.showImage(gal,xfib,yfib,fibRad,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="fig2a.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(gal,xfib,yfib,fibRad,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
     plt.clf()
-    sim.showImage(fluxVMap,xfib,yfib,fibRad,trim=trim,colorbar=False,filename="fig2b.{}".format(figExt),showPlot=showPlot)
+    sim.showImage(fluxVMap,xfib,yfib,fibRad,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
     
     
     # Fig 3
@@ -125,7 +127,7 @@ if __name__ == "__main__":
     plt.ylim(np.array([-250,250]))
     
     plt.gcf().subplots_adjust(left=0.15)
-    plt.savefig("fig3.{}".format(figExt))
+    plt.savefig("{}/fig3.{}".format(plotDir,figExt))
     if(showPlot):
         plt.show()
     
@@ -148,7 +150,7 @@ if __name__ == "__main__":
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False)
     smooth=3
     plt.clf()
-    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4a.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
 
     # now try with PSF and fiber convolution
     atmos_fwhm=1.5
@@ -159,7 +161,7 @@ if __name__ == "__main__":
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=True,convOpt=convOpt)
     smooth=3
     plt.clf()
-    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig4b.{}".format(figExt),showPlot=showPlot)
+    sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4b.{}".format(plotDir,figExt),showPlot=showPlot)
 
 
     # Fig 5
@@ -193,17 +195,9 @@ if __name__ == "__main__":
         print obsParsI[ii,:]
         print obsParsS[ii,:]
         print obsParsIS[ii,:]
-        sim.contourPlotAll(chains,inputPars=inputPars[ii,:],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="fig5_gal{}.{}".format(ii,figExt),showPlot=showPlot)
+        sim.contourPlotAll(chains,inputPars=inputPars[ii,:],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig5_gal{}.{}".format(plotDir,ii,figExt),showPlot=showPlot)
 
-    sim.writeRec(sim.parsToRec(inputPars),"fig5_inputPars.fits")
-    sim.writeRec(sim.parsToRec(obsParsI),"fig5_obsParsI.fits")
-    sim.writeRec(sim.parsToRec(obsParsS),"fig5_obsParsS.fits")
-    sim.writeRec(sim.parsToRec(obsParsIS),"fig5_obsParsIS.fits")
-    
-    plt.hist((errI,errS,errIS),color=["red","green","blue"],label=["Imaging","Spectroscopy","Combined"],bins=20)
-    plt.legend()
-    plt.xlabel(r"g$_{obs}$-g$_{true}$")
-    plt.ylabel("N")
-    plt.savefig("fig5.{}".format(figExt))
-    if(showPlot):
-        plt.show()
+    sim.writeRec(sim.parsToRec(inputPars),"{}/fig5_inputPars.fits".format(dataDir))
+    sim.writeRec(sim.parsToRec(obsParsI),"{}/fig5_obsParsI.fits".format(dataDir))
+    sim.writeRec(sim.parsToRec(obsParsS),"{}/fig5_obsParsS.fits".format(dataDir))
+    sim.writeRec(sim.parsToRec(obsParsIS),"{}/fig5_obsParsIS.fits".format(dataDir))
