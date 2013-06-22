@@ -40,6 +40,10 @@ def recToObs(rec):
 
 if __name__ == "__main__":
 
+    figExt="pdf"
+    plotDir="/data/mgeorge/speclens/plots"
+    dataDir="/data/mgeorge/speclens/data"
+
     if(sys.argv[1]=="first"):
         print "creating new input files"
         nGal=int(sys.argv[2])
@@ -51,15 +55,15 @@ if __name__ == "__main__":
         recObs=obsToRec(xvals,yvals,vvals,ellObs)
         labels=np.array(["PA","b/a","vmax","g1","g2"])
         recPars=sim.parsToRec(inputPars,labels=labels)
-        sim.writeRec(recObs,"mcmc_convergence_obs.fits")
-        sim.writeRec(recPars,"mcmc_convergence_inputPars.fits")
+        sim.writeRec(recObs,"{}/mcmc_convergence_obs.fits".format(dataDir))
+        sim.writeRec(recPars,"{}/mcmc_convergence_inputPars.fits".format(dataDir))
     else:
         print "opening old input files"
         fibRad=1.
         sigma=30.
         ellErr=np.array([0.1,10])
-        recObs=sim.readRec("mcmc_convergence_obs.fits")
-        recPars=sim.readRec("mcmc_convergence_inputPars.fits")
+        recObs=sim.readRec("{}/mcmc_convergence_obs.fits".format(dataDir))
+        recPars=sim.readRec("{}/mcmc_convergence_inputPars.fits".format(dataDir))
         xvals,yvals,vvals,ellObs=recToObs(recObs)
         labels=np.array(["PA","b/a","vmax","g1","g2"])
         inputPars=sim.recToPars(recPars,labels=labels)
@@ -69,7 +73,6 @@ if __name__ == "__main__":
     numFib=len(xvals)
     nGal=len(vvals)
     nPars=len(obsPriors)
-    figExt="pdf"
     nBurn=np.array([20,50,50,100,100])
     nSteps=np.array([100,200,300,500,700])
     nMCMC=len(nBurn)
@@ -96,5 +99,5 @@ if __name__ == "__main__":
             print obsParsS[mm,ii,:]
             print obsParsIS[mm,ii,:]
 
-            sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename="mcmc_{}_{}_conv.{}".format(ii,nSteps[mm],figExt))
+            sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename="{}/mcmc_{}_{}_conv.{}".format(plotDir,ii,nSteps[mm],figExt))
 
