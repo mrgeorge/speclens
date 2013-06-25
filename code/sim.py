@@ -893,6 +893,22 @@ def recToPars(rec,labels=np.array(["PA","b/a","vmax","g1","g2"])):
         pars[:,ii]=rec[labels[ii]]
     return pars
 
+def obsToRec(xvals,yvals,vvals,ellObs):
+    dtype=[("xvals",(xvals.dtype.type,xvals.shape)),("yvals",(yvals.dtype.type,yvals.shape)),("vvals",(vvals.dtype.type,vvals.shape)),("ellObs",(ellObs.dtype.type,ellObs.shape))]
+    rec=np.recarray(1,dtype=dtype)
+    rec["xvals"]=xvals
+    rec["yvals"]=yvals
+    rec["vvals"]=vvals
+    rec["ellObs"]=ellObs
+    return rec
+
+def recToObs(rec):
+    xvals=rec["xvals"].squeeze()
+    yvals=rec["yvals"].squeeze()
+    vvals=rec["vvals"].squeeze()
+    ellObs=rec["ellObs"].squeeze()
+    return (xvals,yvals,vvals,ellObs)
+
 def writeRec(rec,filename):
     fitsio.write(filename,rec)
 

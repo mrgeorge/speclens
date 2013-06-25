@@ -21,22 +21,6 @@ def makeObs(nGal,numFib=6,fibRad=1,fibConfig="hexNoCen",sigma=30.,ellErr=np.arra
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def obsToRec(xvals,yvals,vvals,ellObs):
-    dtype=[("xvals",(xvals.dtype.type,xvals.shape)),("yvals",(yvals.dtype.type,yvals.shape)),("vvals",(vvals.dtype.type,vvals.shape)),("ellObs",(ellObs.dtype.type,ellObs.shape))]
-    rec=np.recarray(1,dtype=dtype)
-    rec["xvals"]=xvals
-    rec["yvals"]=yvals
-    rec["vvals"]=vvals
-    rec["ellObs"]=ellObs
-    return rec
-
-def recToObs(rec):
-    xvals=rec["xvals"].squeeze()
-    yvals=rec["yvals"].squeeze()
-    vvals=rec["vvals"].squeeze()
-    ellObs=rec["ellObs"].squeeze()
-    return (xvals,yvals,vvals,ellObs)
-
 
 if __name__ == "__main__":
 
