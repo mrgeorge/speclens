@@ -782,7 +782,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS",seed=None):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=200,nSteps=500,seed=None):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -907,8 +907,8 @@ def recToObs(rec):
     ellObs=rec["ellObs"].squeeze()
     return (xvals,yvals,vvals,ellObs)
 
-def writeRec(rec,filename):
-    fitsio.write(filename,rec)
+def writeRec(rec,filename,clobber=True):
+    fitsio.write(filename,rec,clobber=clobber)
 
 def readRec(filename):
     rec=fitsio.read(filename)
