@@ -1,7 +1,5 @@
 #! env python
 import sim
-import matplotlib.pyplot as plt
-import matplotlib.cm
 import numpy as np
 import os
 
@@ -21,16 +19,7 @@ def makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,c
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def runEnsemble(nGal,**kwargs):
-    figExt="pdf"
-    plotDir="/data/mgeorge/speclens/plots/"
-    dataDir="/data/mgeorge/speclens/data/"
-    subDir="opt_{}_{}_{}_{}_{}_{}".format(convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig)
-    if(not(os.path.exists(dataDir+subDir))):
-        os.makedirs(dataDir+subDir)
-    if(not(os.path.exists(plotDir+subDir))):
-        os.makedirs(plotDir+subDir)
-
+def runEnsemble(dataDir,subDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None,figExt="pdf"):
     obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     nPars=len(obsPriors)
@@ -38,7 +27,7 @@ def runEnsemble(nGal,**kwargs):
     obsParsS=np.zeros_like(obsParsI)
     obsParsIS=np.zeros_like(obsParsI)
 
-    xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,**kwargs)
+    xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None)
     sim.writeRec(sim.parsToRec(inputPars,labels=labels),dataDir+subDir+"/inputPars.fits")
 
     for ii in range(nGal):
@@ -54,40 +43,70 @@ def runEnsemble(nGal,**kwargs):
         sim.writeRec(sim.parsToRec(obsParsS[0:ii+1],labels=labels),dataDir+subDir+"/obsParsS.fits")
         sim.writeRec(sim.parsToRec(obsParsIS[0:ii+1],labels=labels),dataDir+subDir+"/obsParsIS.fits")
 
-        sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=plotDir+subDir+"/gal_{}.{}".format(ii,figExt))
+        sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=dataDir+subDir+"/plots/gal_{}.{}".format(ii,figExt))
 
+def create_qsub(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed):
+    
+    # text for qsub file
+    jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
+               "#PBS -j oe\n"
+               "#PBS -m bea\n"
+               "#PBS -M mgeorge@astro.berkeley.edu\n"
+               "#PBS -V\n"
+               "\n"
+               "import os\n"
+               "\n"
+               "os.system('date')\n"
+               "os.system('echo `hostname`')\n"
+               "os.chdir('/home/mgeorge/speclens/code/')\n"
+               "import ensemble\n")
+    jobTail="os.system('date')\n"
+    
+    jobFile="{}/{}/qsub".format(dataDir,subDir)
+
+    command="ensemble.runEnsemble({},{},{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
+
+    # create qsub file
+    jf=open(jobFile,'w')
+    jf.write(jobHeader)
+    jf.write(command)
+    jf.write(jobTail)
+    jf.close()
+
+    return jobFile
 
 
 if __name__ == "__main__":
 
+    figExt="pdf"
+    dataDir="/data/mgeorge/speclens/data/"
+    batch="-q batch"
 
-    nGal=100
-    disk_r=1.
+    nGal=3
+    disk_r=np.repeat(1.,nGal)
+    seed=7
+
     convOpt=np.array([None,"pixel"])
     atmos_fwhm=np.array([None,1.5])
     numFib=np.array([6,6])
     fibRad=np.array([1.,1.])
     fibConvolve=np.array([False,True])
     fibConfig=np.array(["hexNoCen","hexNoCen"])
-    seed=7
+
+    nEnsemble=len(convOpt)
+    origcwd=os.getcwd()
+    for ii in range(nEnsemble):
+        subDir="opt_{}_{}_{}_{}_{}_{}".format(convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii])
+        if(not(os.path.exists(dataDir+subDir))):
+            os.makedirs(dataDir+subDir)
+            os.makedirs(dataDir+subDir+"/plots")
+
     
-    runEnsemble(nGal,disk_r=disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,seed=seed)
+        # move to job dir so log files are stored there
+        os.chdir(dataDir+subDir)
+
+        jobFile=create_qsub(dataDir,subDir,nGal,disk_r,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],seed)
+        os.system("qsub -VX {} {}".format(batch,jobFile))
+
+    os.chdir(origcwd)
     
-
-
-
-    for mm in range(nMCMC):
-        print "************MCMC {}".format(mm)
-        for ii in range(nGal):
-            print "************Running Galaxy {}".format(ii)
-            chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,fibRad=fibRad,addNoise=False,nBurn=nBurn[mm],nSteps=nSteps[mm],atmos_fwhm=atmos_fwhm,disk_r=disk_r,fibConvolve=fibConvolve,convOpt=convOpt)
-            obsParsI[mm,ii,:]=sim.getMaxProb(chains[0],lnprobs[0])
-            obsParsS[mm,ii,:]=sim.getMaxProb(chains[1],lnprobs[1])
-            obsParsIS[mm,ii,:]=sim.getMaxProb(chains[2],lnprobs[2])
-            print inputPars[ii,:]
-            print obsParsI[mm,ii,:]
-            print obsParsS[mm,ii,:]
-            print obsParsIS[mm,ii,:]
-
-            sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename="{}/mcmc_{}_{}_conv.{}".format(plotDir,ii,nSteps[mm],figExt))
-
