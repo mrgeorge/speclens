@@ -673,12 +673,6 @@ def vmapModel(pars, xobs, yobs):
     else:
 	vmodel=None
 
-    # compute imaging observable
-    disk_r=1. # we're not modeling sizes now
-    ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
-    disk_r_prime,gal_beta_prime,gal_q_prime=shearEllipse(ellipse,g1,g2)
-    ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
-
     return vmodel
 
 def ellModel(pars):
@@ -687,7 +681,7 @@ def ellModel(pars):
 
     disk_r=1. # we're not modeling sizes now
     ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
-    disk_r_prime,gal_beta_prime,gal_q_prime=shearEllipse(ellipse,g1,g2)
+    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,g1,g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
     return ellmodel
@@ -742,7 +736,7 @@ def interpretPriors(priors):
 
     return (priorFuncs,fixed,guess,guessScale)
 
-def generateEnsemble(nGal,priors,shearOpt="PS"):
+def generateEnsemble(nGal,priors,shearOpt="PS",seed=None):
 # generate a set of galaxies with intrinsic shapes following the prior distribution
 # (priors follow same convention as used by interpretPriors but must not be None)
 # and generate shear parameters following an approach set by shearOpt
@@ -750,6 +744,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     nPars=len(priors)
     pars=np.zeros((nGal,nPars))
+    np.random.seed(seed)
     for ii in xrange(nPars):
         prior=priors[ii]
         # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
@@ -787,7 +782,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS"):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=200,nSteps=500):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=200,nSteps=500,seed=None):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -825,6 +820,7 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
 	ellErr=None
 	
     if(addNoise): # useful when simulating many realizations to project parameter constraints
+        np.random.seed(seed)
 	if(vobs is not None):
 	    specNoise=np.random.randn(numFib)*sigma
 	    vel+=specNoise
