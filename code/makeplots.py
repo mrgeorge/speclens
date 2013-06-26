@@ -8,7 +8,7 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    figExt="png" # pdf or png
+    figExt="pdf" # pdf or png
     plotDir="/data/mgeorge/speclens/plots"
     dataDir="/data/mgeorge/speclens/data"
     showPlot=False
@@ -143,11 +143,11 @@ if __name__ == "__main__":
     xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
     vvals=sim.vmapModel(pars, xvals, yvals)
     ellObs=sim.ellModel(pars)
-    ellErr=np.array([0.1,10])
+    ellErr=np.array([10.,0.1])
     priors=[None,[0.1,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
 
     # compare imaging vs spectro vs combined
-    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False)
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False,nSteps=250)
     smooth=3
     plt.clf()
     sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     fibConfig="hexNoCen"
     xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
     sigma=30.
-    ellErr=np.array([0.1,10])
+    ellErr=np.array([10.,0.1])
     smooth=3
 
     obsParsI=np.zeros_like(inputPars)
