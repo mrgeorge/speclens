@@ -27,13 +27,13 @@ def runEnsemble(dataDir,subDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0
     obsParsS=np.zeros_like(obsParsI)
     obsParsIS=np.zeros_like(obsParsI)
 
-    xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None)
+    xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,inputPriors=inputPriors,disk_r=disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr,seed=seed)
     sim.writeRec(sim.parsToRec(inputPars,labels=labels),dataDir+subDir+"/inputPars.fits")
 
     for ii in range(nGal):
         print "************Running Galaxy {}".format(ii)
 
-        chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,disk_r=disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=seed)
+        chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,disk_r=disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=seed)
         obsParsI[ii,:]=sim.getMaxProb(chains[0],lnprobs[0])
         obsParsS[ii,:]=sim.getMaxProb(chains[1],lnprobs[1])
         obsParsIS[ii,:]=sim.getMaxProb(chains[2],lnprobs[2])
@@ -55,16 +55,19 @@ def create_qsub(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibC
                "#PBS -V\n"
                "\n"
                "import os\n"
+               "import ensemble\n"
                "\n"
                "os.system('date')\n"
                "os.system('echo `hostname`')\n"
-               "os.chdir('/home/mgeorge/speclens/code/')\n"
-               "import ensemble\n")
+        )
     jobTail="os.system('date')\n"
     
     jobFile="{}/{}/qsub".format(dataDir,subDir)
 
-    command="ensemble.runEnsemble({},{},{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
+    if(convOpt is not None):
+        convOpt="\"{}\"".format(convOpt)
+
+    command="ensemble.runEnsemble(\"{}\",\"{}\",{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(dataDir,subDir,nGal,disk_r.tolist(),convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
 
     # create qsub file
     jf=open(jobFile,'w')
