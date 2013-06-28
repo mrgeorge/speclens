@@ -62,7 +62,8 @@ if __name__ == "__main__":
     numFib=7
     fibRad=1.
     fibConfig="hex"
-    xfib,yfib=sim.getFiberPos(numFib,fibRad,fibConfig)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
+    xfib,yfib=pos
     sim.showImage(gal,xfib,yfib,fibRad,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
     plt.clf()
     sim.showImage(fluxVMap,xfib,yfib,fibRad,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
@@ -83,7 +84,8 @@ if __name__ == "__main__":
     numFib=7
     fibRad=1.
     fibConfig="hex"
-    xfib,yfib=sim.getFiberPos(numFib,fibRad,fibConfig)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
+    xfib,yfib=pos
     
     theta=np.linspace(0,2.*np.pi,num=200)
     xvals=2.*fibRad*np.cos(theta)
@@ -140,7 +142,8 @@ if __name__ == "__main__":
     numFib=6
     fibRad=1
     fibConfig="hexNoCen"
-    xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
+    xvals,yvals=pos
     vvals=sim.vmapModel(pars, xvals, yvals)
     ellObs=sim.ellModel(pars)
     ellErr=np.array([10.,0.1])
@@ -174,7 +177,8 @@ if __name__ == "__main__":
     numFib=6
     fibRad=1
     fibConfig="hexNoCen"
-    xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
+    xvals,yvals=pos
     sigma=30.
     ellErr=np.array([10.,0.1])
     smooth=3
