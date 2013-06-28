@@ -5,6 +5,8 @@ import scipy.integrate
 import scipy.signal
 import scipy.ndimage
 import numpy as np
+import matplotlib
+matplotlib.use('Agg') # must appear before importing pyplot to get plots w/o GUI
 import matplotlib.pyplot as plt
 import matplotlib.cm
 import matplotlib.patches
