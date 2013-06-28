@@ -799,7 +799,7 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
     if(vobs is not None):
 	numFib=vobs.size
         xobs,yobs=getFiberPos(numFib,fibRad,fibConfig)
-	vel=vobs.copy()
+	vel=np.array(vobs).copy()
 	velErr=np.repeat(sigma,numFib)
 
         # SETUP CONVOLUTION KERNEL
@@ -815,8 +815,8 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
         kernel=None
 
     if(imObs is not None):
-	ellObs=imObs.copy()
-	ellErr=imErr.copy()
+	ellObs=np.array(imObs).copy()
+	ellErr=np.array(imErr).copy()
     else:
 	ellObs=None
 	ellErr=None
@@ -884,6 +884,16 @@ def parsToRec(pars,labels=np.array(["PA","b/a","vmax","g1","g2"])):
     rec=np.recarray(len(pars),dtype=dtype)
     for ii in range(len(labels)):
         rec[labels[ii]]=pars[:,ii]
+    return rec
+
+def chainToRec(chain,lnprob,labels=np.array(["PA","b/a","vmax","g1","g2"])):
+    nGal=chain.shape[0]
+    nPars=chain.shape[1]
+    arr=np.zeros((nGal,nPars+1))
+    arr[:,:-1]=chain
+    arr[:,-1]=lnprob
+    labels=np.append(labels,"lnprob")
+    rec=parsToRec(arr,labels=labels)
     return rec
 
 def recToPars(rec,labels=np.array(["PA","b/a","vmax","g1","g2"])):
