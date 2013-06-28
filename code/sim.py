@@ -20,27 +20,51 @@ plt.rc('axes',linewidth=1.5)
 pixScale=0.1
 imgSizePix=100
 
-def getFiberPos(numFib,fibRad,fibConfig):
+def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
 # returns fiber center positions relative to origin in same units as fibRad (arcsec)
+# also returns fibShape (circle or square)
+# for configurations with square fibers, PA sets position angle (e.g. slit, IFU grid)
+# for circular fibers, fibRad=fiber radius. for square fibers, fibRad=edge length
+
+    pos=np.zeros((2,numFib))
 
     if(fibConfig=="hex"):
-        pos=np.zeros((2,numFib))
+        fibShape="circle"
         pos[:,0]=np.array([0.,0.])
         theta=np.linspace(0,2*np.pi,num=numFib-1,endpoint=False)
         rad=2.*fibRad
         pos[0,1:]=rad*np.cos(theta)
         pos[1,1:]=rad*np.sin(theta)
-        return pos
     elif(fibConfig=="hexNoCen"):
-        pos=np.zeros((2,numFib))
+        fibShape="circle"
         theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
         rad=2.*fibRad
         pos[0,:]=rad*np.cos(theta)
         pos[1,:]=rad*np.sin(theta)
-        return pos
+    elif(fibConfig=="slit"):
+        fibShape="square"
+        slitX=np.linspace(-1,1,num=numFib)*0.5*fibRad*(numFib-1)
+        pos[0,:]=slitX*np.cos(np.deg2rad(fibPA))
+        pos[1,:]=slitX*np.sin(np.deg2rad(fibPA))
+    elif(fibConfig=="ifu"):
+        fibShape="square"
+        numSide=np.sqrt(numFib)
+        if(np.int(numSide) != numSide):
+            print "Error: ifu config needs a square number of fibers"
+        else:
+            ifuX=np.linspace(-1,1,num=numSide)*0.5*fibRad*(numSide-1)
+            xx,yy=np.meshgrid(ifuX,ifuX)
+            xx=xx.flatten()
+            yy=yy.flatten()
+            PArad=np.deg2rad(fibPA)
+            pos[0,:]=xx*np.cos(PArad)-yy*np.sin(PArad)
+            pos[1,:]=xx*np.sin(PArad)+yy*np.cos(PArad)
     else:
         # TO DO - add other configs - line, box, circle. and extend hex for MaNGA style
         pass 
+
+    return (pos,fibShape,fibPA)
+
 
 # These functions take a galsim object <image> and integrate over the area of a fiber
 def radIntegrand(rad,theta,fiberPos,image):
@@ -784,7 +808,7 @@ def generateEnsemble(nGal,priors,shearOpt="PS",seed=None):
 
     return pars
     
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
+def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
 # fit model to fiber velocities
 # vobs is the data to be fit
 # sigma is the errorbar on that value (e.g. 30 km/s)
@@ -798,13 +822,14 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
     # SETUP DATA
     if(vobs is not None):
 	numFib=vobs.size
-        xobs,yobs=getFiberPos(numFib,fibRad,fibConfig)
+        pos,fibShape=getFiberPos(numFib,fibRad,fibConfig,fibPA=fibPA)
+        xobs,yobs=pos
 	vel=np.array(vobs).copy()
 	velErr=np.repeat(sigma,numFib)
 
         # SETUP CONVOLUTION KERNEL
         if(convOpt=="pixel"):
-            kernel=makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve)
+            kernel=makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA)
         else: #convOpt is "galsim" or None
             kernel=None
     else:
