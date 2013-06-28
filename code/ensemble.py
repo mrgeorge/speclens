@@ -4,6 +4,7 @@ import numpy as np
 import os
 
 def makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
+# Generate ensemble of input pars and observed values (w/o noise added)
 
     inputPars=sim.generateEnsemble(nGal,inputPriors,shearOpt=None,seed=seed)
 
@@ -20,13 +21,19 @@ def makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,c
     return (xvals,yvals,vvals,ellObs,inputPars)
 
 def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,figExt="pdf",**kwargs):
+# call fitObs to run MCMC for a galaxy and save the resulting chains
+# this is what create_qsub_galArr calls to run each galaxy
+
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
     sim.writeRec(sim.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits".format(galID))
     sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits".format(galID))
     sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits".format(galID))
-    sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
+    sim.contourPlotAll(chains,inputPars=inputPars,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
 def runEnsemble(outDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None,figExt="pdf"):
+# given a set of control parameters, generate a list of galaxies, run MCMC and store chains
+# this was intended to be used as the main function for create_qsub_ensemble
+# but is now deprecated in favor of create_qsub_galArr and runGal
     obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     nPars=len(obsPriors)
@@ -42,6 +49,7 @@ def runEnsemble(outDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],di
         runGal(outDir,ii,inputPars[ii],labels,vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,figExt=figExt,disk_r=disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=ii)
 
 def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr,seed):
+# make a job array that generates a list of galaxies and runs each one as a separate job
     
     # text for qsub file
     jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
@@ -85,6 +93,8 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
 
 def create_qsub_ensemble(outDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed):
+# make a job that creates a list of galaxies and then runs them all in a single serial job
+# now deprecated, use create_qsub_galArr instead so that many galaxies can be run in parallel
     
     # text for qsub file
     jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
@@ -118,6 +128,8 @@ def create_qsub_ensemble(outDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fib
     return jobFile
 
 if __name__ == "__main__":
+# main creates a list of control pars and then calls create_qsub_galArr to make an ensemble of galaxies for each set of control pars
+# this can be used to test different observing configurations (fiber sizes, shapes, PSFs, velocity errors, etc)
 
     figExt="pdf"
     dataDir="/data/mgeorge/speclens/data/"
