@@ -3,20 +3,28 @@ import sim
 import numpy as np
 import os
 
-def makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
-# Generate ensemble of input pars and observed values (w/o noise added)
+def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
+# Generate input pars and observed values (w/o noise added) for a galaxy
 
-    inputPars=sim.generateEnsemble(nGal,inputPriors,shearOpt=None,seed=seed)
+    inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed)
 
-    xvals,yvals=sim.getFiberPos(numFib,fibRad,fibConfig)
+    # first get imaging observables (with noise) to get PA for slit/ifu alignment
+    ellObs=sim.ellModel(inputPars[ii,:])
+    imNoise=np.random.randn(ellObs.size)*ellErr
+    ellObs+=imNoise
+
+    fibPA=ellObs[0] # align fibers to observed PA (no effect for circular fibers)
+
+    pos,fibShape==sim.getFiberPos(numFib,fibRad,fibConfig,fibPA)
+    xvals,yvals=pos
     if(convOpt is not None):
-        if((type(disk_r) is int) | (type(disk_r) is float)):
-            disk_r=np.repeat(disk_r,nGal)
         kernel=sim.makeConvolutionKernel(xvals,yvals,atmos_fwhm,fibRad,fibConvolve)
-        vvals=np.array([sim.vmapObs(inputPars[ii,:],xvals,yvals,disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel) for ii in range(nGal)])
+        vvals=sim.vmapObs(inputPars[ii,:],xvals,yvals,disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
     else: # this is faster if we don't need to convolve with psf or fiber
-        vvals=np.array([sim.vmapModel(inputPars[ii,:],xvals,yvals) for ii in range(nGal)])
-    ellObs=np.array([sim.ellModel(inputPars[ii,:]) for ii in range(nGal)])
+        vvals=sim.vmapModel(inputPars[ii,:],xvals,yvals)
+
+    specNoise=np.random.randn(numFib)*sigma
+    vvals+=specNoise
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
@@ -29,24 +37,6 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
     sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits".format(galID))
     sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits".format(galID))
     sim.contourPlotAll(chains,inputPars=inputPars,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
-
-def runEnsemble(outDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None,figExt="pdf"):
-# given a set of control parameters, generate a list of galaxies, run MCMC and store chains
-# this was intended to be used as the main function for create_qsub_ensemble
-# but is now deprecated in favor of create_qsub_galArr and runGal
-    obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
-    labels=np.array(["PA","b/a","vmax","g1","g2"])
-    nPars=len(obsPriors)
-    obsParsI=np.zeros((nGal,nPars))
-    obsParsS=np.zeros_like(obsParsI)
-    obsParsIS=np.zeros_like(obsParsI)
-
-    xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,inputPriors=inputPriors,disk_r=disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr,seed=seed)
-    sim.writeRec(sim.parsToRec(inputPars,labels=labels),outDir+"/inputPars.fits")
-
-    for ii in range(nGal):
-        print "************Running Galaxy {}".format(ii)
-        runGal(outDir,ii,inputPars[ii],labels,vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,figExt=figExt,disk_r=disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=ii)
 
 def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr,seed):
 # make a job array that generates a list of galaxies and runs each one as a separate job
@@ -74,11 +64,11 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
     commands=("\n"
               "thisGal=int(os.environ['PBS_ARRAYID'])\n"
-              "disk_r=np.repeat(1.,{nGal})\n"
+              "disk_r=1.\n"
               "obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]\n"
               "labels=np.array(['PA','b/a','vmax','g1','g2'])\n"
-              "xvals,yvals,vvals,ellObs,inputPars=ensemble.makeObs({nGal:d},inputPriors={inputPriors},disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed={seed})\n"
-              "ensemble.runGal(\"{outDir}\",thisGal,inputPars[thisGal],labels,vvals[thisGal,:],{sigma},ellObs[thisGal,:],{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r[thisGal],convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",addNoise=True,seed=thisGal)\n\n".format(nGal=nGal,inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),seed=seed,outDir=outDir,figExt=figExt)
+              "xvals,yvals,vvals,ellObs,inputPars=ensemble.makeObs(inputPriors={inputPriors},disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed=thisGal)\n"
+              "ensemble.runGal(\"{outDir}\",thisGal,inputPars,labels,vvals,{sigma},ellObs,{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",fibPA=ellObs[0],addNoise=False,seed=thisGal)\n\n".format(nGal=nGal,inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),outDir=outDir,figExt=figExt)
         )
 
     # create qsub file
@@ -90,42 +80,6 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
     return jobFile
 
-
-
-def create_qsub_ensemble(outDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed):
-# make a job that creates a list of galaxies and then runs them all in a single serial job
-# now deprecated, use create_qsub_galArr instead so that many galaxies can be run in parallel
-    
-    # text for qsub file
-    jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
-               "#PBS -j oe\n"
-               "#PBS -m bea\n"
-               "#PBS -M mgeorge@astro.berkeley.edu\n"
-               "#PBS -V\n"
-               "\n"
-               "import os\n"
-               "import ensemble\n"
-               "\n"
-               "os.system('date')\n"
-               "os.system('echo `hostname`')\n"
-        )
-    jobTail="os.system('date')\n"
-    
-    jobFile="{}/qsub".format(outDir)
-
-    if(convOpt is not None):
-        convOpt="\"{}\"".format(convOpt)
-
-    command="ensemble.runEnsemble(\"{}\",{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(outDir,nGal,disk_r.tolist(),convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
-
-    # create qsub file
-    jf=open(jobFile,'w')
-    jf.write(jobHeader)
-    jf.write(command)
-    jf.write(jobTail)
-    jf.close()
-
-    return jobFile
 
 if __name__ == "__main__":
 # main creates a list of control pars and then calls create_qsub_galArr to make an ensemble of galaxies for each set of control pars
