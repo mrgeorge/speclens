@@ -19,7 +19,14 @@ def makeObs(nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,c
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def runEnsemble(dataDir,subDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None,figExt="pdf"):
+def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,figExt="pdf",**kwargs):
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
+    sim.writeRec(sim.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits".format(galID))
+    sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits".format(galID))
+    sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits".format(galID))
+    sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
+
+def runEnsemble(outDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",sigma=30.,ellErr=np.array([10.,0.1]),seed=None,figExt="pdf"):
     obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     nPars=len(obsPriors)
@@ -28,24 +35,56 @@ def runEnsemble(dataDir,subDir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0
     obsParsIS=np.zeros_like(obsParsI)
 
     xvals,yvals,vvals,ellObs,inputPars=makeObs(nGal,inputPriors=inputPriors,disk_r=disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr,seed=seed)
-    sim.writeRec(sim.parsToRec(inputPars,labels=labels),dataDir+subDir+"/inputPars.fits")
+    sim.writeRec(sim.parsToRec(inputPars,labels=labels),outDir+"/inputPars.fits")
 
     for ii in range(nGal):
         print "************Running Galaxy {}".format(ii)
+        runGal(outDir,ii,inputPars[ii],labels,vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,figExt=figExt,disk_r=disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=ii)
 
-        chains,lnprobs=sim.fitObs(vvals[ii,:],sigma,ellObs[ii,:],ellErr,obsPriors,disk_r=disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,addNoise=True,seed=seed)
-        obsParsI[ii,:]=sim.getMaxProb(chains[0],lnprobs[0])
-        obsParsS[ii,:]=sim.getMaxProb(chains[1],lnprobs[1])
-        obsParsIS[ii,:]=sim.getMaxProb(chains[2],lnprobs[2])
+def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr,seed):
+    
+    # text for qsub file
+    jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
+               "#PBS -j oe\n"
+               "#PBS -m bea\n"
+               "#PBS -M mgeorge@astro.berkeley.edu\n"
+               "#PBS -V\n"
+               "\n"
+               "import os\n"
+               "import numpy as np\n"
+               "import ensemble\n"
+               "\n"
+               "os.system('date')\n"
+               "os.system('echo `hostname`')\n"
+        )
+    jobTail="os.system('date')\n"
+    
+    jobFile="{}/qsub".format(outDir)
 
-        # write (and re-write) fits file output as we go
-        sim.writeRec(sim.parsToRec(obsParsI[0:ii+1],labels=labels),dataDir+subDir+"/obsParsI.fits")
-        sim.writeRec(sim.parsToRec(obsParsS[0:ii+1],labels=labels),dataDir+subDir+"/obsParsS.fits")
-        sim.writeRec(sim.parsToRec(obsParsIS[0:ii+1],labels=labels),dataDir+subDir+"/obsParsIS.fits")
+    if(convOpt is not None):
+        convOpt="\"{}\"".format(convOpt)
 
-        sim.contourPlotAll(chains,inputPars=inputPars[ii],smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=dataDir+subDir+"/plots/gal_{}.{}".format(ii,figExt))
+    commands=("\n"
+              "thisGal=int(os.environ['PBS_ARRAYID'])\n"
+              "disk_r=np.repeat(1.,{nGal})\n"
+              "obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]\n"
+              "labels=np.array(['PA','b/a','vmax','g1','g2'])\n"
+              "xvals,yvals,vvals,ellObs,inputPars=ensemble.makeObs({nGal:d},inputPriors={inputPriors},disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed={seed})\n"
+              "ensemble.runGal(\"{outDir}\",thisGal,inputPars[thisGal],labels,vvals[thisGal,:],{sigma},ellObs[thisGal,:],{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r[thisGal],convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",addNoise=True,seed=thisGal)\n\n".format(nGal=nGal,inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),seed=seed,outDir=outDir,figExt=figExt)
+        )
 
-def create_qsub(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed):
+    # create qsub file
+    jf=open(jobFile,'w')
+    jf.write(jobHeader)
+    jf.write(commands)
+    jf.write(jobTail)
+    jf.close()
+
+    return jobFile
+
+
+
+def create_qsub_ensemble(outDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed):
     
     # text for qsub file
     jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
@@ -62,12 +101,12 @@ def create_qsub(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibC
         )
     jobTail="os.system('date')\n"
     
-    jobFile="{}/{}/qsub".format(dataDir,subDir)
+    jobFile="{}/qsub".format(outDir)
 
     if(convOpt is not None):
         convOpt="\"{}\"".format(convOpt)
 
-    command="ensemble.runEnsemble(\"{}\",\"{}\",{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(dataDir,subDir,nGal,disk_r.tolist(),convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
+    command="ensemble.runEnsemble(\"{}\",{},disk_r={},convOpt={},atmos_fwhm={},numFib={},fibRad={},fibConvolve={},fibConfig=\"{}\",seed={})\n".format(outDir,nGal,disk_r.tolist(),convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,seed)
 
     # create qsub file
     jf=open(jobFile,'w')
@@ -78,7 +117,6 @@ def create_qsub(dataDir,subDir,nGal,disk_r,convOpt,atmos_fwhm,numFib,fibRad,fibC
 
     return jobFile
 
-
 if __name__ == "__main__":
 
     figExt="pdf"
@@ -86,17 +124,21 @@ if __name__ == "__main__":
     batch="-q batch"
 
     nGal=3
-    disk_r=np.repeat(1.,nGal)
+    #    disk_r=np.repeat(1.,nGal)
     seed=7
 
+    inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
+
     convOpt=np.array([None,"pixel"])
+    nEnsemble=len(convOpt)
     atmos_fwhm=np.array([None,1.5])
     numFib=np.array([6,6])
     fibRad=np.array([1.,1.])
     fibConvolve=np.array([False,True])
     fibConfig=np.array(["hexNoCen","hexNoCen"])
+    sigma=np.repeat(30.,nEnsemble)
+    ellErr=np.tile(np.array([10.,0.1]),nEnsemble).reshape((nEnsemble,2))
 
-    nEnsemble=len(convOpt)
     origcwd=os.getcwd()
     for ii in range(nEnsemble):
         subDir="opt_{}_{}_{}_{}_{}_{}".format(convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii])
@@ -108,8 +150,10 @@ if __name__ == "__main__":
         # move to job dir so log files are stored there
         os.chdir(dataDir+subDir)
 
-        jobFile=create_qsub(dataDir,subDir,nGal,disk_r,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],seed)
-        os.system("qsub -VX {} {}".format(batch,jobFile))
+        #        jobFile=create_qsub_ensemble(dataDir+subDir,nGal,disk_r,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],seed)
+        #        os.system("qsub -VX {} {}".format(batch,jobFile))
+        jobFile=create_qsub_galArr(dataDir+subDir,nGal,inputPriors,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],sigma[ii],ellErr[ii],seed)
+        os.system("qsub -VX -t 0-{} {} {}".format(nGal-1,batch,jobFile))
 
     os.chdir(origcwd)
     
