@@ -2,6 +2,7 @@
 import sim
 import numpy as np
 import os
+import glob
 
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
 # Generate input pars and observed values (w/o noise added) for a galaxy
@@ -80,6 +81,36 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
     return jobFile
 
+def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
+
+    labels=np.array(["PA","b/a","vmax","g1","g2"])
+
+    chainIFiles=glob.glob(dir+"/chainI_*.fits")
+    chainSFiles=glob.glob(dir+"/chainS_*.fits")
+    chainISFiles=glob.glob(dir+"/chainIS_*.fits")
+
+    dI=np.zeros((nGal,len(labels)))
+    dS=np.zeros_like(dI)
+    dIS=np.zeros_like(dI)
+    
+    for ii in range(nGal):
+        if((dir+"chainI_{:03d}.fits".format(ii) in chainIFiles) &
+           (dir+"chainS_{:03d}.fits".format(ii) in chainSFiles) &
+           (dir+"chainIS_{:03d}.fits".format(ii) in chainISFiles)):
+            inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()
+            recI=sim.readRec(dir+"chainI_{:03d}.fits".format(ii))
+            recS=sim.readRec(dir+"chainS_{:03d}.fits".format(ii))
+            recIS=sim.readRec(dir+"chainIS_{:03d}.fits".format(ii))
+
+            obsI=sim.getMaxProb(sim.recToPars(recI,labels=labels),recI['lnprob'])
+            obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels),recS['lnprob'])
+            obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels),recIS['lnprob'])
+            
+            dI[ii]=obsI-inputPars
+            dS[ii]=obsS-inputPars
+            dIS[ii]=obsIS-inputPars
+
+    return (np.std(dI,axis=0),np.std(dS,axis=0),np.std(dIS,axis=0))
 
 if __name__ == "__main__":
 # main creates a list of control pars and then calls create_qsub_galArr to make an ensemble of galaxies for each set of control pars
