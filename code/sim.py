@@ -60,10 +60,10 @@ def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
             pos[0,:]=xx*np.cos(PArad)-yy*np.sin(PArad)
             pos[1,:]=xx*np.sin(PArad)+yy*np.cos(PArad)
     else:
-        # TO DO - add other configs - line, box, circle. and extend hex for MaNGA style
+        # TO DO - add other configs - e.g. circle, extend hex for MaNGA style
         pass 
 
-    return (pos,fibShape,fibPA)
+    return (pos,fibShape)
 
 
 # These functions take a galsim object <image> and integrate over the area of a fiber
@@ -555,6 +555,7 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA
         if(fibShape=="circle"):
             sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
         elif(fibShape=="square"):
+            PArad=np.deg2rad(fibPA)
             sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*fibRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*fibRad)) for pos in zip(xobs,yobs)])
         kernel[sel]=1.
         
