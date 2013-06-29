@@ -525,10 +525,11 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
 
     return (fluxVMapArr,imgArr)
 
-def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve):
+def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA):
 # construct the fiber x PSF convolution kernel
 # this saves time since you only need to calculate it once and can multiply it by the flux map,
-#    rather than conolving each model galaxy and sampling at a position
+#    rather than convolving each model galaxy and sampling at a position
+# returns kernel, an ndarray of size [numFib, imgSizePix, imgSizePix]
 
     numFib=xobs.size
     half=imgSizePix/2
@@ -538,16 +539,23 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve):
         if(fibConvolve): # PSF and Fiber convolution
             psfArr=np.exp(-(xx**2 + yy**2)/(2.*atmos_sigma**2))
             fibArrs=np.zeros((numFib,imgSizePix,imgSizePix))
-            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+            if(fibShape=="circle"):
+                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+            elif(fibShape=="square"):
+                PArad=np.deg2rad(fibPA)
+                sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*fibRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*fibRad)) for pos in zip(xobs,yobs)])
             fibArrs[sel]=1.
             kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(numFib)])
         else:
-            # this is basically the psf convolved with 6 delta functions
-            kernel=np.array([np.exp(-((xx-pos[0])**2 + (yy-pos[1])**2)/(2.*atmos_sigma**2)) for ii in range(numFib)])
+            # this is basically the psf convolved with a delta function at the center of each fiber
+            kernel=np.array([np.exp(-((xx-pos[0])**2 + (yy-pos[1])**2)/(2.*atmos_sigma**2)) for pos in zip(xobs,yobs)])
     else:
         # Fiber only
         kernel=np.zeros((numFib,imgSizePix,imgSizePix))
-        sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+        if(fibShape=="circle"):
+            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
+        elif(fibShape=="square"):
+            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*fibRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*fibRad)) for pos in zip(xobs,yobs)])
         kernel[sel]=1.
         
     return kernel
