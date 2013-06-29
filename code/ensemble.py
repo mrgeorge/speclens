@@ -15,7 +15,7 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
 
     fibPA=ellObs[0] # align fibers to observed PA (no effect for circular fibers)
 
-    pos,fibShape==sim.getFiberPos(numFib,fibRad,fibConfig,fibPA)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig,fibPA)
     xvals,yvals=pos
     if(convOpt is not None):
         kernel=sim.makeConvolutionKernel(xvals,yvals,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA)
