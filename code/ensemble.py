@@ -9,7 +9,7 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
     inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed)
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
-    ellObs=sim.ellModel(inputPars[ii,:])
+    ellObs=sim.ellModel(inputPars)
     imNoise=np.random.randn(ellObs.size)*ellErr
     ellObs+=imNoise
 
@@ -19,9 +19,9 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
     xvals,yvals=pos
     if(convOpt is not None):
         kernel=sim.makeConvolutionKernel(xvals,yvals,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA)
-        vvals=sim.vmapObs(inputPars[ii,:],xvals,yvals,disk_r[ii],convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
+        vvals=sim.vmapObs(inputPars,xvals,yvals,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
     else: # this is faster if we don't need to convolve with psf or fiber
-        vvals=sim.vmapModel(inputPars[ii,:],xvals,yvals)
+        vvals=sim.vmapModel(inputPars,xvals,yvals)
 
     specNoise=np.random.randn(numFib)*sigma
     vvals+=specNoise
