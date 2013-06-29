@@ -61,12 +61,13 @@ if __name__ == "__main__":
     plt.clf()
     numFib=7
     fibRad=1.
+    fibPA=None
     fibConfig="hex"
     pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
     xfib,yfib=pos
-    sim.showImage(gal,xfib,yfib,fibRad,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
+    sim.showImage(gal,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
     plt.clf()
-    sim.showImage(fluxVMap,xfib,yfib,fibRad,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
+    sim.showImage(fluxVMap,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
     
     
     # Fig 3
@@ -141,8 +142,9 @@ if __name__ == "__main__":
     sigma=30.
     numFib=6
     fibRad=1
+    fibPA=0.
     fibConfig="hexNoCen"
-    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig)
+    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig,fibPA=fibPA)
     xvals,yvals=pos
     vvals=sim.vmapModel(pars, xvals, yvals)
     ellObs=sim.ellModel(pars)
@@ -150,7 +152,7 @@ if __name__ == "__main__":
     priors=[None,[0.1,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
 
     # compare imaging vs spectro vs combined
-    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,addNoise=False,nSteps=250)
+    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,fibConfig=fibConfig,fibPA=fibPA,addNoise=False,nSteps=250)
     smooth=3
     plt.clf()
     sim.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
