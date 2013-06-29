@@ -89,30 +89,29 @@ if __name__ == "__main__":
     dataDir="/data/mgeorge/speclens/data/"
     batch="-q batch"
 
-    nGal=3
+    nGal=50
     #    disk_r=np.repeat(1.,nGal)
     seed=7
 
     inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
 
-    convOpt=np.array([None,"pixel"])
+    convOpt=np.array([None,"pixel","pixel","pixel",None])
     nEnsemble=len(convOpt)
-    atmos_fwhm=np.array([None,1.5])
-    numFib=np.array([6,6])
-    fibRad=np.array([1.,1.])
-    fibConvolve=np.array([False,True])
-    fibConfig=np.array(["hexNoCen","hexNoCen"])
-    sigma=np.repeat(30.,nEnsemble)
+    atmos_fwhm=np.array([None,1.5,1.5,0.5,None])
+    numFib=np.array([6,6,10,100,100])
+    fibRad=np.array([1.,1.,0.5,0.5,0.5])
+    fibConvolve=np.array([False,True,True,True,False])
+    fibConfig=np.array(["hexNoCen","hexNoCen","slit","ifu","ifu"])
+    sigma=np.array([30.,30.,30.,5.,5.])
     ellErr=np.tile(np.array([10.,0.1]),nEnsemble).reshape((nEnsemble,2))
 
     origcwd=os.getcwd()
     for ii in range(nEnsemble):
-        subDir="opt_{}_{}_{}_{}_{}_{}".format(convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii])
+        subDir="opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],fibConvolve[ii],convOpt[ii])
         if(not(os.path.exists(dataDir+subDir))):
             os.makedirs(dataDir+subDir)
             os.makedirs(dataDir+subDir+"/plots")
 
-    
         # move to job dir so log files are stored there
         os.chdir(dataDir+subDir)
 
