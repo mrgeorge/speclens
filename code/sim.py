@@ -782,7 +782,7 @@ def interpretPriors(priors):
 
     return (priorFuncs,fixed,guess,guessScale)
 
-def generateEnsemble(nGal,priors,shearOpt="PS",seed=None):
+def generateEnsemble(nGal,priors,shearOpt=None,seed=None):
 # generate a set of galaxies with intrinsic shapes following the prior distribution
 # (priors follow same convention as used by interpretPriors but must not be None)
 # and generate shear parameters following an approach set by shearOpt
