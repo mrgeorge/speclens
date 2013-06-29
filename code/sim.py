@@ -173,7 +173,7 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-def showImage(profile,xfib,yfib,fibRad,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
+def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
@@ -191,9 +191,20 @@ def showImage(profile,xfib,yfib,fibRad,filename=None,colorbar=True,colorbarLabel
     if(xfib is not None):
         numFib=xfib.size
         for pos in zip(xfib,yfib):
-            circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=2)
-            ax=plt.gca()
-            ax.add_patch(circ)
+            if(fibShape=="circle"):
+                circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=2)
+                ax=plt.gca()
+                ax.add_patch(circ)
+            elif(fibShape=="square"):
+                PArad=np.deg2rad(fibPA)
+                corners=np.zeros((4,2))
+                xx=np.array([-1,1,1,-1])
+                yy=np.array([-1,-1,1,1])
+                corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*fibRad+pos[0]
+                corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*fibRad+pos[1]
+                sq=plt.Polygon(corners,fill=False,color='white',lw=2)
+                ax=plt.gca()
+                ax.add_patch(sq)
 
     if(colorbar):
 	cbar=plt.colorbar()
