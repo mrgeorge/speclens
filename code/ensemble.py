@@ -11,6 +11,7 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
     ellObs=sim.ellModel(inputPars)
+    np.random.seed(100*seed)
     imNoise=np.random.randn(ellObs.size)*ellErr
     ellObs+=imNoise
 
@@ -39,7 +40,7 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
     sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits".format(galID))
     sim.contourPlotAll(chains,inputPars=inputPars,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
-def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr,seed):
+def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
 # make a job array that generates a list of galaxies and runs each one as a separate job
     
     # text for qsub file
@@ -106,11 +107,17 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
             obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels),recS['lnprob'])
             obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels),recIS['lnprob'])
             
-            dI[ii]=obsI-inputPars
-            dS[ii]=obsS-inputPars
-            dIS[ii]=obsIS-inputPars
+            dI[ii,:]=obsI-inputPars
+            dS[ii,:]=obsS-inputPars
+            dIS[ii,:]=obsIS-inputPars
+        else:
+            dI[ii,:]=np.repeat(np.nan,len(labels))
+            dS[ii,:]=np.repeat(np.nan,len(labels))
+            dIS[ii,:]=np.repeat(np.nan,len(labels))
 
-    return (np.std(dI,axis=0),np.std(dS,axis=0),np.std(dIS,axis=0))
+    good=~np.isnan(dI[:,0])
+
+    return (np.std(dI[good],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
 
 if __name__ == "__main__":
 # main creates a list of control pars and then calls create_qsub_galArr to make an ensemble of galaxies for each set of control pars
@@ -120,20 +127,19 @@ if __name__ == "__main__":
     dataDir="/data/mgeorge/speclens/data/"
     batch="-q batch"
 
-    nGal=50
+    nGal=100
     #    disk_r=np.repeat(1.,nGal)
-    seed=7
 
     inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
 
-    convOpt=np.array([None,"pixel","pixel","pixel",None])
+    convOpt=np.append(np.repeat(None,6),np.repeat("pixel",12))
     nEnsemble=len(convOpt)
-    atmos_fwhm=np.array([None,1.5,1.5,0.5,None])
-    numFib=np.array([6,6,10,100,100])
-    fibRad=np.array([1.,1.,0.5,0.5,0.5])
-    fibConvolve=np.array([False,True,True,True,False])
-    fibConfig=np.array(["hexNoCen","hexNoCen","slit","ifu","ifu"])
-    sigma=np.array([30.,30.,30.,5.,5.])
+    atmos_fwhm=np.append(np.repeat(None,6),np.repeat([0.5,1.4],6))
+    numFib=np.tile([6,10,100],6)
+    fibRad=np.tile([1.,0.5,0.5],6)
+    fibConvolve=np.append(np.repeat(False,6),np.repeat(True,12))
+    fibConfig=np.tile(["hexNoCen","slit","ifu"],6)
+    sigma=np.tile(np.repeat([5.,30.],3),3)
     ellErr=np.tile(np.array([10.,0.1]),nEnsemble).reshape((nEnsemble,2))
 
     origcwd=os.getcwd()
@@ -148,7 +154,7 @@ if __name__ == "__main__":
 
         #        jobFile=create_qsub_ensemble(dataDir+subDir,nGal,disk_r,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],seed)
         #        os.system("qsub -VX {} {}".format(batch,jobFile))
-        jobFile=create_qsub_galArr(dataDir+subDir,nGal,inputPriors,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],sigma[ii],ellErr[ii],seed)
+        jobFile=create_qsub_galArr(dataDir+subDir,nGal,inputPriors,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],sigma[ii],ellErr[ii])
         os.system("qsub -VX -t 0-{} {} {}".format(nGal-1,batch,jobFile))
 
     os.chdir(origcwd)
