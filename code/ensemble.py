@@ -107,7 +107,7 @@ if __name__ == "__main__":
 
     origcwd=os.getcwd()
     for ii in range(nEnsemble):
-        subDir="opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],fibConvolve[ii],convOpt[ii])
+        subDir="opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],bool(fibConvolve[ii]),convOpt[ii])
         if(not(os.path.exists(dataDir+subDir))):
             os.makedirs(dataDir+subDir)
             os.makedirs(dataDir+subDir+"/plots")
