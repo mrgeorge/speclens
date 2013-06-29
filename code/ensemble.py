@@ -6,7 +6,7 @@ import os
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
 # Generate input pars and observed values (w/o noise added) for a galaxy
 
-    inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed)
+    inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
     ellObs=sim.ellModel(inputPars)
