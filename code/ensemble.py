@@ -35,9 +35,9 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
 # this is what create_qsub_galArr calls to run each galaxy
 
     chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
-    sim.writeRec(sim.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits".format(galID))
-    sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits".format(galID))
-    sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits".format(galID))
+    sim.writeRec(sim.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
+    sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
     sim.contourPlotAll(chains,inputPars=inputPars,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
 def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
@@ -93,6 +93,9 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
     dI=np.zeros((nGal,len(labels)))
     dS=np.zeros_like(dI)
     dIS=np.zeros_like(dI)
+    dImed=np.zeros((nGal,len(labels)))
+    dSmed=np.zeros_like(dI)
+    dISmed=np.zeros_like(dI)
     
     for ii in range(nGal):
         if((dir+"chainI_{:03d}.fits".format(ii) in chainIFiles) &
@@ -107,17 +110,70 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
             obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels),recS['lnprob'])
             obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels),recIS['lnprob'])
             
+            obsImed=sim.getMedPost(sim.recToPars(recI,labels=labels))
+            obsSmed=sim.getMedPost(sim.recToPars(recS,labels=labels))
+            obsISmed=sim.getMedPost(sim.recToPars(recIS,labels=labels))
+            
             dI[ii,:]=obsI-inputPars
             dS[ii,:]=obsS-inputPars
             dIS[ii,:]=obsIS-inputPars
+
+            dImed[ii,:]=obsImed-inputPars
+            dSmed[ii,:]=obsSmed-inputPars
+            dISmed[ii,:]=obsISmed-inputPars
         else:
             dI[ii,:]=np.repeat(np.nan,len(labels))
             dS[ii,:]=np.repeat(np.nan,len(labels))
             dIS[ii,:]=np.repeat(np.nan,len(labels))
 
+            dImed[ii,:]=np.repeat(np.nan,len(labels))
+            dSmed[ii,:]=np.repeat(np.nan,len(labels))
+            dISmed[ii,:]=np.repeat(np.nan,len(labels))
+
     good=~np.isnan(dI[:,0])
 
-    return (np.std(dI[good],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
+    print "STD Max"
+    print np.std(dI[good,:],axis=0)
+    print np.std(dS[good,:],axis=0)
+    print np.std(dIS[good,:],axis=0)
+    print "STD Med"
+    print np.std(dImed[good,:],axis=0)
+    print np.std(dSmed[good,:],axis=0)
+    print np.std(dISmed[good,:],axis=0)
+    print "MAD Max"
+    print np.median(np.abs(dI[good,:]),axis=0)
+    print np.median(np.abs(dS[good,:]),axis=0)
+    print np.median(np.abs(dIS[good,:]),axis=0)
+    print "MAD Med"
+    print np.median(np.abs(dImed[good,:]),axis=0)
+    print np.median(np.abs(dSmed[good,:]),axis=0)
+    print np.median(np.abs(dISmed[good,:]),axis=0)
+
+    #    return (np.std(dI[good,:],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
+
+def getScatterAll():
+    dataDir="/data/mgeorge/speclens/data/"
+
+    nGal=100
+
+    inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
+
+    convOpt=np.append(np.repeat(None,6),np.repeat("pixel",12))
+    nEnsemble=len(convOpt)
+    atmos_fwhm=np.append(np.repeat(None,6),np.repeat([0.5,1.4],6))
+    numFib=np.tile([6,10,100],6)
+    fibRad=np.tile([1.,0.5,0.5],6)
+    fibConvolve=np.append(np.repeat(False,6),np.repeat(True,12))
+    fibConfig=np.tile(["hexNoCen","slit","ifu"],6)
+    sigma=np.tile(np.repeat([5.,30.],3),3)
+    ellErr=np.tile(np.array([10.,0.1]),nEnsemble).reshape((nEnsemble,2))
+
+    for ii in range(nEnsemble):
+        subDir="opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],bool(fibConvolve[ii]),convOpt[ii])
+
+        print subDir
+        getScatter(dataDir+subDir+"/",nGal)
+
 
 if __name__ == "__main__":
 # main creates a list of control pars and then calls create_qsub_galArr to make an ensemble of galaxies for each set of control pars
