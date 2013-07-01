@@ -924,6 +924,9 @@ def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP]
 
+def getMedPost(chain):
+    return np.median(chain,axis=0)
+
 def parsToRec(pars,labels=np.array(["PA","b/a","vmax","g1","g2"])):
     dtype=[(label,float) for label in labels]
     rec=np.recarray(len(pars),dtype=dtype)
@@ -964,8 +967,8 @@ def recToObs(rec):
     ellObs=rec["ellObs"].squeeze()
     return (xvals,yvals,vvals,ellObs)
 
-def writeRec(rec,filename,clobber=True):
-    fitsio.write(filename,rec,clobber=clobber)
+def writeRec(rec,filename,clobber=True,compress="GZIP"):
+    fitsio.write(filename,rec,clobber=clobber,compress=compress)
 
 def readRec(filename):
     rec=fitsio.read(filename)
