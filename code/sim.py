@@ -774,11 +774,14 @@ def interpretPriors(priors):
 		    priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
 
     # remove fixed entries from list of pars to fit
+    delarr=np.array([])
     for ii in xrange(nPars):
 	if(fixed[ii] is not None):
-	    guess=np.delete(guess,ii)
-	    guessScale=np.delete(guessScale,ii)
-	    priorFuncs=np.delete(priorFuncs,ii)
+            delarr=np.append(delarr,ii)
+    if(len(delarr) > 0):
+        guess=np.delete(guess,delarr)
+        guessScale=np.delete(guessScale,delarr)
+        priorFuncs=np.delete(priorFuncs,delarr)
 
     return (priorFuncs,fixed,guess,guessScale)
 
