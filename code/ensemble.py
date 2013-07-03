@@ -85,50 +85,36 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
 
     labels=np.array(["PA","b/a","vmax","g1","g2"])
+    free=np.array([1,2,3,4])
+    
+    chainIFiles=glob.glob(dir+"/chainI_*.fits.gz")
+    chainSFiles=glob.glob(dir+"/chainS_*.fits.gz")
+    chainISFiles=glob.glob(dir+"/chainIS_*.fits.gz")
 
-    chainIFiles=glob.glob(dir+"/chainI_*.fits")
-    chainSFiles=glob.glob(dir+"/chainS_*.fits")
-    chainISFiles=glob.glob(dir+"/chainIS_*.fits")
-
-    dI=np.zeros((nGal,len(labels)))
+    dI=np.zeros((nGal,len(free)))
     dS=np.zeros_like(dI)
     dIS=np.zeros_like(dI)
-    dImed=np.zeros((nGal,len(labels)))
-    dSmed=np.zeros_like(dI)
-    dISmed=np.zeros_like(dI)
     
     for ii in range(nGal):
-        if((dir+"chainI_{:03d}.fits".format(ii) in chainIFiles) &
-           (dir+"chainS_{:03d}.fits".format(ii) in chainSFiles) &
-           (dir+"chainIS_{:03d}.fits".format(ii) in chainISFiles)):
+        if((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
+           (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
+           (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles)):
             inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()
-            recI=sim.readRec(dir+"chainI_{:03d}.fits".format(ii))
-            recS=sim.readRec(dir+"chainS_{:03d}.fits".format(ii))
-            recIS=sim.readRec(dir+"chainIS_{:03d}.fits".format(ii))
+            recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
+            recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
+            recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
 
-            obsI=sim.getMaxProb(sim.recToPars(recI,labels=labels),recI['lnprob'])
-            obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels),recS['lnprob'])
-            obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels),recIS['lnprob'])
+            obsI=sim.getMaxProb(sim.recToPars(recI,labels=labels[free]),recI['lnprob'])
+            obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels[free]),recS['lnprob'])
+            obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels[free]),recIS['lnprob'])
             
-            obsImed=sim.getMedPost(sim.recToPars(recI,labels=labels))
-            obsSmed=sim.getMedPost(sim.recToPars(recS,labels=labels))
-            obsISmed=sim.getMedPost(sim.recToPars(recIS,labels=labels))
-            
-            dI[ii,:]=obsI-inputPars
-            dS[ii,:]=obsS-inputPars
-            dIS[ii,:]=obsIS-inputPars
-
-            dImed[ii,:]=obsImed-inputPars
-            dSmed[ii,:]=obsSmed-inputPars
-            dISmed[ii,:]=obsISmed-inputPars
+            dI[ii,:]=obsI-inputPars[free]
+            dS[ii,:]=obsS-inputPars[free]
+            dIS[ii,:]=obsIS-inputPars[free]
         else:
-            dI[ii,:]=np.repeat(np.nan,len(labels))
-            dS[ii,:]=np.repeat(np.nan,len(labels))
-            dIS[ii,:]=np.repeat(np.nan,len(labels))
-
-            dImed[ii,:]=np.repeat(np.nan,len(labels))
-            dSmed[ii,:]=np.repeat(np.nan,len(labels))
-            dISmed[ii,:]=np.repeat(np.nan,len(labels))
+            dI[ii,:]=np.repeat(np.nan,len(free))
+            dS[ii,:]=np.repeat(np.nan,len(free))
+            dIS[ii,:]=np.repeat(np.nan,len(free))
 
     good=~np.isnan(dI[:,0])
 
@@ -136,18 +122,6 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
     print np.std(dI[good,:],axis=0)
     print np.std(dS[good,:],axis=0)
     print np.std(dIS[good,:],axis=0)
-    print "STD Med"
-    print np.std(dImed[good,:],axis=0)
-    print np.std(dSmed[good,:],axis=0)
-    print np.std(dISmed[good,:],axis=0)
-    print "MAD Max"
-    print np.median(np.abs(dI[good,:]),axis=0)
-    print np.median(np.abs(dS[good,:]),axis=0)
-    print np.median(np.abs(dIS[good,:]),axis=0)
-    print "MAD Med"
-    print np.median(np.abs(dImed[good,:]),axis=0)
-    print np.median(np.abs(dSmed[good,:]),axis=0)
-    print np.median(np.abs(dISmed[good,:]),axis=0)
 
     #    return (np.std(dI[good,:],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
 
