@@ -82,10 +82,7 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
     return jobFile
 
-def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
-
-    labels=np.array(["PA","b/a","vmax","g1","g2"])
-    free=np.array([1,2,3,4])
+def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4])):
     
     chainIFiles=glob.glob(dir+"/chainI_*.fits.gz")
     chainSFiles=glob.glob(dir+"/chainS_*.fits.gz")
@@ -94,12 +91,13 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
     dI=np.zeros((nGal,len(free)))
     dS=np.zeros_like(dI)
     dIS=np.zeros_like(dI)
+    inputPars=np.zeros_like(dI)
     
     for ii in range(nGal):
         if((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
            (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
            (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles)):
-            inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()
+            inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
             recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
             recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
             recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
@@ -108,9 +106,9 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
             obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels[free]),recS['lnprob'])
             obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels[free]),recIS['lnprob'])
             
-            dI[ii,:]=obsI-inputPars[free]
-            dS[ii,:]=obsS-inputPars[free]
-            dIS[ii,:]=obsIS-inputPars[free]
+            dI[ii,:]=obsI-inputPars[ii,:]
+            dS[ii,:]=obsS-inputPars[ii,:]
+            dIS[ii,:]=obsIS-inputPars[ii,:]
         else:
             dI[ii,:]=np.repeat(np.nan,len(free))
             dS[ii,:]=np.repeat(np.nan,len(free))
@@ -123,6 +121,7 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]):
     print np.std(dS[good,:],axis=0)
     print np.std(dIS[good,:],axis=0)
 
+    return (dI,dS,dIS,inputPars)
     #    return (np.std(dI[good,:],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
 
 def getScatterAll():
