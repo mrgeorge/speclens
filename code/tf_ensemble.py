@@ -47,7 +47,7 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
     sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
     sim.contourPlotAll(chains,inputPars=inputPars,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
-def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
+def create_qsub_galArr(outDir,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
 # make a job array that generates a list of galaxies and runs each one as a separate job
     
     # text for qsub file
@@ -77,8 +77,9 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
               "labels=np.array(['PA','b/a','vmax','g1','g2'])\n"
               "xvals,yvals,vvals,ellObs,inputPars=tf_ensemble.makeObs(inputPriors={inputPriors},disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed=thisGal)\n"
               "obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]\n"
+#              "obsPriors=[[0,360],[0,1],[50,250],[-0.5,0.5],[-0.5,0.5]]\n"
               "free=np.array([0,1,2,3,4])\n"
-              "tf_ensemble.runGal(\"{outDir}\",thisGal,inputPars[free],labels[free],vvals,{sigma},ellObs,{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",fibPA=ellObs[0],addNoise=False,seed=thisGal)\n\n".format(nGal=nGal,inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),outDir=outDir,figExt=figExt)
+              "tf_ensemble.runGal(\"{outDir}\",thisGal,inputPars[free],labels[free],vvals,{sigma},ellObs,{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",fibPA=ellObs[0],addNoise=False,seed=thisGal)\n\n".format(inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),outDir=outDir,figExt=figExt)
         )
 
     # create qsub file
@@ -100,18 +101,19 @@ if __name__ == "__main__":
     dataDir="/data/mgeorge/speclens/data/"
     batch="-q batch"
 
+    galStart=0
     nGal=100
 
     inputPriors=[[0,360],[0,1],150,(0.,0.02),(0.,0.02)]
 
-    convOpt=np.array([None,None,"pixel"])
+    convOpt=np.array(["pixel"])
     nEnsemble=len(convOpt)
-    atmos_fwhm=np.array([None,None,1.4])
-    numFib=np.array([10,6,6])
-    fibRad=np.array([0.5,1,1])
-    fibConvolve=np.array([False,False,True])
-    fibConfig=np.array(["slit","hexNoCen","hexNoCen"])
-    sigma=np.array([5.,5.,30])
+    atmos_fwhm=np.array([1.4])
+    numFib=np.array([6])
+    fibRad=np.array([1.])
+    fibConvolve=np.array([True])
+    fibConfig=np.array(["hexNoCen"])
+    sigma=np.array([30.])
     ellErr=np.tile(np.array([3.,0.01]),nEnsemble).reshape((nEnsemble,2))
 
     origcwd=os.getcwd()
@@ -124,8 +126,8 @@ if __name__ == "__main__":
         # move to job dir so log files are stored there
         os.chdir(dataDir+subDir)
 
-        jobFile=create_qsub_galArr(dataDir+subDir,nGal,inputPriors,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],sigma[ii],ellErr[ii])
-        os.system("qsub -VX -t 0-{} {} {}".format(nGal-1,batch,jobFile))
+        jobFile=create_qsub_galArr(dataDir+subDir,inputPriors,convOpt[ii],atmos_fwhm[ii],numFib[ii],fibRad[ii],fibConvolve[ii],fibConfig[ii],sigma[ii],ellErr[ii])
+        os.system("qsub -VX -t {}-{} {} {}".format(galStart,galStart+nGal-1,batch,jobFile))
 
     os.chdir(origcwd)
     
