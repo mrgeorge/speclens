@@ -112,7 +112,7 @@ def create_qsub_galArr(outDir,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibCo
               "gals=coma.selectComaTargets()\n"
               "thisGal=int(os.environ['PBS_ARRAYID'])\n"
               "disk_r=gals[thisGal]['disk_r']\n"
-              "inputPriors=[[0,360],[0,1],150,gals[thisGal]['g1'],gals[thisGal]['g2']]\n"
+              "inputPriors=[[0,360],[0,1],150,float(gals[thisGal]['g1']),float(gals[thisGal]['g2'])]\n"
               "labels=np.array(['PA','b/a','vmax','g1','g2'])\n"
               "xvals,yvals,vvals,ellObs,inputPars=coma.makeObs(inputPriors=inputPriors,disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed=thisGal)\n"
               "obsPriors=[[0,360],[0,1],(150,20),[-0.5,0.5],[-0.5,0.5]]\n"
