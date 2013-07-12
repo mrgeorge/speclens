@@ -6,11 +6,38 @@ import fitsio
 import esutil
 import galsim
 import galsim.integ
+import re
+import astropy.io.ascii
 
 # select galaxies behind Coma
 # generate ensemble of disks with shears from their positions
 # measure noisy shears and recover tangential shear profile vs distance
 
+def parseRAStr(raStr):
+    hms=re.split('h|m|s',raStr)
+    hh,mm,ss=float(hms[0]),float(hms[1]),float(hms[2])
+    raDeg=(hh + mm/60. + ss/3600.)*15
+    return raDeg
+
+def parseDecStr(decStr):
+    dms=re.split('d|m|s',decStr)
+    dd,mm,ss=float(dms[0]),float(dms[1]),float(dms[2])
+    decDeg=(dd + mm/60. + ss/3600.)
+    return decDeg
+    
+def getNedZ():
+    rec=astropy.io.ascii.read("/data/mgeorge/speclens/data/coma_z_ned.clean")
+    ra=np.zeros(len(rec))
+    dec=np.zeros_like(ra)
+    z=np.zeros_like(ra)
+    for ii in range(len(rec)):
+        ra[ii]=parseRAStr(rec['col1'][ii])
+        dec[ii]=parseDecStr(rec['col2'][ii])
+        z[ii]=rec['col3'][ii]
+
+    good=(z>0)
+    return (ra[good],dec[good],z[good])
+    
 def selectComaTargets():
     cat=fitsio.read("/data/mgeorge/speclens/data/coma_sdss_cas.fits")
     comaRA=194.898779 # J200 for NGC 4874 from NED
