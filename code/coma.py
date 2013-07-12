@@ -18,16 +18,17 @@ def selectComaTargets():
     plateRad=1.5 # deg
     sel=((cat['z'] > 0.1) &
          (cat['z'] < 0.8) &
-         (cat['zErr'] < 0.4) &
+         (cat['zErr'] > 0.) &
+         (cat['zErr'] < 0.1) &
          (cat['dered_r'] > 18.) &
          (cat['dered_r'] < 21.) &
          (cat['dered_g'] < 21.) &
-         (cat['expRad_r'] > 2) &
-         (cat['expRad_r'] < 10.) &
+         (cat['expRad_r']*np.sqrt(cat['expAB_r']) > 1.4) &
+         (cat['expRad_r']*np.sqrt(cat['expAB_r']) < 10.) &
          (esutil.coords.sphdist(comaRA,comaDec,cat['ra'],cat['dec']) < plateRad)
         )
 
-    # TO DO - use circularized radii (sqrt(ab)), and use known-z catalog
+    # TO DO - use known-z catalog
 
     cat=cat[sel]
 
@@ -39,7 +40,7 @@ def selectComaTargets():
     dtype=[(label,float) for label in ("disk_r","g1","g2")]
     rec=np.recarray(len(cat),dtype=dtype)
     for ii in range(len(cat)):
-        gal=galsim.Sersic(n=1,scale_radius=float(cat[ii]['expRad_r']))
+        gal=galsim.Sersic(n=1,scale_radius=float(cat[ii]['expRad_r']*np.sqrt(cat[ii]['expAB_r'])))
         rec[ii]['disk_r']=gal.getHalfLightRadius()
         rec[ii]['g1'],rec[ii]['g2']=nfw.getShear(pos=(cat[ii]['ra']-comaRA,cat[ii]['dec']-comaDec),units=galsim.degrees,z_s=cat[ii]['z'])
 
