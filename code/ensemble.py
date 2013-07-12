@@ -95,13 +95,25 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     hwS=np.zeros_like(dI)
     hwIS=np.zeros_like(dI)
     inputPars=np.zeros_like(dI)
+
+    # check if inputPriors is a list of lists (i.e. different inputs for each galaxy)
+    if(len(inputPriors) != len(labels)):
+        if(len(inputPriors[0]) == len(labels)):
+            listInput=True
+        else:
+            print "Error in getScatter: inputPriors should be a list of len={} or a list of such lists".format(len(labels))
+    else:
+        listInput=False
     
     for ii in range(nGal):
         print ii
         if((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
            (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
            (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles)):
-            inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
+            if(listInput):
+                inputPars[ii,:]=sim.generateEnsemble(1,inputPriors[ii],shearOpt=None,seed=ii).squeeze()[free]
+            else:
+                inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
             recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
             recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
             recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
@@ -131,8 +143,7 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     print np.std(dS[good,:],axis=0)
     print np.std(dIS[good,:],axis=0)
 
-    return (dI,dS,dIS,hwI,hwS,hwIS,inputPars)
-    #    return (np.std(dI[good,:],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
+    return (dI[good],dS[good],dIS[good],hwI[good],hwS[good],hwIS[good],inputPars[good])
 
 def getScatterAll():
     dataDir="/data/mgeorge/speclens/data/"
