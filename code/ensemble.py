@@ -91,9 +91,13 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     dI=np.zeros((nGal,len(free)))
     dS=np.zeros_like(dI)
     dIS=np.zeros_like(dI)
+    hwI=np.zeros_like(dI)
+    hwS=np.zeros_like(dI)
+    hwIS=np.zeros_like(dI)
     inputPars=np.zeros_like(dI)
     
     for ii in range(nGal):
+        print ii
         if((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
            (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
            (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles)):
@@ -109,10 +113,16 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
             dI[ii,:]=obsI-inputPars[ii,:]
             dS[ii,:]=obsS-inputPars[ii,:]
             dIS[ii,:]=obsIS-inputPars[ii,:]
+            hwI[ii,:]=sim.get68(sim.recToPars(recI,labels=labels[free]),opt="hw")
+            hwS[ii,:]=sim.get68(sim.recToPars(recS,labels=labels[free]),opt="hw")
+            hwIS[ii,:]=sim.get68(sim.recToPars(recIS,labels=labels[free]),opt="hw")
         else:
             dI[ii,:]=np.repeat(np.nan,len(free))
             dS[ii,:]=np.repeat(np.nan,len(free))
             dIS[ii,:]=np.repeat(np.nan,len(free))
+            hwI[ii,:]=np.repeat(np.nan,len(free))
+            hwS[ii,:]=np.repeat(np.nan,len(free))
+            hwIS[ii,:]=np.repeat(np.nan,len(free))
 
     good=~np.isnan(dI[:,0])
 
@@ -121,7 +131,7 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     print np.std(dS[good,:],axis=0)
     print np.std(dIS[good,:],axis=0)
 
-    return (dI,dS,dIS,inputPars)
+    return (dI,dS,dIS,hwI,hwS,hwIS,inputPars)
     #    return (np.std(dI[good,:],axis=0),np.std(dS[good,:],axis=0),np.std(dIS[good,:],axis=0))
 
 def getScatterAll():
