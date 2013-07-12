@@ -18,9 +18,8 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
     ellObs=sim.ellModel(inputPars)
     np.random.seed(100*seed)
 
-# NOTE - imNoise IS TURNED OFF!!
-    #    imNoise=np.random.randn(ellObs.size)*ellErr
-    #    ellObs+=imNoise
+    imNoise=np.random.randn(ellObs.size)*ellErr
+    ellObs+=imNoise
 
     fibPA=ellObs[0] # align fibers to observed PA (no effect for circular fibers)
 
@@ -73,10 +72,10 @@ def create_qsub_galArr(outDir,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibCo
 
     commands=("\n"
               "thisGal=int(os.environ['PBS_ARRAYID'])\n"
-              "disk_r=1.\n"
+              "disk_r=2.9\n"
               "labels=np.array(['PA','b/a','vmax','g1','g2'])\n"
               "xvals,yvals,vvals,ellObs,inputPars=tf_ensemble.makeObs(inputPriors={inputPriors},disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},numFib={numFib},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",sigma={sigma},ellErr={ellErr},seed=thisGal)\n"
-              "obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]\n"
+              "obsPriors=[[0,360],[0,1],(150,20),[-0.5,0.5],[-0.5,0.5]]\n"
 #              "obsPriors=[[0,360],[0,1],[50,250],[-0.5,0.5],[-0.5,0.5]]\n"
               "free=np.array([0,1,2,3,4])\n"
               "tf_ensemble.runGal(\"{outDir}\",thisGal,inputPars[free],labels[free],vvals,{sigma},ellObs,{ellErr},obsPriors,figExt=\"{figExt}\",disk_r=disk_r,convOpt={convOpt},atmos_fwhm={atmos_fwhm},fibRad={fibRad},fibConvolve={fibConvolve},fibConfig=\"{fibConfig}\",fibPA=ellObs[0],addNoise=False,seed=thisGal)\n\n".format(inputPriors=inputPriors,convOpt=convOpt,atmos_fwhm=atmos_fwhm,numFib=numFib,fibRad=fibRad,fibConvolve=fibConvolve,fibConfig=fibConfig,sigma=sigma,ellErr=ellErr.tolist(),outDir=outDir,figExt=figExt)
@@ -99,7 +98,8 @@ if __name__ == "__main__":
 
     figExt="pdf"
     dataDir="/data/mgeorge/speclens/data/"
-    batch="-q batch"
+    #    batch="-q batch"
+    batch="-q big"
 
     galStart=0
     nGal=100
@@ -114,11 +114,11 @@ if __name__ == "__main__":
     fibConvolve=np.array([True])
     fibConfig=np.array(["hexNoCen"])
     sigma=np.array([30.])
-    ellErr=np.tile(np.array([3.,0.01]),nEnsemble).reshape((nEnsemble,2))
+    ellErr=np.tile(np.array([10.,0.06]),nEnsemble).reshape((nEnsemble,2))
 
     origcwd=os.getcwd()
     for ii in range(nEnsemble):
-        subDir="tfshearpa_opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],bool(fibConvolve[ii]),convOpt[ii])
+        subDir="tf_r2.9_pa10_ba0.06_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],bool(fibConvolve[ii]),convOpt[ii])
         if(not(os.path.exists(dataDir+subDir))):
             os.makedirs(dataDir+subDir)
             os.makedirs(dataDir+subDir+"/plots")
