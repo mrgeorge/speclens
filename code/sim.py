@@ -303,7 +303,7 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(showPlot):
 	plt.show()
     
-def contourPlotAll(chains,inputPars=None,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
+def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
 # make a grid of contour plots for each pair of parameters
 # chain is actually a list of 1 or more chains from emcee sampler
 
@@ -334,6 +334,12 @@ def contourPlotAll(chains,inputPars=None,smooth=0,percentiles=[0.68,0.95,0.99],c
 	histColors=colors[0]
 	contourColors=colors
 	    
+    # Get max posterior and width
+    if((showMax) & (lnprobs is not None)):
+        maxProbs=np.array([getMaxProb(ch,lnp) for ch,lnp in zip(chains,lnprobs)])
+    if(show68):
+        ranges=np.array([get68(ch,opt="lowhigh") for ch in chains])
+        
     # fill plot panels
     for row in range(nPars):
 	for col in range(nPars):
@@ -358,7 +364,7 @@ def contourPlotAll(chains,inputPars=None,smooth=0,percentiles=[0.68,0.95,0.99],c
 	    xlim=limArr[col]
 	    ylim=limArr[row]
 	    if(row == col):
-		axarr[row,col].hist(xarrs,bins=50,range=xlim,histtype="step",color=histColors)
+		histvals=axarr[row,col].hist(xarrs,bins=50,range=xlim,histtype="step",color=histColors)
 		if(xlabel is not None):
 		    axarr[row,col].set_xlabel(xlabel)
 		if(ylabel is not None):
@@ -368,6 +374,19 @@ def contourPlotAll(chains,inputPars=None,smooth=0,percentiles=[0.68,0.95,0.99],c
                 if(inputPars is not None):
                     # add vertical lines marking the input value
                     plt.plot(np.repeat(inputPars[col],2),np.array(plt.gca().get_ylim()),color="yellow",ls="--")
+                if(showMax):
+                    # add vertical lines marking the maximum posterior value
+                    for mp,color in zip(maxProbs,colors):
+                        plt.plot(np.repeat(mp[col],2),np.array(plt.gca().get_ylim()),color=color,ls="-.")
+                if(show68):
+                    # add vertical lines marking 68% width
+                    histBinWidth=histvals[1][1]-histvals[1][0]
+                    xhistvals=histvals[1][:-1]+0.5*histBinWidth
+                    dFactor=5
+                    xhistvalsdense=np.repeat(xhistvals,dFactor)+np.tile(np.linspace(-0.5,.5,num=dFactor)*histBinWidth,len(xhistvals))
+                    for rr,color,yhistvals in zip(ranges,colors,histvals[0]):
+                        yhistvalsdense=np.repeat(yhistvals,dFactor)
+                        plt.fill_between(xhistvalsdense,yhistvalsdense,where=((xhistvalsdense > rr[0][col]) & (xhistvalsdense < rr[1][col])),color=color,alpha=0.5)
 	    elif(col < row):
 		contourPlot(xarrs,yarrs,smooth=smooth,percentiles=percentiles,colors=contourColors,xlabel=xlabel,ylabel=ylabel)
 		axarr[row,col].set_xlim(xlim)
