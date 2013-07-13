@@ -4,6 +4,7 @@ import galsim
 import scipy.integrate
 import scipy.signal
 import scipy.ndimage
+import scipy.stats
 import numpy as np
 import matplotlib
 matplotlib.use('Agg') # must appear before importing pyplot to get plots w/o GUI
@@ -303,7 +304,7 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(showPlot):
 	plt.show()
     
-def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
+def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,showPeakKDE=True,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
 # make a grid of contour plots for each pair of parameters
 # chain is actually a list of 1 or more chains from emcee sampler
 
@@ -337,6 +338,8 @@ def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,show68=True,s
     # Get max posterior and width
     if((showMax) & (lnprobs is not None)):
         maxProbs=np.array([getMaxProb(ch,lnp) for ch,lnp in zip(chains,lnprobs)])
+    if((showPeakKDE) & (lnprobs is not None)):
+        peakKDE=np.array([getPeakKDE(ch,getMaxProb(ch,lnp)) for ch,lnp in zip(chains,lnprobs)])
     if(show68):
         ranges=np.array([get68(ch,opt="lowhigh") for ch in chains])
         
@@ -364,29 +367,31 @@ def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,show68=True,s
 	    xlim=limArr[col]
 	    ylim=limArr[row]
 	    if(row == col):
-		histvals=axarr[row,col].hist(xarrs,bins=50,range=xlim,histtype="step",color=histColors)
+                #		histvals=axarr[row,col].hist(xarrs,bins=50,range=xlim,histtype="step",color=histColors)
+                xKDE=np.linspace(xlim[0],xlim[1],num=50)
+                for ii in range(nChains):
+                    kern=scipy.stats.gaussian_kde(xarrs[ii])
+                    yKDE=kern(xKDE)
+                    axarr[row,col].plot(xKDE,yKDE,color=histColors[ii])
+                    if(showMax):
+                        # add vertical lines marking the maximum posterior value
+                        plt.plot(np.repeat(maxProbs[ii][col],2),np.array([0,kern(maxProbs[ii][col])]),color=histColors[ii],ls="-.")
+                    if(showPeakKDE):
+                        # add vertical lines marking the maximum posterior density value
+                        plt.plot(np.repeat(peakKDE[ii][col],2),np.array([0,kern(peakKDE[ii][col])]),color=histColors[ii],ls=":")
+                    if(show68):
+                        # fill band marking 68% width
+                        plt.fill_between(xKDE,yKDE,where=((xKDE > ranges[ii][0][col]) & (xKDE < ranges[ii][1][col])),color=histColors[ii],alpha=0.5)
+                if(inputPars is not None):
+                    # add vertical lines marking the input value
+                    plt.plot(np.repeat(inputPars[col],2),np.array(plt.gca().get_ylim()),color="yellow",ls="--")
+
 		if(xlabel is not None):
 		    axarr[row,col].set_xlabel(xlabel)
 		if(ylabel is not None):
 		    axarr[row,col].set_ylabel(ylabel)
 		axarr[row,col].set_xlim(xlim)
 		plt.setp(axarr[row,col].get_yticklabels(),visible=False)
-                if(inputPars is not None):
-                    # add vertical lines marking the input value
-                    plt.plot(np.repeat(inputPars[col],2),np.array(plt.gca().get_ylim()),color="yellow",ls="--")
-                if(showMax):
-                    # add vertical lines marking the maximum posterior value
-                    for mp,color in zip(maxProbs,colors):
-                        plt.plot(np.repeat(mp[col],2),np.array(plt.gca().get_ylim()),color=color,ls="-.")
-                if(show68):
-                    # add vertical lines marking 68% width
-                    histBinWidth=histvals[1][1]-histvals[1][0]
-                    xhistvals=histvals[1][:-1]+0.5*histBinWidth
-                    dFactor=5
-                    xhistvalsdense=np.repeat(xhistvals,dFactor)+np.tile(np.linspace(-0.5,.5,num=dFactor)*histBinWidth,len(xhistvals))
-                    for rr,color,yhistvals in zip(ranges,colors,histvals[0]):
-                        yhistvalsdense=np.repeat(yhistvals,dFactor)
-                        plt.fill_between(xhistvalsdense,yhistvalsdense,where=((xhistvalsdense > rr[0][col]) & (xhistvalsdense < rr[1][col])),color=color,alpha=0.5)
 	    elif(col < row):
 		contourPlot(xarrs,yarrs,smooth=smooth,percentiles=percentiles,colors=contourColors,xlabel=xlabel,ylabel=ylabel)
 		axarr[row,col].set_xlim(xlim)
@@ -403,6 +408,7 @@ def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,show68=True,s
 	fig.savefig(filename)
     if(showPlot):
 	fig.show()
+
 
 def getInclination(gal_q):
 # see http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
@@ -946,7 +952,19 @@ def getMaxProb(chain,lnprob):
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP]
 
+def getPeakKDE(chain,guess):
+    if(len(chain.shape)==1):
+        nPars=1
+    else:
+        nPars=chain.shape[1]
+    peakKDE=np.zeros(nPars)
+    for ii in range(nPars):
+        kern=scipy.stats.gaussian_kde(chain[:,ii])
+        peakKDE[ii]=scipy.optimize.fmin(lambda x: -kern(x), guess[ii],disp=False)
+    return peakKDE
+
 def getMedPost(chain):
+# this is not a good estimator when posteriors are flat
     return np.median(chain,axis=0)
 
 def get68(chain,opt="hw"):
