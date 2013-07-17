@@ -1025,6 +1025,15 @@ def recToObs(rec):
     ellObs=rec["ellObs"].squeeze()
     return (xvals,yvals,vvals,ellObs)
 
+def statsToRec(inputPars,mp,kde,hw):
+    dtype=[("inputPars",(inputPars.dtype.type,inputPars.shape)),("mp",(mp.dtype.type,mp.shape)),("kde",(kde.dtype.type,kde.shape)),("hw",(hw.dtype.type,hw.shape))]
+    rec=np.recarray(1,dtype=dtype)
+    rec["inputPars"]=inputPars
+    rec["mp"]=mp
+    rec["kde"]=kde
+    rec["hw"]=hw
+    return rec
+
 def writeRec(rec,filename,clobber=True,compress="GZIP"):
     fitsio.write(filename,rec,clobber=clobber,compress=compress)
 
