@@ -82,15 +82,21 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
 
     return jobFile
 
-def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4])):
+def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4]),fileType="chain"):
     
     chainIFiles=glob.glob(dir+"/chainI_*.fits.gz")
     chainSFiles=glob.glob(dir+"/chainS_*.fits.gz")
     chainISFiles=glob.glob(dir+"/chainIS_*.fits.gz")
+    statsIFiles=glob.glob(dir+"/statsI_*.fits.gz")
+    statsSFiles=glob.glob(dir+"/statsS_*.fits.gz")
+    statsISFiles=glob.glob(dir+"/statsIS_*.fits.gz")
 
     dI=np.zeros((nGal,len(free)))
     dS=np.zeros_like(dI)
     dIS=np.zeros_like(dI)
+    dIkde=np.zeros_like(dI)
+    dSkde=np.zeros_like(dI)
+    dISkde=np.zeros_like(dI)
     hwI=np.zeros_like(dI)
     hwS=np.zeros_like(dI)
     hwIS=np.zeros_like(dI)
@@ -107,27 +113,63 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     
     for ii in range(nGal):
         print ii
-        if((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
-           (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
-           (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles)):
+        if(fileType=="chain"):
+            filesExist=((dir+"chainI_{:03d}.fits.gz".format(ii) in chainIFiles) &
+                        (dir+"chainS_{:03d}.fits.gz".format(ii) in chainSFiles) &
+                        (dir+"chainIS_{:03d}.fits.gz".format(ii) in chainISFiles))
+        elif(fileType=="stats"):
+            filesExist=((dir+"statsI_{:03d}.fits.gz".format(ii) in statsIFiles) &
+                        (dir+"statsS_{:03d}.fits.gz".format(ii) in statsSFiles) &
+                        (dir+"statsIS_{:03d}.fits.gz".format(ii) in statsISFiles))
+        if(filesExist):
             if(listInput):
                 inputPars[ii,:]=sim.generateEnsemble(1,inputPriors[ii],shearOpt=None,seed=ii).squeeze()[free]
             else:
                 inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
-            recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
-            recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
-            recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
 
-            obsI=sim.getMaxProb(sim.recToPars(recI,labels=labels[free]),recI['lnprob'])
-            obsS=sim.getMaxProb(sim.recToPars(recS,labels=labels[free]),recS['lnprob'])
-            obsIS=sim.getMaxProb(sim.recToPars(recIS,labels=labels[free]),recIS['lnprob'])
+            if(fileType=="chain"):
+                recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
+                recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
+                recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
+
+                chainI=sim.recToPars(recI,labels=labels[free])
+                chainS=sim.recToPars(recS,labels=labels[free])
+                chainIS=sim.recToPars(recIS,labels=labels[free])
+
+                obsI=sim.getMaxProb(chainI,recI['lnprob'])
+                obsS=sim.getMaxProb(chainS,recS['lnprob'])
+                obsIS=sim.getMaxProb(chainIS,recIS['lnprob'])
             
+                obsIkde=sim.getPeakKDE(chainI,obsI)
+                obsSkde=sim.getPeakKDE(chainS,obsS)
+                obsISkde=sim.getPeakKDE(chainIS,obsIS)
+
+                hwI[ii,:]=sim.get68(chainI,opt="hw")
+                hwS[ii,:]=sim.get68(chainS,opt="hw")
+                hwIS[ii,:]=sim.get68(chainIS,opt="hw")
+            elif(fileType=="stats"):
+                statsI=sim.readRec(dir+"statsI_{:03d}.fits.gz".format(ii))
+                statsS=sim.readRec(dir+"statsS_{:03d}.fits.gz".format(ii))
+                statsIS=sim.readRec(dir+"statsIS_{:03d}.fits.gz".format(ii))
+
+                obsI=statsI['mp']
+                obsS=statsS['mp']
+                obsIS=statsIS['mp']
+
+                obsIkde=statsI['kde']
+                obsSkde=statsS['kde']
+                obsISkde=statsIS['kde']
+
+                hwI[ii,:]=statsI['hw']
+                hwS[ii,:]=statsS['hw']
+                hwIS[ii,:]=statsIS['hw']
+
             dI[ii,:]=obsI-inputPars[ii,:]
             dS[ii,:]=obsS-inputPars[ii,:]
             dIS[ii,:]=obsIS-inputPars[ii,:]
-            hwI[ii,:]=sim.get68(sim.recToPars(recI,labels=labels[free]),opt="hw")
-            hwS[ii,:]=sim.get68(sim.recToPars(recS,labels=labels[free]),opt="hw")
-            hwIS[ii,:]=sim.get68(sim.recToPars(recIS,labels=labels[free]),opt="hw")
+            dIkde[ii,:]=obsIkde-inputPars[ii,:]
+            dSkde[ii,:]=obsSkde-inputPars[ii,:]
+            dISkde[ii,:]=obsISkde-inputPars[ii,:]
         else:
             dI[ii,:]=np.repeat(np.nan,len(free))
             dS[ii,:]=np.repeat(np.nan,len(free))
@@ -143,7 +185,7 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     print np.std(dS[good,:],axis=0)
     print np.std(dIS[good,:],axis=0)
 
-    return (dI[good],dS[good],dIS[good],hwI[good],hwS[good],hwIS[good],inputPars[good])
+    return (dI[good],dS[good],dIS[good],dIkde[good],dSkde[good],dISkde[good],hwI[good],hwS[good],hwIS[good],inputPars[good])
 
 def getScatterAll():
     dataDir="/data/mgeorge/speclens/data/"
