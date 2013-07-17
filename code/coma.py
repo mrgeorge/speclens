@@ -64,14 +64,45 @@ def selectComaTargets():
     redshift=0.0239 # NED NGC 4874
     nfw=galsim.NFWHalo(mass=m200c,conc=conc,redshift=redshift,halo_pos=(0,0),omega_m=0.3,omega_lam=0.7)
 
-    dtype=[(label,float) for label in ("disk_r","g1","g2")]
+    dtype=[(label,float) for label in ("ra","dec","disk_r","g1","g2")]
     rec=np.recarray(len(cat),dtype=dtype)
+    rec['ra']=cat['ra']
+    rec['dec']=cat['dec']
     for ii in range(len(cat)):
         gal=galsim.Sersic(n=1,scale_radius=float(cat[ii]['expRad_r']*np.sqrt(cat[ii]['expAB_r'])))
         rec[ii]['disk_r']=gal.getHalfLightRadius()
         rec[ii]['g1'],rec[ii]['g2']=nfw.getShear(pos=(cat[ii]['ra']-comaRA,cat[ii]['dec']-comaDec),units=galsim.degrees,z_s=cat[ii]['z'])
 
     return rec
+
+def shearProfile(ra,dec,g1,g2):
+    comaRA=194.898779 # J200 for NGC 4874 from NED
+    comaDec=27.959268 # Note - Kubo gives different (wrong?) coords
+
+    phi=np.arctan2(dec-comaDec,ra-comaRA)
+    dist=esutil.coords.sphdist(ra,dec,comaRA,comaDec) # degrees
+    gtan=-(g1*np.cos(2.*phi) + g2*np.sin(2.*phi))
+
+    bins=np.array([0,0.5,1.0,1.5]) # degrees
+    nBins=len(bins)-1
+    gtanAvg=np.zeros(nBins)
+    gtanErr=np.zeros_like(gtanAvg)
+    distAvg=np.zeros_like(gtanAvg)
+
+    for ii in range(nBins):
+        sel=((dist > bins[ii]) &
+             (dist < bins[ii+1]))
+        nSel=len(sel.nonzero()[0])
+        gtanAvg[ii]=np.mean(gtan[sel])
+        gtanErr[ii]=np.std(gtan[sel])/np.sqrt(nSel)
+        distAvg[ii]=np.mean(dist[sel])
+
+    return (distAvg,gtanAvg,gtanErr)
+
+def plotShearProfile(distAvgs,gtanAvgs,gtanErrs,colors=['black','red','blue']):
+    for ii in range(len(distAvgs)):
+        plt.errorbar(distAvgs[ii],gtanAvgs[ii],yerr=gtanErrs[ii],c=colors[ii],ecolor=colors[ii])
+    plt.show()
 
 
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
