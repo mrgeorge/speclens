@@ -60,6 +60,12 @@ def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
             PArad=np.deg2rad(fibPA)
             pos[0,:]=xx*np.cos(PArad)-yy*np.sin(PArad)
             pos[1,:]=xx*np.sin(PArad)+yy*np.cos(PArad)
+    elif(fibConfig=="triNoCen"):
+        fibShape="circle"
+        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
+        rad=fibRad
+        pos[0,:]=rad*np.cos(theta)
+        pos[1,:]=rad*np.sin(theta)
     else:
         # TO DO - add other configs - e.g. circle, extend hex for MaNGA style
         pass 
@@ -955,13 +961,16 @@ def getMaxProb(chain,lnprob):
 def getPeakKDE(chain,guess):
     if(len(chain.shape)==1):
         nPars=1
+        kern=scipy.stats.gaussian_kde(chain)
+        peakKDE=scipy.optimize.fmin(lambda x: -kern(x), guess,disp=False)
+        return peakKDE
     else:
         nPars=chain.shape[1]
-    peakKDE=np.zeros(nPars)
-    for ii in range(nPars):
-        kern=scipy.stats.gaussian_kde(chain[:,ii])
-        peakKDE[ii]=scipy.optimize.fmin(lambda x: -kern(x), guess[ii],disp=False)
-    return peakKDE
+        peakKDE=np.zeros(nPars)
+        for ii in range(nPars):
+            kern=scipy.stats.gaussian_kde(chain[:,ii])
+            peakKDE[ii]=scipy.optimize.fmin(lambda x: -kern(x), guess[ii],disp=False)
+        return peakKDE
 
 def getMedPost(chain):
 # this is not a good estimator when posteriors are flat
