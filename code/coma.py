@@ -1,4 +1,5 @@
 #! env python
+import matplotlib.pyplot as plt
 import sim
 import numpy as np
 import os
@@ -8,6 +9,13 @@ import galsim
 import galsim.integ
 import re
 import astropy.io.ascii
+import ensemble
+
+cosmo=esutil.cosmology.Cosmo()
+
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
+plt.rc('text', usetex=True)
+plt.rc('axes',linewidth=1.5)
 
 # select galaxies behind Coma
 # generate ensemble of disks with shears from their positions
@@ -64,10 +72,11 @@ def selectComaTargets():
     redshift=0.0239 # NED NGC 4874
     nfw=galsim.NFWHalo(mass=m200c,conc=conc,redshift=redshift,halo_pos=(0,0),omega_m=0.3,omega_lam=0.7)
 
-    dtype=[(label,float) for label in ("ra","dec","disk_r","g1","g2")]
+    dtype=[(label,float) for label in ("ra","dec","z","disk_r","g1","g2")]
     rec=np.recarray(len(cat),dtype=dtype)
     rec['ra']=cat['ra']
     rec['dec']=cat['dec']
+    rec['z']=cat['z']
     for ii in range(len(cat)):
         gal=galsim.Sersic(n=1,scale_radius=float(cat[ii]['expRad_r']*np.sqrt(cat[ii]['expAB_r'])))
         rec[ii]['disk_r']=gal.getHalfLightRadius()
@@ -75,7 +84,22 @@ def selectComaTargets():
 
     return rec
 
-def shearProfile(ra,dec,g1,g2):
+def plotTargetDistr(gals):
+    plt.hist(gals['disk_r'],bins=20,histtype="step")
+    plt.xlim((0,10))
+    plt.xlabel(r"$\theta_{1/2}$ (arcsec)")
+    plt.ylabel("N")
+    plt.savefig("coma_size.png")
+    plt.show()
+
+    plt.hist(gals['z'],bins=20,histtype="step")
+    plt.xlim((0,0.5))
+    plt.xlabel("$z_{phot}$")
+    plt.ylabel("N")
+    plt.savefig("coma_redshifts.png")
+    plt.show()
+
+def shearProfile(ra,dec,g1,g2,weight):
     comaRA=194.898779 # J200 for NGC 4874 from NED
     comaDec=27.959268 # Note - Kubo gives different (wrong?) coords
 
@@ -83,7 +107,7 @@ def shearProfile(ra,dec,g1,g2):
     dist=esutil.coords.sphdist(ra,dec,comaRA,comaDec) # degrees
     gtan=-(g1*np.cos(2.*phi) + g2*np.sin(2.*phi))
 
-    bins=np.array([0,0.5,1.0,1.5]) # degrees
+    bins=np.array([0,0.4,0.8,1.2,1.6]) # degrees
     nBins=len(bins)-1
     gtanAvg=np.zeros(nBins)
     gtanErr=np.zeros_like(gtanAvg)
@@ -93,8 +117,8 @@ def shearProfile(ra,dec,g1,g2):
         sel=((dist > bins[ii]) &
              (dist < bins[ii+1]))
         nSel=len(sel.nonzero()[0])
-        gtanAvg[ii]=np.mean(gtan[sel])
-        gtanErr[ii]=np.std(gtan[sel])/np.sqrt(nSel)
+        gtanAvg[ii]=np.sum(gtan[sel]*weight[sel])/np.sum(weight[sel])
+        gtanErr[ii]=np.std(gtan[sel]*weight[sel])/np.sum(weight[sel])
         distAvg[ii]=np.mean(dist[sel])
 
     return (distAvg,gtanAvg,gtanErr)
@@ -103,6 +127,126 @@ def plotShearProfile(distAvgs,gtanAvgs,gtanErrs,colors=['black','red','blue']):
     for ii in range(len(distAvgs)):
         plt.errorbar(distAvgs[ii],gtanAvgs[ii],yerr=gtanErrs[ii],c=colors[ii],ecolor=colors[ii])
     plt.show()
+
+def plotModelShear():
+    bins=np.array([0,0.5,1.0,1.5]) # degrees
+    nBins=len(bins)-1
+    distAvg=0.5*(bins[:-1]+bins[1:])
+    binArea=np.pi*(bins[1:]**2 - bins[:-1]**2) # deg^2
+
+    distModel=np.linspace(np.min(bins),np.max(bins),num=100)
+
+    m200c=1.88e15 # Kubo
+    conc=3.84 # Kubo
+    redshift=0.0239 # NED NGC 4874
+    nfw=galsim.NFWHalo(mass=m200c,conc=conc,redshift=redshift,halo_pos=(0,0),omega_m=0.3,omega_lam=0.7)
+    z_s=0.1
+
+    nKubo=2.7e5/200. # N/deg^2
+    nBOSS=120 # N/deg^2
+
+    sigmaKubo=0.37
+    sigmaI=0.37
+    sigmaIS=0.15
+
+    gtanKubo=np.zeros(nBins)
+    for ii in range(nBins):
+        gtanKubo[ii],zero=nfw.getShear(pos=(distAvg[ii],0),units=galsim.degrees,z_s=z_s)
+    gtanKubo*=-1
+
+    gtanModel=np.zeros(len(distModel))
+    for ii in range(len(distModel)):
+        gtanModel[ii],zero=nfw.getShear(pos=(distModel[ii],0),units=galsim.degrees,z_s=z_s)
+    gtanModel*=-1
+
+    gerrKubo=sigmaKubo/np.sqrt(2.*(1.-sigmaKubo**2) * nKubo * binArea)
+    gerrI=sigmaI/np.sqrt(2.*(1.-sigmaI**2) * nBOSS * binArea)
+    gerrIS=sigmaIS/np.sqrt(2.*(1.-sigmaIS**2) * nBOSS * binArea)
+
+    offset=0.08*(bins[1]-bins[0])
+    colors=["black","red","blue"]
+    plt.plot(distModel,gtanModel,color="black")
+    plt.errorbar(distAvg-offset,gtanKubo,yerr=gerrKubo,ecolor=colors[0],mfc=colors[0],label=r"Kubo $\sigma_{SN}=0.37$, n=1350 deg$^{-2}$",fmt='o')
+    plt.errorbar(distAvg,gtanKubo,yerr=gerrI,ecolor=colors[1],mfc=colors[1],label=r"Imaging $\sigma_{SN}=0.37$, n=120 deg$^{-2}$",fmt='s')
+    plt.errorbar(distAvg+offset,gtanKubo,yerr=gerrIS,ecolor=colors[2],mfc=colors[2],label=r"Im+Spec $\sigma_{SN}=0.15$, n=120 deg$^{-2}$",fmt='^')
+
+    plt.legend(prop={'size':14},numpoints=1)
+    plt.xlabel(r"$\theta$ (deg)")
+    plt.ylabel(r"$\gamma_{t}$")
+    plt.xlim((bins[0],bins[-1]))
+    plt.ylim((-0.019,0.049))
+    plt.gcf().subplots_adjust(left=0.15)
+
+    radTicks=np.array([0,0.5,1.,1.5])
+    ax2=plt.gca().twiny()
+    ax2.set_xlim(bins[0],bins[-1])
+    ax2.set_xticklabels(radTicks)
+    ax2.set_xticks(np.rad2deg(radTicks/cosmo.Da(0,redshift)))
+    ax2.set_xlabel(r"R (Mpc)")
+
+    plt.savefig("coma_radial.pdf")
+    plt.show()
+
+def plotZDep():
+    gals=selectComaTargets()
+    zbins=[0.1,0.2,0.3,0.4]
+    nzBins=len(zbins)-1
+
+    zNorm=0.1
+    redshift=0.0239 # NED NGC 4874
+    sciNorm=cosmo.sigmacritinv(redshift,0.1)
+    zModel=np.linspace(zbins[0],zbins[-1],num=50)
+    sciModel=cosmo.sigmacritinv(redshift,zModel)/sciNorm
+
+    zAvg=np.zeros(nzBins)
+    sciAvg=np.zeros(nzBins)
+    sciErr=np.zeros(nzBins)
+    sigmaIS=0.12
+    for ii in range(nzBins):
+        sel=((gals['z']>zbins[ii]) & (gals['z']<zbins[ii+1]))
+        zAvg[ii]=np.mean(gals[sel]['z'])
+        sciAvg[ii]=np.mean(cosmo.sigmacritinv(redshift,gals[sel]['z']))
+        sciErr[ii]=sigmaIS/np.sqrt(2.*(1.-sigmaIS**2) * len(sel.nonzero()[0]))
+    sciAvg/=sciNorm
+    sciErr/=sciNorm
+
+    plt.plot(zModel,sciModel)
+    plt.errorbar(zAvg,sciAvg-1,yerr=sciErr,fmt='o')
+    plt.xlabel(r"$z_s$")
+    plt.ylabel(r"$<\Sigma_c(z=0.1)>/<\Sigma_c(z)>-1$")
+    plt.xlim(zbins[0],zbins[-1])
+    plt.gcf().subplots_adjust(left=0.2)
+    plt.savefig("coma_zdep.png")
+    plt.show()
+
+def parsToProfile():
+    gals=selectComaTargets()
+    inputPriors=[[[0,360],[0,1],150,float(gals[thisGal]['g1']),float(gals[thisGal]['g2'])] for thisGal in
+range(len(gals))]
+    dI,dS,dIS,dIkde,dSkde,dISkde,hwI,hwS,hwIS,inputPars=ensemble.getScatter("/data/mgeorge/speclens/data/coma_hexNoCen_6_1.0_1.4_30.0_1_pixel/",len(gals),inputPriors=inputPriors,fileType="stats")
+    obsI=dIkde+inputPars
+    obsS=dSkde+inputPars
+    obsIS=dISkde+inputPars
+
+    weightTrue=np.ones(len(gals))
+    #    varI=hwI[:,3]**2 + hwI[:,4]**2
+    #    varS=hwS[:,3]**2 + hwS[:,4]**2
+    #    varIS=hwIS[:,3]**2 + hwIS[:,4]**2
+
+    varI=((1.-inputPars[:,1]**2)/inputPars[:,1])**2
+    varS=varI
+    varIS=varI
+
+    weightI=(1/varI)/np.sum(1./varI)
+    weightS=(1/varS)/np.sum(1./varS)
+    weightIS=(1/varIS)/np.sum(1./varIS)
+
+    distTrue,gtanTrue,gerrTrue=shearProfile(gals['ra'],gals['dec'],gals['g1'],gals['g2'],weightTrue)
+    distI,gtanI,gerrI=shearProfile(gals['ra'],gals['dec'],obsI[:,3],obsI[:,4],weightI)
+    distS,gtanS,gerrS=shearProfile(gals['ra'],gals['dec'],obsS[:,3],obsS[:,4],weightS)
+    distIS,gtanIS,gerrIS=shearProfile(gals['ra'],gals['dec'],obsIS[:,3],obsIS[:,4],weightIS)
+
+    plotShearProfile((distTrue,distI,distS,distIS),(gtanTrue,gtanI,gtanS,gtanIS),(gerrTrue,gerrI,gerrS,gerrIS),colors=["black","red","green","blue"])
 
 
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
