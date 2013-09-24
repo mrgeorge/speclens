@@ -126,28 +126,23 @@ def shearEllipse(ellipse,g1,g2):
     return (disk_r_prime,gal_q_prime,gal_beta_prime)
 
 def shearPairs(pairs,g1,g2):
+# This shear matrix is different from the one in makeGalVMap2
+# because images get flipped around when plotted
+# This convention is meant for visualization
     pairs_prime=pairs.copy()
     gSq=g1**2+g2**2
     assert(gSq < 1)
     if(pairs.shape == (2,)): # only one pair
-	x1,y1=pairs
-	#	x1p=((1+g1)*x1 -     g2*y1)
-	#	y1p=(   -g2*x1 + (1-g1)*y1)
-	#	x1p=((1-kappa-gamma1)*x1 -           gamma2*y1)
-	#	y1p=(         -gamma2*x1 + (1-kappa+gamma1)*y1)
-	x1p=1./np.sqrt(1.-gSq)*((1+g1)*x1 -     g2*y1)
-	y1p=1./np.sqrt(1.-gSq)*(   -g2*x1 + (1-g1)*y1)
-	pairs_prime=np.array([x1p,y1p])
+        x1,y1=pairs
+        x1p=1./np.sqrt(1.-gSq)*((1+g1)*x1 +     g2*y1)
+        y1p=1./np.sqrt(1.-gSq)*(    g2*x1 + (1-g1)*y1)
+        pairs_prime=np.array([x1p,y1p])
     else:
-	for ii in range(len(pairs)):
-	    x1,y1=pairs[ii]
-	    #	    x1p=((1+g1)*x1 -     g2*y1)
-	    #	    y1p=(   -g2*x1 + (1-g1)*y1)
-	    #	x1p=((1-kappa-gamma1)*x1 -           gamma2*y1)
-	    #	y1p=(         -gamma2*x1 + (1-kappa+gamma1)*y1)
-	    x1p=1./np.sqrt(1.-gSq)*((1+g1)*x1 -     g2*y1)
-	    y1p=1./np.sqrt(1.-gSq)*(   -g2*x1 + (1-g1)*y1)
-	    pairs_prime[ii]=np.array([x1p,y1p])
+        for ii in range(len(pairs)):
+            x1,y1=pairs[ii]
+            x1p=1./np.sqrt(1.-gSq)*((1+g1)*x1 +     g2*y1)
+            y1p=1./np.sqrt(1.-gSq)*(    g2*x1 + (1-g1)*y1)
+            pairs_prime[ii]=np.array([x1p,y1p])
 
     return pairs_prime
  
@@ -562,10 +557,11 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
         shear=np.array([[1-g1,-g2],[-g2,1+g1]])/np.sqrt(1.-g1**2-g2**2)
         xs=shear[0,0]*(xx-xCen) + shear[0,1]*(yy-yCen) + xCen
         ys=shear[1,0]*(xx-xCen) + shear[1,1]*(yy-yCen) + yCen
+        vmapArr=scipy.ndimage.map_coordinates(vmapArr.T,(xs,ys))
         fluxVMapArr=scipy.ndimage.map_coordinates(fluxVMapArr.T,(xs,ys))
         imgArr=scipy.ndimage.map_coordinates(imgArr.T,(xs,ys))
 
-    return (fluxVMapArr,imgArr)
+    return (vmapArr,fluxVMapArr,imgArr)
 
 def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA):
 # construct the fiber x PSF convolution kernel
