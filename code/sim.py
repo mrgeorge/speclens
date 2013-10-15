@@ -175,7 +175,7 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",showPlot=False):
+def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",lw=2,title=None,showPlot=False):
 # Plot image given by galsim object <profile> with fiber pattern overlaid
 
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
@@ -194,7 +194,7 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
         numFib=xfib.size
         for pos in zip(xfib,yfib):
             if(fibShape=="circle"):
-                circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=2)
+                circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(circ)
             elif(fibShape=="square"):
@@ -204,7 +204,7 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
                 yy=np.array([-1,-1,1,1])
                 corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*fibRad+pos[0]
                 corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*fibRad+pos[1]
-                sq=plt.Polygon(corners,fill=False,color='white',lw=2)
+                sq=plt.Polygon(corners,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(sq)
 
@@ -216,19 +216,19 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
     if(ellipse is not None): # ellipse is either None or np.array([disk_r,gal_q,gal_beta])
 	ax=plt.gca()
 	rscale=2
-	ell=matplotlib.patches.Ellipse(xy=(0,0),width=rscale*ellipse[0]*ellipse[1],height=rscale*ellipse[0],angle=ellipse[2]-90,fill=False,color="white",lw=2)
+	ell=matplotlib.patches.Ellipse(xy=(0,0),width=rscale*ellipse[0]*ellipse[1],height=rscale*ellipse[0],angle=ellipse[2]-90,fill=False,color="white",lw=lw)
 	ax.add_artist(ell)
     
     if(lines is not None): # lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
 	    if(lines.shape == (4,)): # only one line		
-		plt.plot(lines[0:2],lines[2:4],color=lcolors,lw=2,ls=lstyles)
+		plt.plot(lines[0:2],lines[2:4],color=lcolors,lw=lw,ls=lstyles)
             else:
 		if(type(lcolors) is str):
 		    lcolors=np.repeat(lcolors,len(lines))
 		if(type(lstyles) is str):
 		    lstyles=np.repeat(lstyles,len(lines))
 		for line,color,style in zip(lines,lcolors,lstyles):
-		    plt.plot(line[0:2],line[2:4],color=color,lw=2,ls=style)
+		    plt.plot(line[0:2],line[2:4],color=color,lw=lw,ls=style)
 		    
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
@@ -236,6 +236,9 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
 	plt.xlim((-halfWidth+trim,halfWidth-trim))
 	plt.ylim((-halfWidth+trim,halfWidth-trim))
 
+    if(title is not None):
+        plt.title(title)
+    
     if(filename):
 	plt.savefig(filename)
     if(showPlot):
