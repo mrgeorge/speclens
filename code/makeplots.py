@@ -26,7 +26,7 @@ if __name__ == "__main__":
     disk_n=1.
     disk_r=2.
     bulge_frac=0.
-    gal_q=0.6
+    gal_q=0.75
     gal_beta=0.1
     gal_flux=1.
     atmos_fwhm=1.
@@ -38,38 +38,39 @@ if __name__ == "__main__":
     
     ell=[disk_r,gal_q,gal_beta]
     lines=sim.getEllipseAxes(ell)
+    lw=3
     
     vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
-    trim=1
+    trim=2
     plt.clf()
-    sim.showImage(vmap,None,None,None,trim=trim,colorbar=True,ellipse=ell,lines=lines,filename="{}/fig1a.{}".format(plotDir,figExt),showPlot=showPlot)
+    sim.showImage(vmap,None,None,None,trim=trim,colorbar=True,ellipse=ell,lines=lines,lw=lw,filename="{}/fig1a.{}".format(plotDir,figExt),title=r"q$_{\rm int}=0.75$, $\gamma_+=0, \gamma_{\times}=0$",showPlot=showPlot)
     
-    g1=0.1
+    g1=0.2
     g2=0.
-    
-    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     ellSheared=sim.shearEllipse(ell,g1,g2)
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
-    plt.clf()
-    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,filename="{}/fig1b.{}".format(plotDir,figExt),showPlot=showPlot)
-    
     
     vmapInc,fluxVMapInc,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,ellSheared[0],bulge_frac,ellSheared[1],ellSheared[2],gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,0.,0.)
-    trim=1
     plt.clf()
-    sim.showImage(vmapInc,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,filename="{}/fig1c.{}".format(plotDir,figExt),showPlot=showPlot)
+    sim.showImage(vmapInc,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,lw=lw,filename="{}/fig1b.{}".format(plotDir,figExt),title=r"q$_{\rm int}=0.5$",showPlot=showPlot)
 
+    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+    plt.clf()
+    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,lw=lw,filename="{}/fig1c.{}".format(plotDir,figExt),title=r"$\gamma_+=0.2$",showPlot=showPlot)
+    
 
     g1=0.0
-    g2=0.1
-    
-    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+    g2=0.2
     ellSheared=sim.shearEllipse(ell,g1,g2)
     linesSheared=sim.shearLines(lines,g1,g2)
     linesObs=sim.getEllipseAxes(ellSheared)
+    
+    vmapSheared,fluxVMapSheared,galSheared = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     plt.clf()
-    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],filename="{}/fig1d.{}".format(plotDir,figExt),showPlot=showPlot)
+    sim.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],lw=lw,filename="{}/fig1d.{}".format(plotDir,figExt),title=r"$\gamma_{\times}=0.2$",showPlot=showPlot)
+
+    print "Finished Fig 1"
     # Fig 2
     # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions
     # (unsheared)
