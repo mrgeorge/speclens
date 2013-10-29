@@ -13,7 +13,7 @@ if __name__ == "__main__":
     dataDir="/data/mgeorge/speclens/data"
     showPlot=False
 
-    plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
+    plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':30})
     plt.rc('text', usetex=True)
     plt.rc('axes',linewidth=1.5)
 
@@ -38,10 +38,10 @@ if __name__ == "__main__":
     
     ell=[disk_r,gal_q,gal_beta]
     lines=sim.getEllipseAxes(ell)
-    lw=3
+    lw=5
     
     vmap,fluxVMap,gal = sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
-    trim=2
+    trim=2.5
     plt.clf()
     sim.showImage(vmap,None,None,None,trim=trim,colorbar=True,ellipse=ell,lines=lines,lw=lw,filename="{}/fig1a.{}".format(plotDir,figExt),title=r"q$_{\rm int}=0.75$, $\gamma_+=0, \gamma_{\times}=0$",showPlot=showPlot)
     

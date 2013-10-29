@@ -209,7 +209,7 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
                 ax.add_patch(sq)
 
     if(colorbar):
-	cbar=plt.colorbar()
+	cbar=plt.colorbar(fraction=0.05)
 	if(colorbarLabel is not None):
 	    cbar.set_label(colorbarLabel)
 
@@ -238,9 +238,9 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
 
     if(title is not None):
         plt.title(title)
-    
+
     if(filename):
-	plt.savefig(filename)
+	plt.savefig(filename,bbox_inches=matplotlib.transforms.Bbox(np.array(((0,-.4),(8.5,6))))) # annoying hardcode fudge to keep labels inside plot
     if(showPlot):
 	plt.show()
 
