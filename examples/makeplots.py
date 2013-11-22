@@ -1,21 +1,36 @@
 #! env python
-import sim
+
 import matplotlib.pyplot as plt
 import matplotlib.cm
 import numpy as np
+import os
+import sys
 
+try:
+    import speclens
+except ImportError: # add parent dir to python search path
+    path, filename = os.path.split(__file__)
+    sys.path.append(os.path.abspath(os.path.join(path,"../")))
+    import speclens
+import speclens.sim as sim
+    
 # This is a driver for functions in sim.py to create some figures for a proposal
 
 if __name__ == "__main__":
 
-    figExt="pdf" # pdf or png
-    plotDir="/data/mgeorge/speclens/plots"
-    dataDir="/data/mgeorge/speclens/data"
-    showPlot=False
+    # set up paths for output dirs
+    speclensDir="../"
+    if not os.path.isdir(speclensDir):
+        raise NameError(speclensDir)
+    plotDir=speclensDir+"/plots"
+    dataDir=speclensDir+"/data"
+    if not os.path.isdir(plotDir):
+        os.mkdir(plotDir)
+    if not os.path.isdir(dataDir):
+        os.mkdir(dataDir)
 
-    plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':30})
-    plt.rc('text', usetex=True)
-    plt.rc('axes',linewidth=1.5)
+    figExt="pdf" # pdf or png
+    showPlot=False
 
     # Fig 1
     # Mimic Morales Fig. 1

@@ -1,2 +1,4 @@
 *.pyc
 *~
+/plots/
+/data/
