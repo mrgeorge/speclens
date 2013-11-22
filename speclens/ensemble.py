@@ -1,5 +1,7 @@
 #! env python
 import sim
+import io
+import plot
 import numpy as np
 import os
 import glob
@@ -34,11 +36,11 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
 # call fitObs to run MCMC for a galaxy and save the resulting chains
 # this is what create_qsub_galArr calls to run each galaxy
 
-    chains,lnprobs=sim.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
-    sim.writeRec(sim.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
-    sim.writeRec(sim.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    sim.writeRec(sim.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    sim.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
+    chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
+    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=labels),outDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=labels),outDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
 def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
 # make a job array that generates a list of galaxies and runs each one as a separate job
@@ -128,29 +130,29 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
                 inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
 
             if(fileType=="chain"):
-                recI=sim.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
-                recS=sim.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
-                recIS=sim.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
+                recI=io.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
+                recS=io.readRec(dir+"chainS_{:03d}.fits.gz".format(ii))
+                recIS=io.readRec(dir+"chainIS_{:03d}.fits.gz".format(ii))
 
-                chainI=sim.recToPars(recI,labels=labels[free])
-                chainS=sim.recToPars(recS,labels=labels[free])
-                chainIS=sim.recToPars(recIS,labels=labels[free])
+                chainI=io.recToPars(recI,labels=labels[free])
+                chainS=io.recToPars(recS,labels=labels[free])
+                chainIS=io.recToPars(recIS,labels=labels[free])
 
-                obsI=sim.getMaxProb(chainI,recI['lnprob'])
-                obsS=sim.getMaxProb(chainS,recS['lnprob'])
-                obsIS=sim.getMaxProb(chainIS,recIS['lnprob'])
+                obsI=fit.getMaxProb(chainI,recI['lnprob'])
+                obsS=fit.getMaxProb(chainS,recS['lnprob'])
+                obsIS=fit.getMaxProb(chainIS,recIS['lnprob'])
             
-                obsIkde=sim.getPeakKDE(chainI,obsI)
-                obsSkde=sim.getPeakKDE(chainS,obsS)
-                obsISkde=sim.getPeakKDE(chainIS,obsIS)
+                obsIkde=fit.getPeakKDE(chainI,obsI)
+                obsSkde=fit.getPeakKDE(chainS,obsS)
+                obsISkde=fit.getPeakKDE(chainIS,obsIS)
 
-                hwI[ii,:]=sim.get68(chainI,opt="hw")
-                hwS[ii,:]=sim.get68(chainS,opt="hw")
-                hwIS[ii,:]=sim.get68(chainIS,opt="hw")
+                hwI[ii,:]=fit.get68(chainI,opt="hw")
+                hwS[ii,:]=fit.get68(chainS,opt="hw")
+                hwIS[ii,:]=fit.get68(chainIS,opt="hw")
             elif(fileType=="stats"):
-                statsI=sim.readRec(dir+"statsI_{:03d}.fits.gz".format(ii))
-                statsS=sim.readRec(dir+"statsS_{:03d}.fits.gz".format(ii))
-                statsIS=sim.readRec(dir+"statsIS_{:03d}.fits.gz".format(ii))
+                statsI=io.readRec(dir+"statsI_{:03d}.fits.gz".format(ii))
+                statsS=io.readRec(dir+"statsS_{:03d}.fits.gz".format(ii))
+                statsIS=io.readRec(dir+"statsIS_{:03d}.fits.gz".format(ii))
 
                 obsI=statsI['mp']
                 obsS=statsS['mp']
