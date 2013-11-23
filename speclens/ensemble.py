@@ -7,8 +7,29 @@ import os
 import glob
 
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
-# Generate input pars and observed values (w/o noise added) for a galaxy
+    """Generate input model parameters and observables for one galaxy
 
+    Inputs:
+        inputPriors - list of priors for input pars, 
+                      see fit.interpretPriors for format
+                      default [[0,360],[0,1],150,(0,0.05),(0,0.05)]
+        disk_r - galaxy size, float or ndarray (default None)
+        convOpt - None (default), "galsim", or "pixel"
+        atmos_fwhm - gaussian PSF FWHM (default None)
+        numFib - number of fibers (default 6)
+        fibRad - fiber radius in arcsecs (default 1)
+        fibConvolve - bool for whether to convolved with fiber (default False)
+                      (note PSF and fiber convolution controlled separately)
+        fibConfig - string used by sim.getFiberPos to describe 
+                    slit/ifu/fiber config (default "hexNoCen")
+        fibPA - fiber position angle if shape is square (default None)
+        sigma - rms velocity error in km/s (default 30.)
+        ellErr - ndarray (gal_beta_err degrees, gal_q_err), default [10,0.1]
+        seed - random number generator repeatability (default None)
+    Returns:
+        (xvals,yvals,vvals,ellObs,inputPars) tuple    
+    """
+    
     inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
@@ -33,8 +54,27 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
     return (xvals,yvals,vvals,ellObs,inputPars)
 
 def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,figExt="pdf",**kwargs):
-# call fitObs to run MCMC for a galaxy and save the resulting chains
-# this is what create_qsub_galArr calls to run each galaxy
+    """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
+
+    This is what create_qsub_galArr calls to run each galaxy
+
+    Inputs:
+        outDir - directory to write output files
+        galID - label to name each galaxy file separately
+        inputPars - ndarray of nGal sets of model parameters
+                    from makeObs or sim.generateEnsemble
+        labels - string parameter names for plot axes
+        vvals - observed velocity values
+        sigma - error on vvals
+        ellObs - observed image values
+        ellErr - error on ellObs
+        obsPriors - priors used when fitting data
+                    (note: these may be different than inputPriors)
+        figExt - plot file format (default "pdf", or "png")
+        **kwargs - args passed on to fit.fitObs
+    Returns:
+        nothing, chains and plots written to outDir
+    """
 
     chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
     io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=labels),outDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
@@ -43,7 +83,26 @@ def runGal(outDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,fig
     plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=outDir+"/plots/gal_{:03d}.{}".format(galID,figExt))
 
 def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,fibConvolve,fibConfig,sigma,ellErr):
-# make a job array that generates a list of galaxies and runs each one as a separate job
+    """Make list of galaxies and batch job array to fit each one separately
+
+    Warning! - hardcoded pars, intended for riemann
+    
+    Inputs:
+        outDir - directory for output files and jobs script
+        nGal - number of galaxies to generate and run
+        inputPriors - list of priors for input pars, 
+                      see fit.interpretPriors for format
+        convOpt - None (default), "galsim", or "pixel"
+        atmos_fwhm - gaussian PSF FWHM
+        numFib - number of fibers
+        fibRad - fiber radius in arcsecs
+        fibConvolve - bool for whether to convolve image with fibers
+        fibConfig - string specifying slit/ifu/fiber configuration
+        sigma - velocity errors in km/s
+        ellErr - errors in imaging observables
+    Returns:
+        jobFile - name of job script, file is also written at this location
+    """
     
     # text for qsub file
     jobHeader=("#!/clusterfs/riemann/software/Python/2.7.1/bin/python\n"
@@ -85,6 +144,27 @@ def create_qsub_galArr(outDir,nGal,inputPriors,convOpt,atmos_fwhm,numFib,fibRad,
     return jobFile
 
 def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4]),fileType="chain"):
+    """Read output chains or chain summaries and compute scatter in fits
+
+    This should work while an ensemble is still running, as it tries to
+    read all the output files but ignores ones that are missing.
+
+    Inputs:
+        dir - directory where chains are saved
+        nGal - number of galaxies in ensemble
+        inputPriors - priors used when generating galaxies
+                      (note, these may differ from obsPriors used in fitting)
+                      default [[0,360],[0,1],150,(0,0.05),(0,0.05)]
+        labels - string parameter names for plot axes
+                 default ndarray["PA","b/a","vmax","g1","g2"]
+                 Note - labels includes *all* pars, not just free ones
+        free - ndarray listing indices of fit parameters
+                 default ndarray[0,1,2,3,4]
+        fileType - "chain" or "stats" 
+    Returns:
+        tuple of ndarrays summarizing offsets and scatter of 
+            parameters recovered from fits to noisy data
+    """
     
     chainIFiles=glob.glob(dir+"/chainI_*.fits.gz")
     chainSFiles=glob.glob(dir+"/chainS_*.fits.gz")
@@ -190,6 +270,8 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     return (dI[good],dS[good],dIS[good],dIkde[good],dSkde[good],dISkde[good],hwI[good],hwS[good],hwIS[good],inputPars[good])
 
 def getScatterAll():
+    """Wrapper to getScatter to compare results for several ensembles"""
+
     dataDir="/data/mgeorge/speclens/data/"
 
     nGal=100
