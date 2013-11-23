@@ -16,7 +16,7 @@ plt.rc('text', usetex=True)
 plt.rc('axes',linewidth=1.5)
 
 def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",lw=2,title=None,showPlot=False):
-# Plot image given by galsim object <profile> with fiber pattern overlaid
+    """Plot image given by galsim object with fiber pattern overlaid"""
 
     imgFrame=galsim.ImageF(sim.imgSizePix,sim.imgSizePix)
     img=profile.draw(image=imgFrame,dx=sim.pixScale)
@@ -86,7 +86,7 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
 
 
 def showArr(arr):
-    #extracted from sim.py - pixel equivalent of showImage (with fewer features)
+    """Pixel equivalent of showImage (with fewer features)"""
     
     halfWidth=0.5*sim.imgSizePix*sim.pixScale # arcsec
     plt.clf()
@@ -95,7 +95,7 @@ def showArr(arr):
 
 
 def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel=None,ylabel=None,xlim=None,ylim=None,filename=None,showPlot=False):
-# make a 2d contour plot of parameter posteriors
+    """Make a 2d contour plot of parameter posteriors"""
 
     n2dbins=300
 
@@ -159,9 +159,11 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
 	plt.show()
     
 def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,showPeakKDE=True,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
-# make a grid of contour plots for each pair of parameters
-# chain is actually a list of 1 or more chains from emcee sampler
+    """Make a grid of contour plots for each pair of parameters
 
+    Note - chain is actually a list of 1 or more chains from emcee sampler
+    """
+    
     nChains=len(chains)
     nPars=chains[0].shape[1]
 
