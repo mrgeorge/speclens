@@ -8,6 +8,7 @@ import sim
 ####
 # Priors
 ####
+# These generate functions used in lnProbVMapModel to compute chisq_prior
 
 def makeFlatPrior(range):
     return lambda x: priorFlat(x, range)
@@ -21,16 +22,35 @@ def priorFlat(arg, range):
 def makeGaussPrior(mean, sigma):
     return lambda x: ((x-mean)/sigma)**2
 
+def makeGaussTruncPrior(mean, sigma, range):
+    return lambda x: ((x-mean)/sigma)**2 + priorFlat(x, range)
+    
 def interpretPriors(priors):
-# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax, g1,g2
-#    None: leave this variable completely free
-#    float: fix the variable to this value
-#    list[a,b]: flat prior between a and b
-#    tuple(a,b): gaussian prior with mean a and stddev b
+    """Generate functions to evaluate priors and fix variables.
 
+    Inputs:
+        priors - a list or tuple with an entry for each of M parameters 
+          in the full model. Each parameter can have a prior set by one of
+          the following formats:
+            None - leave this variable completely free
+            float - fix the variable to this value
+            list[a,b] - flat prior between a and b
+            tuple(a,b) - gaussian prior with mean a and stddev b
+            tuple(a,b,c,d) - gaussian prior with mean a and stddev b, truncated at c and d
+
+    Returns:
+        priorFuncs - ndarray of length N (# of free parameters to fit)
+        fixed - ndarray of length M; None for free pars, float for fixed pars
+        guess - ndarray of length N with initial guesses
+        guessScale - ndarray of length N with scale for range of initial guesses
+    """
+
+    # Define initial guess and range for emcee
+    # Recall pars=[gal_beta, gal_q, vmax, g1, g2]
     guess=np.array([10.,0.1,100.,0.,0.])
     guessScale=np.array([10.,0.3,50.,0.02,0.02])
-    nPars=len(guess)
+    nPars=len(guess) # Number of pars in FULL MODEL (some may get fixed and not be sent to emcee)
+    
     fixed=np.repeat(None, nPars)
     priorFuncs=np.repeat(None, nPars)
     if(priors is not None):
@@ -46,9 +66,19 @@ def interpretPriors(priors):
 		    priorRange=np.copy(prior)
 		    priorFuncs[ii]=makeFlatPrior(priorRange)
 		elif(type(prior) is tuple):
-		    priorMean=np.copy(prior[0])
-		    priorSigma=np.copy(prior[1])
-		    priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+            if(len(prior)==2):
+                priorMean=np.copy(prior[0])
+                priorSigma=np.copy(prior[1])
+                priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+            elif(len(prior)==4):
+                priorMean=np.copy(prior[0])
+                priorSigma=np.copy(prior[1])
+                priorRange=np.copy(prior[2:])
+                priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+            else:
+                raise ValueError(prior)
+        else:
+            raise ValueError(ii,prior,type(prior))
 
     # remove fixed entries from list of pars to fit
     delarr=np.array([])
@@ -67,19 +97,37 @@ def interpretPriors(priors):
 # Evaluate Likelihood
 ####
 
-def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fixed, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel):
-# pars are the free parameters to be fit (some or all of [PA, b/a, vmax, g1, g2])
-# xobs, yobs are the fiber positions for velocity measurements
-# vobs are the measured velocities
-# verr are the uncertainties in measured velocities
-# ellobs are the imaging observables sheared (PA, b/a)
-# ellerr are the uncertainties on the imaging observables
-# priorFuncs are the functions that define the priors (from interpretPriors)
-# fixed is an array with an entry for each of [PA, b/a, vmax, g1, g2]. float means fix, None means free
-# returns ln(P(model|data))
+def lnProbVMapModel(pars, priors, xobs, yobs, vobs, verr, ellobs, ellerr, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel):
+    """Return ln(P(model|data)) = -0.5*chisq to evaluate likelihood surface.
 
-# Note: if you only want to consider spectroscopic or imaging observables, set xobs or ellobs to None
-	
+    Take model parameters, priors, and data and compute chisq=sum[((model-data)/error)**2].
+
+    Note: if you only want to consider spectroscopic or imaging observables,
+          set xobs or ellobs to None
+
+    Inputs:
+        pars - ndarray of N model parameters to be fit (N<=M)
+        priors - see interpretPriors for format
+        xobs - float or ndarray of fiber x-centers
+        yobs - float or ndarray of fiber y-centers
+        vobs - float or ndarray of fiber velocities
+        verr - errors on vobs
+        ellobs - imaging observables
+        ellerr - errors on ellobs
+        disk_r - disk half-light radius in arcsec
+        convOpt - None, "galsim", or "pixel"
+        atmos_fwhm - FWHM of gaussian PSF
+        fibRad - fiber radius in arcsecs
+        fibConvolve - bool for whether to convolve with fiber
+                      (note, atmos and fiber convolution controlled separately)
+        kernel - convolution kernel if convOpt=="pixel", see sim.makeConvolutionKernel
+        
+    Returns:
+        lnP - a float (this is what emcee needs)
+    """
+
+    priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
+
     # wrap PA to fall between 0 and 360
     if(fixed[0] is None):
 	pars[0]=pars[0] % 360.
@@ -137,15 +185,22 @@ def lnProbVMapModel(pars, xobs, yobs, vobs, verr, ellobs, ellerr, priorFuncs, fi
 
 
 def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
-# fit model to fiber velocities
-# vobs is the data to be fit
-# sigma is the errorbar on that value (e.g. 30 km/s)
+    """Call emcee and return sampler to fit model to fiber velocities
 
-# priors is a list or tuple with an entry for each fit parameter: gal_beta, gal_q, vmax
-#    None: leave this variable completely free
-#    float: fix the variable to this value
-#    list[a,b]: flat prior between a and b
-#    tuple(a,b): gaussian prior with mean a and stddev b
+    Inputs:
+        vobs - velocity data array to be fit
+        sigma - errorbars on vobs (e.g. 30 km/s)
+        imObs - imaging data array to be fit
+        imErr - errorbars on imObs
+        priors - see interpretPriors for format
+        disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, fibConfig, fibPA 
+            - see sim.vmapObs
+        addNoise - bool for whether to fit noisy or noise-free observations
+        nWalkers, nBurn, nSteps - see emcee documentation
+
+    Returns:
+        sampler - emcee object with posterior chains
+    """
 
     # SETUP DATA
     if(vobs is not None):
@@ -203,8 +258,10 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
     return sampler
 
 def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
-# wrapper to vmapFit to compare chains with imaging, spectroscopy, and combined observables
-# passes kwargs to vmapFit
+    """Wrapper to vmapFit to compute chains for each set of observables
+
+    Passes kwargs to vmapFit
+    """
 
     print "Imaging"
     samplerI=vmapFit(None,specErr,imObs,imErr,priors,**kwargs)
@@ -228,11 +285,17 @@ def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
     lnprobs=[flatlnprobI[goodI],flatlnprobS[goodS],flatlnprobIS[goodIS]]
     return (chains,lnprobs)
 
+####
+# Chain statistics
+####
+
 def getMaxProb(chain,lnprob):
+    """Return chain pars that give max lnP"""
     maxP=(lnprob == np.max(lnprob)).nonzero()[0][0]
     return chain[maxP]
 
 def getPeakKDE(chain,guess):
+    """Return chain pars that give peak of posterior PDF, using KDE"""
     if(len(chain.shape)==1):
         nPars=1
         kern=scipy.stats.gaussian_kde(chain)
@@ -247,12 +310,17 @@ def getPeakKDE(chain,guess):
         return peakKDE
 
 def getMedPost(chain):
-# this is not a good estimator when posteriors are flat
+    """Return chain pars that give median of posterior PDF
+
+    Warning! this is not a good estimator when posteriors are flat
+    """
     return np.median(chain,axis=0)
 
 def get68(chain,opt="hw"):
-# get half-width of 68% confidence range
-# for a gaussian distribution, this is 1-sigma
+    """Return half-width of 16-84 percentile range in posterior PDF
+
+    For a gaussian distribution, this is 1-sigma
+    """
     nSteps=len(chain)
     chainSort=np.sort(chain,axis=0)
     low68=chainSort[0.16*nSteps]
@@ -266,4 +334,3 @@ def get68(chain,opt="hw"):
         return high68
     elif(opt=="lowhigh"):
         return (low68,high68)
-    
