@@ -11,10 +11,19 @@ pixScale=0.1
 imgSizePix=100
 
 def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
-# returns fiber center positions relative to origin in same units as fibRad (arcsec)
-# also returns fibShape (circle or square)
-# for configurations with square fibers, PA sets position angle (e.g. slit, IFU grid)
-# for circular fibers, fibRad=fiber radius. for square fibers, fibRad=edge length
+    """Return fiber center positions and fiber shape given config string.
+
+    Inputs:
+        numFib - number of fibers
+        fibRad - fiber radius in arcsec for circular fibers
+                 or edge length for square fibers
+        fibConfig - configuration string (hex|hexNoCen|slit|ifu|triNoCen)
+        fibPA - position angle for configs with square fibers (default None)
+    Returns:
+        (pos, fibShape)
+            pos - 2 x numFib ndarray with fiber centers in arcsecs from origin
+            fibShape - string "circle" or "square"
+    """        
 
     pos=np.zeros((2,numFib))
 
@@ -62,20 +71,40 @@ def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
     return (pos,fibShape)
 
 
-# These functions take a galsim object <image> and integrate over the area of a fiber
+# These functions take a galsim object <image> and integrate over the area of a fiber (currently obsolete)
 def radIntegrand(rad,theta,fiberPos,image):
+    """Evaluate radial integrand used by galsim version of getFiberFlux"""
     pos=galsim.PositionD(x=fiberPos[0]+rad*np.cos(theta),y=fiberPos[1]+rad*np.sin(theta))
     return rad*image.xValue(pos)
 def thetaIntegrand(theta,fiberPos,image,fibRad,tol):
+    """Evaluate theta integrand used by galsim version of getFiberFlux"""
     return scipy.integrate.quad(radIntegrand,0,fibRad,args=(theta,fiberPos,image),epsabs=tol,epsrel=tol)[0]
 def getFiberFlux(fibID,numFib,fibRad,fibConfig,image,tol=1.e-4):
+    """Integrate image flux over fiber area, used by galsim version of getFiberFlux"""
     fiberPos=getFiberPos(numFib,fibRad,fibConfig)[:,fibID]
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
+
 def getFiberFluxes(xobs,yobs,fibRad,fibConvolve,image):
-# convolve image with fiber area and return fiber flux
-# if fibConvolve is False, just sample the image at central position without convolving
- 
+    """Convolve image with fiber area and return fiber flux.
+
+    Inputs:
+        xobs - float or ndarray of fiber x-centers
+        yobs - float or ndarray of fiber y-centers
+        fibRad - fiber radius in arcsecs
+        fibConvolve - if False, just sample the image at central position 
+                      without convolving, else convolve
+        image - galsim object
+    Returns:
+        fiberFluxes - ndarray of values sampled at fiber centers in convolved image.
+
+    Note: getFiberFluxes is meant as an update to getFiberFlux since 
+          sampling the image after galsim's Convolve with scipy's map_coordinates
+          should be faster than the real-space integral over each fiber.
+          But, getFiberFluxes currently assumes circular fibers only, and
+          is being superceded by makeConvolutionKernel with convOpt=pixel.
+    """
+
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
 
     coordsPix=np.array([xobs,yobs])/pixScale + 0.5*imgSizePix # converted to pixels
@@ -93,7 +122,17 @@ def getFiberFluxes(xobs,yobs,fibRad,fibConvolve,image):
     return scipy.ndimage.map_coordinates(fibImageArr.T,coordsPix)
     
 def shearEllipse(ellipse,g1,g2):
-# Following Supri & Harari 1999
+    """Shear ellipse parameters following Supri & Harari 1999.
+
+    Inputs:
+        ellipse - (disk_r, gal_q, gal_beta) unsheared ellipse
+        g1 - shear 1
+        g2 - shear 2
+    Returns:
+        (disk_r_prime, gal_q_prime, gal_beta_prime) - sheared ellipse parameters
+
+    Note: This is only used for visualization
+    """
     disk_r,gal_q,gal_beta=ellipse
     gamma=np.sqrt(g1**2 + g2**2)
     epsilon=(1-gal_q**2)/(1+gal_q**2)
@@ -115,9 +154,19 @@ def shearEllipse(ellipse,g1,g2):
     return (disk_r_prime,gal_q_prime,gal_beta_prime)
 
 def shearPairs(pairs,g1,g2):
-# This shear matrix is different from the one in makeGalVMap2
-# because images get flipped around when plotted
-# This convention is meant for visualization
+    """Shear coordinate pairs
+
+    Inputs:
+        pairs - list or ndarray of [(x1,y1), ...] coordinates
+        g1 - shear 1
+        g2 - shear 2
+    Returns:
+        pairs_prime - shear coordinates in same format as pairs
+    Note: This shear matrix is different from the one in makeGalVMap2
+          because images get flipped around when plotted
+          This convention is meant for visualization
+    """
+
     pairs_prime=pairs.copy()
     gSq=g1**2+g2**2
     assert(gSq < 1)
@@ -136,7 +185,15 @@ def shearPairs(pairs,g1,g2):
     return pairs_prime
  
 def shearLines(lines,g1,g2):
-# lines is either None or np.array([[x1,x2,y1,y2],...]) or np.array([x1,x2,y1,y2])
+    """Shear lines by calling shearPairs on each pair of coords
+
+    Inputs:
+        lines - ndarray([[x1,x2,y1,y2],...]) or ndarray([x1,x2,y1,y2])
+        g1 - shear 1
+        g2 - shear 2
+    Returns:
+        lines_prime - shear coordinates in same format as lines
+    """
     lines_prime=lines.copy()
     if(lines.shape == (4,)): # only one line		
 	x1,x2,y1,y2=lines
@@ -153,7 +210,13 @@ def shearLines(lines,g1,g2):
     return lines_prime
 
 def getEllipseAxes(ellipse):
-# returns endpoints of major and minor axis of an ellipse
+    """Return endpoints of major and minor axis of an ellipse
+
+    Input:
+        ellipse - (disk_r, gal_q, gal_beta)
+    Returns:
+        lines - ndarray([[xa1,xa2,ya1,ya2],[xb1,xb2,yb1,yb2]])
+    """
     disk_r,gal_q,gal_beta=ellipse
     gal_beta_rad=np.deg2rad(gal_beta)
     xmaj=disk_r*np.cos(gal_beta_rad)
@@ -166,12 +229,22 @@ def getEllipseAxes(ellipse):
 
 
 def getInclination(gal_q):
-# see http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
-    # just give simple flat thin disk case for now
+    """Return inclination in radians for a flat think disk
+
+    See http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
+    """
     return np.arccos(gal_q) # radians
 
 def getOmega(rad,pars,option='flat'):
-# return angular rotation rate, i.e. v(r)/r
+    """Return angular rotation rate, i.e. v(r)/r
+
+    Inputs:
+        rad - ndarray of radii at which to sample
+        pars - float or array of option-dependent rotation curve parameters
+        option - "flat", "solid", or "nfw" (default "flat")
+    Returns:
+        omega - ndarray same length as rad with rotation rates
+    """
 
     if(option=='flat'): # v(r)=pars[0]
         return pars[0]/rad
@@ -185,9 +258,28 @@ def getOmega(rad,pars,option='flat'):
         return pars[0]*vel/rad
 
 def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
-# Construct galsim objects for galaxy (image), velocity map, and flux-weighted velocity map
-# with optional lensing shear and PSF convolution
-	
+    """Construct galsim objects for image, velocity map, and flux-weighted velocity map.
+
+    Inputs:
+        bulge_n - bulge Sersic index
+        bulge_r - bulge half-light radius
+        disk_n - disk Sersic index
+        disk_r - disk half-light radius
+        bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
+        gal_q - axis ratio
+        gal_beta - position angle in degrees
+        gal_flux - normalization of image flux
+        atmos_fwhm - FWHM of gaussian PSF
+        rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
+        rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
+        g1 - shear 1
+        g2 - shear 2
+    Returns:
+        (vmap,fluxVMap,gal) - tuple of galsim objects
+
+    Note: See also makeGalVMap2, which uses pixel arrays instead of galsim objects
+    """
+    
     # Define the galaxy velocity map
     if(0 < bulge_frac < 1):
         bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
@@ -261,6 +353,27 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     return (vmap,fluxVMap,gal)
 
 def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2):
+    """Construct pixel arrays for image, velocity map, and flux-weighted velocity map.
+
+    Inputs:
+        bulge_n - bulge Sersic index
+        bulge_r - bulge half-light radius
+        disk_n - disk Sersic index
+        disk_r - disk half-light radius
+        bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
+        gal_q - axis ratio
+        gal_beta - position angle in degrees
+        gal_flux - normalization of image flux
+        rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
+        rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
+        g1 - shear 1
+        g2 - shear 2
+    Returns:
+        (vmapArr,fluxVMapArr,imgArr) - tuple of ndarray images
+
+    Note: See also makeGalVMap, which uses galsim objects instead of pixel arrays
+    """
+
     # Define the galaxy velocity map
     if(0 < bulge_frac < 1):
         bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
@@ -318,11 +431,26 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     return (vmapArr,fluxVMapArr,imgArr)
 
 def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA):
-# construct the fiber x PSF convolution kernel
-# this saves time since you only need to calculate it once and can multiply it by the flux map,
-#    rather than convolving each model galaxy and sampling at a position
-# returns kernel, an ndarray of size [numFib, imgSizePix, imgSizePix]
+    """Construct the fiber x PSF convolution kernel
 
+    When using pixel arrays (instead of galsim objects),
+    makeConvolutionKernel saves time since you only need to 
+    calculate the kernel once and can multiply it by the flux map,
+    rather than convolving each model galaxy and sampling at a position
+
+    Inputs:
+        xobs - float or ndarray of fiber x-centers
+        yobs - float or ndarray of fiber y-centers
+        atmos_fwhm - FWHM of gaussian PSF
+        fibRad - fiber radius in arcsecs
+        fibConvolve - if False, just sample the image at central position 
+                      without convolving, else convolve
+        fibShape - string "circle" or "square"
+        fibPA - position angle for configs with square fibers 
+                (can be None for fibShape="circle")
+    Returns:
+        kernel - an ndarray of size [xobs.size, imgSizePix, imgSizePix]
+    """
     numFib=xobs.size
     half=imgSizePix/2
     xx,yy=np.meshgrid((np.arange(imgSizePix)-half)*pixScale,(np.arange(imgSizePix)-half)*pixScale)
@@ -354,10 +482,31 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA
     return kernel
 
 def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=None,fibRad=None,fibConvolve=False,kernel=None):
-# get flux-weighted fiber-averaged velocities
-#for convOpt=galsim, need to specify atmos_fwhm,fibRad,fibConvolve
-#for convOpt=pixel, need to specify kernel
-	
+    """Get flux-weighted fiber-averaged velocities
+
+    vmapObs computes fiber sampling in two ways, depending on convOpt
+        for convOpt=galsim, need to specify atmos_fwhm,fibRad,fibConvolve
+        for convOpt=pixel, need to specify kernel
+
+    Inputs:
+        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+        xobs - float or ndarray of fiber x-centers
+        yobs - float or ndarray of fiber y-centers
+        disk_r - disk half-light radius
+        showPlot - bool for presenting plots (default False)
+        convOpt - how to compute images and convolutions ("galsim" or "pixel")
+        atmos_fwhm - FWHM of gaussian PSF (default None)
+        fibRad - fiber radius in arcsecs (default None)
+        fibConvolve - if False (default), just sample the image at central position 
+                      without convolving, else convolve
+        kernel - an ndarray of size [xobs.size, imgSizePix, imgSizePix]
+                 from makeConvolutionKernel
+    Returns:
+        ndarray of flux-weighted fiber-averaged velocities
+
+    Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
+    """
+    	
     gal_beta,gal_q,vmax,g1,g2=pars
     
     numFib=xobs.size
@@ -392,13 +541,19 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
     return vmapFibFlux/galFibFlux
 
 def vmapModel(pars, xobs, yobs):
-# evaluate velocity field at azimuthal angles around center, called by curve_fit
-# pars: PA in deg., gal_q, vmax, g1, g2 [PA, gal_q, and vmax are the *unsheared* parameters]
-# xobs, yobs are the N positions (in arcsec) relative to the center at which
-#    the *sheared* (observed) field is sampled
-# returns (vmodel, ellmodel), where vmodel is an N array of fiber velocities,
-#    ellmodel is the array of sheared imaging observables (gal_beta,gal_q)
+    """Evaluate model velocity field at given coordinates
 
+    Inputs:
+        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+        xobs, yobs - the N positions (in arcsec) relative to the center at which
+                     the *sheared* (observed) field is sampled
+    Returns:
+        (vmodel, ellmodel)
+            vmodel is an N array of fiber velocities
+            ellmodel is the array of sheared imaging observables (gal_beta,gal_q)
+
+    Note: vmapModel is like vmapObs without PSF and fiber convolution
+    """
     gal_beta,gal_q,vmax,g1,g2=pars
 
     # compute spectroscopic observable
@@ -431,7 +586,14 @@ def vmapModel(pars, xobs, yobs):
     return vmodel
 
 def ellModel(pars):
-    # compute imaging observable
+    """Compute sheared ellipse pars for a model galaxy
+
+    Inputs:
+        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+    Returns:
+        ndarray([gal_beta, gal_q]) *sheared* values
+    """
+
     gal_beta,gal_q,vmax,g1,g2=pars
 
     disk_r=1. # we're not modeling sizes now
@@ -442,10 +604,16 @@ def ellModel(pars):
     return ellmodel
 
 def generateEnsemble(nGal,priors,shearOpt=None,seed=None):
-# generate a set of galaxies with intrinsic shapes following the prior distribution
-# (priors follow same convention as used by interpretPriors but must not be None)
-# and generate shear parameters following an approach set by shearOpt
-#     shearOpt="PS", "NFW", None - shears can also be defined using uniform or gaussian priors
+    """Generate set of galaxies with shapes following a set of priors
+
+    Inputs:
+        nGal - number of galaxies to generate
+        priors - see fit.interpretPriors for conventions, must not be None here
+        shearOpt - distribution of shears, if not set by priors ("PS", "NFW", None)
+        seed - used for repeatable random number generation (default None)
+    Returns:
+        pars - ndarray (nGal x [gal_beta, gal_q, vmax, g1, g2])
+    """
 
     nPars=len(priors)
     pars=np.zeros((nGal,nPars))
