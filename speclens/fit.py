@@ -57,24 +57,24 @@ def interpretPriors(priors):
 	for ii in xrange(nPars):
 	    prior=priors[ii]
 	    # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
-	    if(prior is not None):
-		if((type(prior) is int) | (type(prior) is float)):
-		# entry will be removed from list of pars and guess but value is still sent to evauluate function
-		    fixVal=np.copy(prior)
-		    fixed[ii]=fixVal
-		elif(type(prior) is list):
-		    priorRange=np.copy(prior)
-		    priorFuncs[ii]=makeFlatPrior(priorRange)
-		elif(type(prior) is tuple):
-            if(len(prior)==2):
-                priorMean=np.copy(prior[0])
-                priorSigma=np.copy(prior[1])
-                priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
-            elif(len(prior)==4):
-                priorMean=np.copy(prior[0])
-                priorSigma=np.copy(prior[1])
-                priorRange=np.copy(prior[2:])
-                priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+        if(prior is not None):
+            if((isinstance(prior, int)) | (isinstance(prior, float))):
+            # entry will be removed from list of pars and guess but value is still sent to evauluate function
+                fixVal=np.copy(prior)
+                fixed[ii]=fixVal
+            elif(isinstance(prior, list)):
+                priorRange=np.copy(prior)
+                priorFuncs[ii]=makeFlatPrior(priorRange)
+            elif(isinstance(prior, tuple)):
+                if(len(prior)==2):
+                    priorMean=np.copy(prior[0])
+                    priorSigma=np.copy(prior[1])
+                    priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+                elif(len(prior)==4):
+                    priorMean=np.copy(prior[0])
+                    priorSigma=np.copy(prior[1])
+                    priorRange=np.copy(prior[2:])
+                    priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
             else:
                 raise ValueError(prior)
         else:
@@ -83,7 +83,7 @@ def interpretPriors(priors):
     # remove fixed entries from list of pars to fit
     delarr=np.array([])
     for ii in xrange(nPars):
-	if(fixed[ii] is not None):
+        if(fixed[ii] is not None):
             delarr=np.append(delarr,ii)
     if(len(delarr) > 0):
         guess=np.delete(guess,delarr)
