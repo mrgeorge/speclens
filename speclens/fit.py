@@ -247,7 +247,7 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
 
     # RUN MCMC
     walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[xobs, yobs, vel, velErr, ellObs, ellErr, priorFuncs, fixed, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel])
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[priors, xobs, yobs, vel, velErr, ellObs, ellErr, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel])
     print "emcee burnin"
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
