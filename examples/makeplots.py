@@ -15,25 +15,18 @@ except ImportError: # add parent dir to python search path
     
 # This is a driver for functions in sim.py to create some figures for a proposal
 
-if __name__ == "__main__":
 
-    # set up paths for output dirs
-    speclensDir="../"
-    if not os.path.isdir(speclensDir):
-        raise NameError(speclensDir)
-    plotDir=speclensDir+"/plots"
-    dataDir=speclensDir+"/data"
-    if not os.path.isdir(plotDir):
-        os.mkdir(plotDir)
-    if not os.path.isdir(dataDir):
-        os.mkdir(dataDir)
+def shearVMapPlot(plotDir, figExt="pdf", showPlot=False):
+    """Create plots illustrating shear effect on velocity map.
 
-    figExt="pdf" # pdf or png
-    showPlot=False
-
-    # Fig 1
-    # Mimic Morales Fig. 1
-    # unweighted velocity map with no PSF, unsheared then sheared
+    Similar to Fig. 1 of Morales 2006, make simple velocity maps
+    and plot 4 separate figures:
+        a) unlensed velocity map
+        b) velocity map with different inclination
+        c) velocity map with shear applied at 0 deg to mimic 
+            inclination in image
+        d) velocity map with shear at 45 deg to show misalignment
+    """
 
     bulge_n=4.
     bulge_r=1.
@@ -85,10 +78,35 @@ if __name__ == "__main__":
     speclens.plot.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],lw=lw,filename="{}/fig1d.{}".format(plotDir,figExt),title=r"$\gamma_{\times}=0.2$",showPlot=showPlot)
 
     print "Finished Fig 1"
-    # Fig 2
-    # galaxy image, velocity map, flux-weighted velocity map with PSF and fiber positions
-    # (unsheared)
+    return
+
+def samplingPlot(plotDir, figExt="pdf", showPlot=False):
+    """Create plots of fibers overlaid on image and vmap.
+
+    Show 2 arcsec diameter fibers in hex patter overlaid
+    on galaxy image and flux-weighted velocity map to 
+    illustrate spatial sampling of the velocity field
+    including the effects of seeing.
+    """
+        
+    bulge_n=4.
+    bulge_r=1.
+    disk_n=1.
+    disk_r=2.
+    bulge_frac=0.
+    gal_q=0.75
+    gal_beta=0.1
+    gal_flux=1.
+    atmos_fwhm=1.
+    rotCurveOpt='flat'
+    vmax=100.
+    rotCurvePars=np.array([vmax])
+    g1=0.
+    g2=0.
     
+    vmap,fluxVMap,gal = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+    trim=1.
+
     plt.clf()
     numFib=7
     fibRad=1.
@@ -99,10 +117,18 @@ if __name__ == "__main__":
     speclens.plot.showImage(gal,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
     plt.clf()
     speclens.plot.showImage(fluxVMap,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
-    
-    
-    # Fig 3
-    # vobs vs theta for a few sets of parameters
+
+    print "Finished Fig 2"
+    return
+
+def vThetaPlot(plotDir, figExt="pdf", showPlot=False):
+    """Create plot of velocity vs azimuthal angle
+
+    Illustrate the effects of changing a few parameters
+    on the observed velocity as a function of azimuthal angle.
+    Assumes a hex fiber sampling pattern.
+    """
+
     plt.clf()
     
     sigma=30. # velocity unc in km/s
@@ -164,10 +190,18 @@ if __name__ == "__main__":
     plt.savefig("{}/fig3.{}".format(plotDir,figExt))
     if(showPlot):
         plt.show()
-    
-    # Fig 4
-    # parameter constraints from a number of noise realizations
-    
+
+    print "Finished Fig 3"
+    return
+
+def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
+    """Plot parameter constraints given a measurement with errors
+
+    Take the imaging and velocity observables for a single sheared
+    galaxy and fit a 5 parameter model using MCMC to maximize the
+    fit likelihood. Plot joint posterior constraints.
+    """
+
     pars = np.array([105, 0.5, 200, 0, 0.15])
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     sigma=30.
@@ -199,9 +233,19 @@ if __name__ == "__main__":
     plt.clf()
     speclens.plot.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4b.{}".format(plotDir,figExt),showPlot=showPlot)
 
+    print "Finished Fig 4"
+    return
 
-    # Fig 5
-    # shear error distribution for ensemble
+def ensemblePlots(dataDir, plotDir, figExt="pdf", showPlot=False):
+    """Run fits for an ensemble and compute scatter in shear estimator
+
+    Generate a large sample of galaxy orientations and shears, fit
+    their observables with a 5-parameter model, and compute offsets
+    in the recovered values from the input values. This provides an
+    estimate of the precision with which shear and other variables
+    can be estimated from the data.
+    """
+
     nGal=100
     labels=np.array(["PA","b/a","vmax","g1","g2"])
     inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
@@ -238,3 +282,42 @@ if __name__ == "__main__":
     speclens.io.writeRec(speclens.io.parsToRec(obsParsI),"{}/fig5_obsParsI.fits".format(dataDir))
     speclens.io.writeRec(speclens.io.parsToRec(obsParsS),"{}/fig5_obsParsS.fits".format(dataDir))
     speclens.io.writeRec(speclens.io.parsToRec(obsParsIS),"{}/fig5_obsParsIS.fits".format(dataDir))
+
+
+    
+if __name__ == "__main__":
+
+    # set up paths for output dirs
+    speclensDir="../"
+    if not os.path.isdir(speclensDir):
+        raise NameError(speclensDir)
+    plotDir=speclensDir+"/plots"
+    dataDir=speclensDir+"/data"
+    if not os.path.isdir(plotDir):
+        os.mkdir(plotDir)
+    if not os.path.isdir(dataDir):
+        os.mkdir(dataDir)
+
+    figExt="pdf" # pdf or png
+    showPlot=False
+
+    # Fig 1
+    # Mimic Morales 2006, Fig. 1 - illustrate effect of shear on velocity map
+    shearVMapPlot(plotDir, figExt=figExt, showPlot=showPlot)
+
+    # Fig 2
+    # galaxy image and flux-weighted velocity map with PSF and fiber positions
+    # (unsheared)
+    samplingPlot(plotDir, figExt=figExt, showPlot=showPlot)
+    
+    # Fig 3
+    # vobs vs theta for a few sets of parameters
+    vThetaPlot(plotDir, figExt=figExt, showPlot=showPlot)
+    
+    # Fig 4
+    # parameter constraints from a number of noise realizations
+    modelConstraintPlot(plotDir, figExt=figExt, showPlot=showPlot)
+
+    # Fig 5
+    # shear error distribution for ensemble
+    ensemblePlots(dataDir, plotDir, figExt=figExt, showPlot=showPlot)
