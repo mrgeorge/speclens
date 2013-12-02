@@ -75,10 +75,10 @@ def interpretPriors(priors):
                         priorSigma=np.copy(prior[1])
                         priorRange=np.copy(prior[2:])
                         priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+                    else:
+                        raise ValueError(prior)
                 else:
-                    raise ValueError(prior)
-            else:
-                raise ValueError(ii,prior,type(prior))
+                    raise ValueError(ii,prior,type(prior))
 
     # remove fixed entries from list of pars to fit
     delarr=np.array([])
