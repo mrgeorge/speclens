@@ -146,7 +146,7 @@ def shearEllipse(ellipse,g1,g2):
     disk_r_prime=disk_r*(1+gamma)
     #    assert(epsilon_prime < 1.1)
     if(epsilon_prime>1):
-	epsilon_prime=1.
+        epsilon_prime=1.
     assert(epsilon_prime <= 1.)
     gal_q_prime=np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime))
     gal_beta_prime=np.rad2deg(psi+dpsi)
@@ -195,18 +195,18 @@ def shearLines(lines,g1,g2):
         lines_prime - shear coordinates in same format as lines
     """
     lines_prime=lines.copy()
-    if(lines.shape == (4,)): # only one line		
-	x1,x2,y1,y2=lines
-	x1p,y1p=shearPairs(np.array([x1,y1]),g1,g2)
-	x2p,y2p=shearPairs(np.array([x2,y2]),g1,g2)
-	lines_prime=np.array([x1p,x2p,y1p,y2p])
+    if(lines.shape == (4,)): # only one line
+        x1,x2,y1,y2=lines
+        x1p,y1p=shearPairs(np.array([x1,y1]),g1,g2)
+        x2p,y2p=shearPairs(np.array([x2,y2]),g1,g2)
+        lines_prime=np.array([x1p,x2p,y1p,y2p])
     else:
-	for ii in range(len(lines)):
-	    x1,x2,y1,y2=lines[ii]
-	    x1p,y1p=shearPairs(np.array([x1,y1]),g1,g2)
-	    x2p,y2p=shearPairs(np.array([x2,y2]),g1,g2)
-	    lines_prime[ii]=np.array([x1p,x2p,y1p,y2p])
-	
+        for ii in range(len(lines)):
+            x1,x2,y1,y2=lines[ii]
+            x1p,y1p=shearPairs(np.array([x1,y1]),g1,g2)
+            x2p,y2p=shearPairs(np.array([x2,y2]),g1,g2)
+            lines_prime[ii]=np.array([x1p,x2p,y1p,y2p])
+
     return lines_prime
 
 def getEllipseAxes(ellipse):
@@ -301,7 +301,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     halfWidth=0.5*imgSizePix*pixScale
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
     galImg=gal.draw(image=imgFrame,dx=pixScale)
-    imgArr=galImg.array.copy()	# must store these arrays as copies to avoid overwriting with shared imgFrame
+    imgArr=galImg.array.copy()   # must store these arrays as copies to avoid overwriting with shared imgFrame
 
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
@@ -346,7 +346,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     if(atmos_fwhm > 0):
         # Define atmospheric PSF
         #    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
-	atmos=galsim.Gaussian(fwhm=atmos_fwhm)
+        atmos=galsim.Gaussian(fwhm=atmos_fwhm)
         fluxVMap=galsim.Convolve([atmos, fluxVMap])
         gal=galsim.Convolve([atmos, gal])
 
@@ -395,7 +395,7 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     halfWidth=0.5*imgSizePix*pixScale
     imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
     galImg=gal.draw(image=imgFrame,dx=pixScale)
-    imgArr=galImg.array.copy()	# must store these arrays as copies to avoid overwriting with shared imgFrame
+    imgArr=galImg.array.copy()    # must store these arrays as copies to avoid overwriting with shared imgFrame
 
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
@@ -506,7 +506,7 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
 
     Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
     """
-    	
+
     gal_beta,gal_q,vmax,g1,g2=pars
     
     numFib=xobs.size
@@ -558,30 +558,30 @@ def vmapModel(pars, xobs, yobs):
 
     # compute spectroscopic observable
     if(xobs is not None):
-	# convert coords to source plane
-	pairs=shearPairs(np.array(zip(xobs,yobs)),-g1,-g2)
-	xx=pairs[:,0]
-	yy=pairs[:,1]
+        # convert coords to source plane
+        pairs=shearPairs(np.array(zip(xobs,yobs)),-g1,-g2)
+        xx=pairs[:,0]
+        yy=pairs[:,1]
 
-	# rotated coords aligned with PA guess of major axis
-	xCen,yCen=0,0 # assume centroid is well-measured
-	PArad=np.deg2rad(gal_beta)
-	xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
-	yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
-	# projection along apparent major axis in rotated coords
-	kvec=np.array([1,0,0])
+        # rotated coords aligned with PA guess of major axis
+        xCen,yCen=0,0 # assume centroid is well-measured
+        PArad=np.deg2rad(gal_beta)
+        xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
+        yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
+        # projection along apparent major axis in rotated coords
+        kvec=np.array([1,0,0])
     
-	inc=getInclination(gal_q)
-	sini=np.sin(inc)
-	tani=np.tan(inc)
+        inc=getInclination(gal_q)
+        sini=np.sin(inc)
+        tani=np.tan(inc)
 
-	rotCurvePars=np.array([vmax])
-	nSamp=xobs.size
-	vmodel=np.zeros(nSamp)
+        rotCurvePars=np.array([vmax])
+        nSamp=xobs.size
+        vmodel=np.zeros(nSamp)
         radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
         vmodel=getOmega(radNorm,rotCurvePars,option="flat") * sini * xp
     else:
-	vmodel=None
+        vmodel=None
 
     return vmodel
 
