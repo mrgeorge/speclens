@@ -15,9 +15,9 @@ def makeFlatPrior(range):
 
 def priorFlat(arg, range):
     if((arg >= range[0]) & (arg < range[1])):
-	return 0
+        return 0
     else:
-	return np.Inf
+        return np.Inf
 
 def makeGaussPrior(mean, sigma):
     return lambda x: ((x-mean)/sigma)**2
@@ -54,31 +54,31 @@ def interpretPriors(priors):
     fixed=np.repeat(None, nPars)
     priorFuncs=np.repeat(None, nPars)
     if(priors is not None):
-	for ii in xrange(nPars):
-	    prior=priors[ii]
-	    # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
-        if(prior is not None):
-            if((isinstance(prior, int)) | (isinstance(prior, float))):
-            # entry will be removed from list of pars and guess but value is still sent to evauluate function
-                fixVal=np.copy(prior)
-                fixed[ii]=fixVal
-            elif(isinstance(prior, list)):
-                priorRange=np.copy(prior)
-                priorFuncs[ii]=makeFlatPrior(priorRange)
-            elif(isinstance(prior, tuple)):
-                if(len(prior)==2):
-                    priorMean=np.copy(prior[0])
-                    priorSigma=np.copy(prior[1])
-                    priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
-                elif(len(prior)==4):
-                    priorMean=np.copy(prior[0])
-                    priorSigma=np.copy(prior[1])
-                    priorRange=np.copy(prior[2:])
-                    priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+        for ii in xrange(nPars):
+            prior=priors[ii]
+            # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
+            if(prior is not None):
+                if((isinstance(prior, int)) | (isinstance(prior, float))):
+                # entry will be removed from list of pars and guess but value is still sent to evauluate function
+                    fixVal=np.copy(prior)
+                    fixed[ii]=fixVal
+                elif(isinstance(prior, list)):
+                    priorRange=np.copy(prior)
+                    priorFuncs[ii]=makeFlatPrior(priorRange)
+                elif(isinstance(prior, tuple)):
+                    if(len(prior)==2):
+                        priorMean=np.copy(prior[0])
+                        priorSigma=np.copy(prior[1])
+                        priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+                    elif(len(prior)==4):
+                        priorMean=np.copy(prior[0])
+                        priorSigma=np.copy(prior[1])
+                        priorRange=np.copy(prior[2:])
+                        priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+                else:
+                    raise ValueError(prior)
             else:
-                raise ValueError(prior)
-        else:
-            raise ValueError(ii,prior,type(prior))
+                raise ValueError(ii,prior,type(prior))
 
     # remove fixed entries from list of pars to fit
     delarr=np.array([])
@@ -130,58 +130,57 @@ def lnProbVMapModel(pars, priors, xobs, yobs, vobs, verr, ellobs, ellerr, disk_r
 
     # wrap PA to fall between 0 and 360
     if(fixed[0] is None):
-	pars[0]=pars[0] % 360.
+        pars[0]=pars[0] % 360.
     else:
-	fixed[0]=fixed[0] % 360.
+        fixed[0]=fixed[0] % 360.
 
     # First evaluate the prior to see if this set of pars should be ignored
     chisq_prior=0.
     if(priorFuncs is not None):
-	for ii in range(len(priorFuncs)):
-	    func=priorFuncs[ii]
-	    if(func is not None):
-		chisq_prior+=func(pars[ii])
-    if(chisq_prior == np.Inf):
-	return -np.Inf
+        for ii in range(len(priorFuncs)):
+            func=priorFuncs[ii]
+            if(func is not None):
+                chisq_prior+=func(pars[ii])
+        if(chisq_prior == np.Inf):
+            return -np.Inf
 
     # re-insert any fixed parameters into pars array
     nPars=len(fixed)
     fullPars=np.zeros(nPars)
     parsInd=0
     for ii in xrange(nPars):
-	if(fixed[ii] is None):
-	    fullPars[ii]=pars[parsInd]
-	    parsInd+=1
+        if(fixed[ii] is None):
+            fullPars[ii]=pars[parsInd]
+            parsInd+=1
         else:
             fullPars[ii]=fixed[ii]
 
     if((xobs is None) & (ellobs is None)): # no data, only priors
-	chisq_like=0.
+        chisq_like=0.
     else:
         if((xobs is None) & (ellobs is not None)): # use only imaging data
-	    model=sim.ellModel(fullPars)
-	    data=ellobs
-	    error=ellerr
-	elif((xobs is not None) & (ellobs is None)): # use only velocity data
+            model=sim.ellModel(fullPars)
+            data=ellobs
+            error=ellerr
+        elif((xobs is not None) & (ellobs is None)): # use only velocity data
             if(convOpt is not None):
                 model=sim.vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
             else: # this is faster if we don't need to convolve with psf or fiber
                 model=sim.vmapModel(fullPars,xobs,yobs)
-	    data=vobs
-	    error=verr
+            data=vobs
+            error=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
             if(convOpt is not None):
                 vmodel=sim.vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
             else: # this is faster if we don't need to convolve with psf or fiber
                 vmodel=sim.vmapModel(fullPars,xobs,yobs)
-	    model=np.concatenate([vmodel,ellModel(fullPars)])
-	    data=np.concatenate([vobs,ellobs])
-	    error=np.concatenate([verr,ellerr])
+            model=np.concatenate([vmodel,ellModel(fullPars)])
+            data=np.concatenate([vobs,ellobs])
+            error=np.concatenate([verr,ellerr])
 
-	chisq_like=np.sum(((model-data)/error)**2)
+        chisq_like=np.sum(((model-data)/error)**2)
 
     return -0.5*(chisq_like+chisq_prior)
-
 
 
 def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
@@ -204,11 +203,11 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
 
     # SETUP DATA
     if(vobs is not None):
-	numFib=vobs.size
+        numFib=vobs.size
         pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig,fibPA=fibPA)
         xobs,yobs=pos
-	vel=np.array(vobs).copy()
-	velErr=np.repeat(sigma,numFib)
+        vel=np.array(vobs).copy()
+        velErr=np.repeat(sigma,numFib)
 
         # SETUP CONVOLUTION KERNEL
         if(convOpt=="pixel"):
@@ -216,29 +215,29 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
         else: #convOpt is "galsim" or None
             kernel=None
     else:
-	xobs=None
+        xobs=None
         yobs=None
-	vel=None
-	velErr=None
+        vel=None
+        velErr=None
         kernel=None
 
     if(imObs is not None):
-	ellObs=np.array(imObs).copy()
-	ellErr=np.array(imErr).copy()
+        ellObs=np.array(imObs).copy()
+        ellErr=np.array(imErr).copy()
     else:
-	ellObs=None
-	ellErr=None
+        ellObs=None
+        ellErr=None
 	
     if(addNoise): # useful when simulating many realizations to project parameter constraints
         np.random.seed(seed)
         # NOTE: imObs will always be 2 number, but len(vobs) may vary with fiber configuration
         #       To preserve random seed, generate imObs noise first
 	if(imObs is not None):
-	    imNoise=np.random.randn(ellObs.size)*ellErr
-	    ellObs+=imNoise
+        imNoise=np.random.randn(ellObs.size)*ellErr
+        ellObs+=imNoise
 	if(vobs is not None):
-	    specNoise=np.random.randn(numFib)*sigma
-	    vel+=specNoise
+        specNoise=np.random.randn(numFib)*sigma
+        vel+=specNoise
 
 
     # SETUP PARS and PRIORS
