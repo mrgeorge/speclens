@@ -220,7 +220,7 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     chains,lnprobs=speclens.fit.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,fibConfig=fibConfig,fibPA=fibPA,addNoise=False,nSteps=250)
     smooth=3
     plt.clf()
-    speclens.plot.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=pars,showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
 
     # now try with PSF and fiber convolution
     atmos_fwhm=1.5
@@ -231,7 +231,7 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     chains,lnprobs=speclens.fit.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=True,convOpt=convOpt)
     smooth=3
     plt.clf()
-    speclens.plot.contourPlotAll(chains,inputPars=pars,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4b.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=pars,showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4b.{}".format(plotDir,figExt),showPlot=showPlot)
 
     print "Finished Fig 4"
     return
