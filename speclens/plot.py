@@ -10,6 +10,7 @@ import scipy.stats
 import scipy.signal
 import galsim
 import sim
+import fit
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
@@ -158,10 +159,11 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
     if(showPlot):
         plt.show()
     
-def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=True,showPeakKDE=True,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
+def contourPlotAll(chains,lnprobs=None,inputPars=None,showMax=False,showPeakKDE=False,show68=True,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],labels=None,figsize=(8,6),filename=None,showPlot=False):
     """Make a grid of contour plots for each pair of parameters
 
     Note - chain is actually a list of 1 or more chains from emcee sampler
+    lnprobs must be given if showMax or showPeakKDE are true
     """
     
     nChains=len(chains)

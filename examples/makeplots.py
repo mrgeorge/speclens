@@ -276,8 +276,8 @@ def ensemblePlots(dataDir, plotDir, figExt="pdf", showPlot=False):
         print obsParsI[ii,:]
         print obsParsS[ii,:]
         print obsParsIS[ii,:]
-        speclens.plot.contourPlotAll(chains,inputPars=inputPars[ii,:],smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig5_gal{}.{}".format(plotDir,ii,figExt),showPlot=showPlot)
-
+        speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars[ii,:],showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig5_gal{}.{}".format(plotDir,ii,figExt),showPlot=showPlot)
+        
     speclens.io.writeRec(speclens.io.parsToRec(inputPars),"{}/fig5_inputPars.fits".format(dataDir))
     speclens.io.writeRec(speclens.io.parsToRec(obsParsI),"{}/fig5_obsParsI.fits".format(dataDir))
     speclens.io.writeRec(speclens.io.parsToRec(obsParsS),"{}/fig5_obsParsS.fits".format(dataDir))
