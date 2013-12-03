@@ -113,18 +113,18 @@ def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red",
             xx=xx[1:]+0.5*xxbin
             yy=yy[1:]+0.5*yybin
 
-        if(smooth > 0):
-            kernSize=int(10*smooth)
-            sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
-            kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
-            zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
+            if(smooth > 0):
+                kernSize=int(10*smooth)
+                sx,sy=scipy.mgrid[-kernSize:kernSize+1, -kernSize:kernSize+1]
+                kern=np.exp(-(sx**2 + sy**2)/(2.*smooth**2))
+                zz=scipy.signal.convolve2d(zz,kern/np.sum(kern),mode='same')
 
-        hist,bins=np.histogram(zz.flatten(),bins=1000)
-        sortzz=np.sort(zz.flatten())
-        cumhist=np.cumsum(sortzz)*1./np.sum(zz)
-        levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
+            hist,bins=np.histogram(zz.flatten(),bins=1000)
+            sortzz=np.sort(zz.flatten())
+            cumhist=np.cumsum(sortzz)*1./np.sum(zz)
+            levels=np.array([sortzz[(cumhist>(1-pct)).nonzero()[0][0]] for pct in percentiles])
 
-        plt.contour(xx,yy,zz.T,levels=levels,colors=colors[ii])
+            plt.contour(xx,yy,zz.T,levels=levels,colors=colors[ii])
     else: #we just have single ndarrays for xvals and yvals
         zz,xx,yy=np.histogram2d(xvals,yvals,bins=n2dbins)
         xxbin=xx[1]-xx[0]
