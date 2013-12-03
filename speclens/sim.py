@@ -531,7 +531,7 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
         vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
 
     elif(convOpt=="pixel"):
-        fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
+        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
         if(showPlot):
             plot.showArr(imgArr)
             plot.showArr(fluxVMapArr)
