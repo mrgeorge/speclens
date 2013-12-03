@@ -174,7 +174,7 @@ def lnProbVMapModel(pars, priors, xobs, yobs, vobs, verr, ellobs, ellerr, disk_r
                 vmodel=sim.vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
             else: # this is faster if we don't need to convolve with psf or fiber
                 vmodel=sim.vmapModel(fullPars,xobs,yobs)
-            model=np.concatenate([vmodel,ellModel(fullPars)])
+            model=np.concatenate([vmodel,sim.ellModel(fullPars)])
             data=np.concatenate([vobs,ellobs])
             error=np.concatenate([verr,ellerr])
 
