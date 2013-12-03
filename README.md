@@ -12,8 +12,7 @@ seeing and pointing.
 External Dependencies
 ---------------------
 
-speclens currently uses the following packages. Some of these can
-probably be removed.
+speclens currently uses the following packages:
 
 * python, and common libaries like numpy, matplotlib, scipy
 
@@ -28,7 +27,7 @@ probably be removed.
   sampler for fast MCMC
 
 The following packages are imported by some scripts in scratch/ but
-aren't essential for the main functions.
+aren't essential for the main functions:
 
 * [fitsio](https://github.com/esheldon/fitsio) Erin Sheldon's fitsio
   for python
