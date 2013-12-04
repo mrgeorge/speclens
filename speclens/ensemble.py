@@ -1,4 +1,5 @@
 #! env python
+import galsim # for PS or NFW shear prior
 import sim
 import io
 import plot
@@ -6,6 +7,58 @@ import numpy as np
 import os
 import glob
 
+def generateEnsemble(nGal,priors,shearOpt=None,seed=None):
+    """Generate set of galaxies with shapes following a set of priors
+
+    Inputs:
+        nGal - number of galaxies to generate
+        priors - see fit.interpretPriors for conventions, must not be None here
+        shearOpt - distribution of shears, if not set by priors ("PS", "NFW", None)
+        seed - used for repeatable random number generation (default None)
+    Returns:
+        pars - ndarray (nGal x [gal_beta, gal_q, vmax, g1, g2])
+    """
+
+    nPars=len(priors)
+    pars=np.zeros((nGal,nPars))
+    np.random.seed(seed)
+    for ii in xrange(nPars):
+        prior=priors[ii]
+        # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
+        if((isinstance(prior, int)) | (isinstance(prior, float))): # fixed
+            fixVal=np.copy(prior)
+            pars[:,ii]=fixVal
+        elif(isinstance(prior, list)): # flat prior
+            priorRange=np.copy(prior)
+            pars[:,ii]=np.random.rand(nGal)*(priorRange[1]-priorRange[0]) + priorRange[0]
+        elif(isinstance(prior, tuple)): # gaussian
+            priorMean=np.copy(prior[0])
+            priorSigma=np.copy(prior[1])
+            pars[:,ii]=np.random.randn(nGal)*priorSigma + priorMean
+
+    if(shearOpt is not None):
+        # define area
+        density=150./3600 # 150/sq deg in /sq arcsec (~BOSS target density)
+        area=nGal/density # sq arcsec
+        gridLength=np.ceil(np.sqrt(area)) # arcsec
+        gridSpacing=1. # arcsec
+
+        # assign random uniform positions with origin at center
+        xpos=np.random.rand(nGal)*gridLength - 0.5*gridLength
+        ypos=np.random.rand(nGal)*gridLength - 0.5*gridLength
+        
+        if(shearOpt == "PS"):
+            ps=galsim.PowerSpectrum(lambda k: k**2)
+            ps.buildGrid(grid_spacing=gridSpacing, ngrid=gridLength)
+            g1, g2 = ps.getShear((xpos,ypos))
+            pars[:,-2]=g1
+            pars[:,-1]=g2
+
+        elif(shearOpt == "NFW"):
+            pass
+
+    return pars
+    
 def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
     """Generate input model parameters and observables for one galaxy
 
@@ -30,7 +83,7 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
         (xvals,yvals,vvals,ellObs,inputPars) tuple    
     """
     
-    inputPars=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
+    inputPars=generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
     ellObs=sim.ellModel(inputPars)
