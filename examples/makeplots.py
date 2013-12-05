@@ -236,54 +236,6 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     print "Finished Fig 4"
     return
 
-def ensemblePlots(dataDir, plotDir, figExt="pdf", showPlot=False):
-    """Run fits for an ensemble and compute scatter in shear estimator
-
-    Generate a large sample of galaxy orientations and shears, fit
-    their observables with a 5-parameter model, and compute offsets
-    in the recovered values from the input values. This provides an
-    estimate of the precision with which shear and other variables
-    can be estimated from the data.
-    """
-
-    nGal=100
-    labels=np.array(["PA","b/a","vmax","g1","g2"])
-    inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
-    obsPriors=[[0,360],[0,1],(150,15),[-0.5,0.5],[-0.5,0.5]]
-    inputPars=speclens.sim.generateEnsemble(nGal,inputPriors,shearOpt=None)
-    numFib=6
-    fibRad=1
-    fibConfig="hexNoCen"
-    pos,fibShape=speclens.sim.getFiberPos(numFib,fibRad,fibConfig)
-    xvals,yvals=pos
-    sigma=30.
-    ellErr=np.array([10.,0.1])
-    smooth=3
-
-    obsParsI=np.zeros_like(inputPars)
-    obsParsS=np.zeros_like(inputPars)
-    obsParsIS=np.zeros_like(inputPars)
-    
-    for ii in range(nGal):
-        print "************Running Galaxy {}".format(ii)
-        vvals=speclens.sim.vmapModel(inputPars[ii,:], xvals, yvals)
-        ellObs=speclens.sim.ellModel(inputPars[ii,:])
-        chains,lnprobs=speclens.fit.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,fibRad=fibRad,addNoise=True)
-        obsParsI[ii,:]=speclens.fit.getMaxProb(chains[0],lnprobs[0])
-        obsParsS[ii,:]=speclens.fit.getMaxProb(chains[1],lnprobs[1])
-        obsParsIS[ii,:]=speclens.fit.getMaxProb(chains[2],lnprobs[2])
-        print inputPars[ii,:]
-        print obsParsI[ii,:]
-        print obsParsS[ii,:]
-        print obsParsIS[ii,:]
-        speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars[ii,:],showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig5_gal{}.{}".format(plotDir,ii,figExt),showPlot=showPlot)
-        
-    speclens.io.writeRec(speclens.io.parsToRec(inputPars),"{}/fig5_inputPars.fits".format(dataDir))
-    speclens.io.writeRec(speclens.io.parsToRec(obsParsI),"{}/fig5_obsParsI.fits".format(dataDir))
-    speclens.io.writeRec(speclens.io.parsToRec(obsParsS),"{}/fig5_obsParsS.fits".format(dataDir))
-    speclens.io.writeRec(speclens.io.parsToRec(obsParsIS),"{}/fig5_obsParsIS.fits".format(dataDir))
-
-
     
 if __name__ == "__main__":
 
@@ -317,7 +269,3 @@ if __name__ == "__main__":
     # Fig 4
     # parameter constraints from a number of noise realizations
     modelConstraintPlot(plotDir, figExt=figExt, showPlot=showPlot)
-
-    # Fig 5
-    # shear error distribution for ensemble
-    ensemblePlots(dataDir, plotDir, figExt=figExt, showPlot=showPlot)
