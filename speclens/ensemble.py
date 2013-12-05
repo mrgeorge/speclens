@@ -82,12 +82,14 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
     Returns:
         (xvals,yvals,vvals,ellObs,inputPars) tuple    
     """
-    
+
     inputPars=generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
 
     # first get imaging observables (with noise) to get PA for slit/ifu alignment
     ellObs=sim.ellModel(inputPars)
-    np.random.seed(100*seed)
+    if(seed is not None):
+        np.random.seed(100*seed)
+
     imNoise=np.random.randn(ellObs.size)*ellErr
     ellObs+=imNoise
 
