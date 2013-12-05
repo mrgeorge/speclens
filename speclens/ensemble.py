@@ -270,28 +270,3 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
     print np.std(dIS[good,:],axis=0)
 
     return (dI[good],dS[good],dIS[good],dIkde[good],dSkde[good],dISkde[good],hwI[good],hwS[good],hwIS[good],inputPars[good])
-
-def getScatterAll():
-    """Wrapper to getScatter to compare results for several ensembles"""
-
-    dataDir="/data/mgeorge/speclens/data/"
-
-    nGal=100
-
-    inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)]
-
-    convOpt=np.append(np.repeat(None,6),np.repeat("pixel",12))
-    nEnsemble=len(convOpt)
-    atmos_fwhm=np.append(np.repeat(None,6),np.repeat([0.5,1.4],6))
-    numFib=np.tile([6,10,100],6)
-    fibRad=np.tile([1.,0.5,0.5],6)
-    fibConvolve=np.append(np.repeat(False,6),np.repeat(True,12))
-    fibConfig=np.tile(["hexNoCen","slit","ifu"],6)
-    sigma=np.tile(np.repeat([5.,30.],3),3)
-    ellErr=np.tile(np.array([10.,0.1]),nEnsemble).reshape((nEnsemble,2))
-
-    for ii in range(nEnsemble):
-        subDir="opt_{}_{}_{}_{}_{}_{:d}_{}".format(fibConfig[ii],numFib[ii],fibRad[ii],atmos_fwhm[ii],sigma[ii],bool(fibConvolve[ii]),convOpt[ii])
-
-        print subDir
-        getScatter(dataDir+subDir+"/",nGal)
