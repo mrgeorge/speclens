@@ -316,9 +316,13 @@ def getMedPost(chain):
     return np.median(chain,axis=0)
 
 def get68(chain,opt="hw"):
-    """Return half-width of 16-84 percentile range in posterior PDF
+    """Return description of 16-84 percentile range in posterior PDF
 
-    For a gaussian distribution, this is 1-sigma
+    Inputs: opt - "hw" returns half-width. For a gaussian
+                       distribution, this is 1-sigma
+                  "low" returns the 16th percentile
+                  "high" returns the 84th percentile
+                  "lowhigh" returns a tuple (16th, 84th) percentile range
     """
     nSteps=len(chain)
     chainSort=np.sort(chain,axis=0)
