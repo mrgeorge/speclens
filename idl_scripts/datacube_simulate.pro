@@ -53,19 +53,22 @@ trans = interpol(atm_trans,lambda_trans,lambda_in,/lsq)
 return,trans
 end
 
-function galaxy_spectrum,lambda_in,z
+function galaxy_spectrum,lambda_in,z,atm_trans = atm_transmission
 common galaxy_template_block,lambda_template,template_spectrum
 ;dist should be in Mpc
 if n_elements(template_spectrum) eq 0 then begin
    template_struct = mrdfits('Galaxy_Spectra/kcorrect-templates.fits',1)
    lambda_template = template_struct.lambda
-   template_spectrum = template_struct.spec[*,2]*1e-8
+   template_spectrum = template_struct.spec[*,1]*1e-10
 endif
 z_fid = .50 ; -- which corresponds to this cosmological redshift; we need this for surface-brightness dimming.
 d_fid = lumdist(z_fid,H0=67.3, omega_m = 0.315, Lambda0 = (1-0.315),/silent)
 dist = lumdist(z,H0=67.3, omega_m = 0.315, Lambda0 = (1-0.315),/silent)
-spec = interpol(template_spectrum,lambda_template,lambda_in,/lsq) * (d_fid / dist)^2 * (1+z_fid)^4 /(1+z)^4
-atm_transmission = atmospheric_transmission(lambda_in)
+spec = interpol(template_spectrum,lambda_template,lambda_in) * (d_fid / dist)^2 * (1+z_fid)^4 /(1+z)^4
+if n_elements(atm_transmission) eq 0 then begin
+   atm_transmission = atmospheric_transmission(lambda_in) 
+endif
+
 spec = spec * atm_transmission
 return,spec * (d_fid / dist)^2 * (1+z_fid)^4 /(1+z)^4
 end
@@ -76,7 +79,7 @@ common galaxy_sky_block,lambda_sky,sky_spectrum
 if n_elements(sky_spectrum) eq 0 then begin
    readcol,'Sky_Spectra/kpno_sky.txt',l,sky
    lambda_sky = l
-   sky_spectrum = 10.^((21.572-sky)/2.5)*1e-16
+   sky_spectrum = 10.^((21.572-sky)/2.5)*1e-17
 endif
 sky_interp = interpol(sky_spectrum,lambda_sky,lambda_in,/lsq) ;This is in erg/s/cm^2/arcsec^2
 return,sky_interp
@@ -159,7 +162,7 @@ endfor
 return,spec
 end
 
-function add_noise,cube,lambda,texp,diameter=diameter
+function add_noise_poisson,cube,lambda,texp,diameter=diameter
 ;Assume that cube is in erg/s/cm^2, texp in s, and lambda in Angstroms
 ;Then, the number photon counts is cube[lambda] / (h * c / lambda)
 ;But this must be scaled up by the collecting area.
@@ -185,8 +188,31 @@ endfor
 return,new_cube
 end
 
+function add_noise_gaussian,cube,lambda,texp,diameter=diameter
+;Assume that cube is in erg/s/cm^2, texp in s, and lambda in Angstroms
+;Then, the number photon counts is cube[lambda] / (h * c / lambda)
+;But this must be scaled up by the collecting area.
+;assume 'diameter' is in meters
+if n_elements(diameter) eq 0 then diameter  = 8.
+area = !pi * (diameter*100.)^2
+
+h = 6.62607e-27 ;erg s
+c = 3e10 ;cm/s
+nlambda = n_elements(lambda)
+npix = ( size(cube[*,*,0],/dim))[0]
+new_cube = cube
+for i = 0L,nlambda-1 do begin
+   counts_2d = cube[*,*,i] / (h*c/lambda[i]) *  area
+   new_cube[*,*,i] = (sqrt(counts_2d)*randomn(seed,npix,npix) + counts_2d) * (h*c/lambda[i]) / area
+endfor
+return,new_cube
+end
+
+
+
 
 pro datacube_simulate,p,texp=texp
+time = systime(1)
 if n_elements(texp) eq 0 then texp = 1000.; exposure time
 ;Define a parameters vector:
 ;--------------------------------------------------
@@ -236,18 +262,24 @@ lambda_obs = lambda_obs_min + findgen(nlambda_obs)/float(nlambda_obs-1.)*(lambda
 lambda_rest = lambda_obs / (1. +p[4]) ;Shift into the rest frame of the galaxy
 
 ;Make the data cube.
+tcube = systime(1)
 cube = dblarr(npix,npix,nlambda_obs)
 for i = 0L,npix-1 do begin
    for j = 0L,npix-1 do begin
       zscale = vlos[i,j]/c
-      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4])*image[i,j]/total(image) * p[5]
+      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm) * p[5] *image[i,j]/total(image)
    endfor
 endfor
 
+print,'Making cube took: ',systime(1)-tcube
+
 ;Blur by the seeing.
+tblur = systime(1)
 cube_smeared = apply_seeing(cube)
+print,'Seeing took ',systime(1)-tblur
 
 ;Add the sky flux.
+tsky = systime(1)
 skyspec =  sky_spectrum(lambda_obs)
 sky_cube = cube * 0.
 for i = 0,npix-1 do begin
@@ -256,14 +288,22 @@ for i = 0,npix-1 do begin
       sky_cube[i,j,*] = skyspec
    endfor
 endfor
+print,'Making sky took: ',systime(1) - tsky
 
-;Add noise.
+;Blur to instrumental resolution.
+tres = systime(1)
 cube_resolved = instrumental_resolution(cube_smeared,lambda_obs, Resolution)
 sky_resolved = instrumental_resolution(sky_cube,lambda_obs, Resolution)
-cube_noisy = add_noise(cube_resolved,lambda_obs,texp)
-sky_noisy = add_noise(sky_resolved,lambda_obs,texp)
+print,'Instrumental resolution took:',systime(1)-tres
+
+;Add noise.
+tnoise = systime(1)
+cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp)
+sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp)
+print,'Adding noise took:',systime(1)-tnoise
 
 ;Next, measure a fiber spectrum.
+tfiber = systime(1)
 offset1 = 4*[-2.2*p[1]/sqrt(2),2.2*p[1]/sqrt(2)]
 offset2 = -offset1
 fibersize = 4.
@@ -271,15 +311,16 @@ spec1 = fiber(xgrid,ygrid,cube_noisy,offset1[0],offset1[1],fibersize)
 spec2 = fiber(xgrid,ygrid,cube_noisy,offset2[0],offset2[1],fibersize)
 speccen = fiber(xgrid,ygrid,cube_noisy,0.,0.,fibersize)
 sky_noisy_fiber = fiber(xgrid,ygrid,sky_noisy,0.,0.,fibersize)
+print,'Fiber measurements took: ',systime(1)-tfiber
 
 ;Finally, display the disk galaxy image, and show the fiber and slit
 ;footprints and spectra.
 
 psopen,'Plots/TF_fiber_slit_demo',xsize=6,ysize=6,/inches,/color
 prepare_plots,/color
-loadct,0
+loadct,0,/silent
 display,image,xgrid[*,0],ygrid[0,*],/aspect,max=max(image)*1.05,min=0.
-loadct,6
+loadct,6,/silent
 dist1 = sqrt((xgrid-offset1[0])^2 + (ygrid - offset1[1])^2)
 dist2 = sqrt((xgrid-offset2[0])^2 + (ygrid - offset2[1])^2)
 distcen = sqrt((xgrid)^2 + (ygrid)^2)
@@ -294,14 +335,15 @@ oplot,lambda_obs,spec2-sky_noisy_fiber,color=100
 oplot,lambda_obs,spec1-sky_noisy_fiber,color=20
 
 
-
+tslit = systime(1)
 slitspec_p = slit(xgrid,ygrid,cube_noisy,lambda_obs,p[3],slit = slit_struct)
 slitspec_c = slit(xgrid,ygrid,cube_noisy,lambda_obs,p[3]+!Pi/2.,slit = slit_struct)
+print,'Slit spectroscopy took:',systime(1)-tslit
 
 
-loadct,0
+loadct,0,/silent
 display,image,/aspect,max=max(image)*1.05,min=0.
-loadct,6
+loadct,6,/silent
 xgrid_rot_p = xgrid * cos(p[3]) + ygrid*sin(p[3])
 xgrid_rot_c = xgrid * cos(p[3]+!Pi/2.) + ygrid*sin(p[3]+!Pi/2.)
 contour,abs(xgrid_rot_p),/overplot,level=slit_struct.slit_width,color=200
@@ -316,16 +358,16 @@ for i =0,npix-1 do begin
    sky_subtracted_p[i,*] = slitspec_p[i,*]  - sky_region_p
    sky_subtracted_c[i,*] = slitspec_c[i,*]  - sky_region_c
 endfor
-loadct,0
-display,sky_subtracted_p,findgen(npix),lambda_obs,$
+loadct,0,/silent
+display,sky_subtracted_p,findgen(npix),lambda_obs,/silent,$
         ytitle='wavelength ('+string(197B)+')',charsize=1.5,min=0.
 
-display,sky_subtracted_c,findgen(npix),lambda_obs,$
+display,sky_subtracted_c,findgen(npix),lambda_obs,/silent,$
         ytitle='wavelength ('+string(197B)+')',charsize=1.5,min=0.
 
 psclose
 prepare_plots,/reset
 
-
+print,'Total runtime:',systime(1)-time
 stop
 end
