@@ -430,6 +430,16 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
 
     return (vmapArr,fluxVMapArr,imgArr)
 
+def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac, gal_q, gal_beta):
+    """Draw a galaxy image using Bessel functions
+
+    Follows Spergel 2010 to generate analytic surface brightness
+    profiles. To be tested against galsim approach.
+    """
+
+    pass # to do - port Eric's IDL functions disk_galaxy_image and exp_2d
+
+    
 def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA):
     """Construct the fiber x PSF convolution kernel
 
