@@ -41,9 +41,9 @@ function disk_galaxy_image,x,y,r0,inclination,position_angle,rcut=rcut,xcen=xcen
   return,image
 end
 
-function atmospheric_transmission,lambda_in
+function atmospheric_transmission,lambda_in, reset=reset
 COMMON atm_BLOCK,lambda_trans,atm_trans
-if n_elements(atm_trans) eq 0 then begin
+if (n_elements(atm_trans) eq 0) OR keyword_set(reset) then begin
    file = './Atm_Transmission/atmtrans_default.dat'
    readcol,file,l,atmt
    lambda_trans = l
@@ -53,11 +53,11 @@ trans = interpol(atm_trans,lambda_trans,lambda_in,/lsq)
 return,trans
 end
 
-function galaxy_spectrum,lambda_in,z,atm_trans = atm_transmission
+function galaxy_spectrum,lambda_in,z,atm_trans = atm_transmission, reset=reset
 common galaxy_template_block,lambda_template,template_spectrum
 ;dist should be in Mpc
-if n_elements(template_spectrum) eq 0 then begin
-   template_struct = mrdfits('Galaxy_Spectra/kcorrect-templates.fits',1)
+if (n_elements(template_spectrum) eq 0) OR keyword_set(reset) then begin
+   template_struct = mrdfits('Galaxy_Spectra/kcorrect-templates.fits',1,/silent)
    lambda_template = template_struct.lambda
    template_spectrum = template_struct.spec[*,1]*1e-10
 endif
@@ -74,9 +74,9 @@ return,spec * (d_fid / dist)^2 * (1+z_fid)^4 /(1+z)^4
 end
 
 
-function sky_spectrum,lambda_in
+function sky_spectrum,lambda_in,reset=reset
 common galaxy_sky_block,lambda_sky,sky_spectrum
-if n_elements(sky_spectrum) eq 0 then begin
+if (n_elements(sky_spectrum) eq 0) OR keyword_set(reset) then begin
    readcol,'Sky_Spectra/kpno_sky.txt',l,sky
    lambda_sky = l
    sky_spectrum = 10.^((21.572-sky)/2.5)*1e-17
@@ -133,7 +133,6 @@ return, cube_resolved
 end
 
 
-
 function slit,xgrid,ygrid,cube,lambda_obs,slit_angle,slit_struct=slit_struct
   if n_elements(slit_struct) eq 0 then begin
      slit_struct = create_struct('lambda_min',5000.,'lambda_max',6000.,'delta_lambda',1.,$
@@ -150,17 +149,6 @@ function slit,xgrid,ygrid,cube,lambda_obs,slit_angle,slit_struct=slit_struct
   return,slitspec
 end
 
-function fiber,xgrid,ygrid,cube,xcenter,ycenter,width
-dist = sqrt((xgrid -xcenter)^2 +(ygrid - ycenter)^2)
-fiber_inds = where(dist le width,ct)
-
-for i = 0L,ct-1 do begin
-   thisindex = array_indices(dist,fiber_inds[i])
-   if i eq 0 then spec = cube[thisindex[0],thisindex[1],*]
-   if i ne 0 then spec = spec + cube[thisindex[0],thisindex[1],*]
-endfor
-return,spec
-end
 
 function add_noise_poisson,cube,lambda,texp,diameter=diameter
 ;Assume that cube is in erg/s/cm^2, texp in s, and lambda in Angstroms
@@ -211,17 +199,20 @@ end
 
 
 
-pro datacube_simulate,p,texp=texp
+function datacube_simulate,p,texp=texp,sky_cube = sky_noisy, image = image, lambda = lambda_obs, $
+                           xgrid = xgrid, ygrid = ygrid,nonoise=nonoise
 time = systime(1)
 if n_elements(texp) eq 0 then texp = 1000.; exposure time
 ;Define a parameters vector:
 ;--------------------------------------------------
-;These first parameters govern the image.
+;These first parameters are for the image.
 ;--------------------------------------------------
 ;p[0] = galaxy Luminosity
 ;p[1] = scale radius
 ;p[2] = inclination angle (rad)
 ;p[3] = position angle (rad)
+;--------------------------------------------------
+;These next parameters create the spectrum.
 ;--------------------------------------------------
 ;p[4] = redshift
 ;p[5] = line intensity.
@@ -266,17 +257,17 @@ tcube = systime(1)
 cube = dblarr(npix,npix,nlambda_obs)
 for i = 0L,npix-1 do begin
    for j = 0L,npix-1 do begin
+      reset = (i eq 0) AND (j eq 0)
       zscale = vlos[i,j]/c
-      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm) * p[5] *image[i,j]/total(image)
+      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm, reset = reset) * p[5] *image[i,j]/total(image)
    endfor
 endfor
 
-print,'Making cube took: ',systime(1)-tcube
 
 ;Blur by the seeing.
 tblur = systime(1)
 cube_smeared = apply_seeing(cube)
-print,'Seeing took ',systime(1)-tblur
+
 
 ;Add the sky flux.
 tsky = systime(1)
@@ -288,19 +279,26 @@ for i = 0,npix-1 do begin
       sky_cube[i,j,*] = skyspec
    endfor
 endfor
-print,'Making sky took: ',systime(1) - tsky
 
 ;Blur to instrumental resolution.
 tres = systime(1)
 cube_resolved = instrumental_resolution(cube_smeared,lambda_obs, Resolution)
 sky_resolved = instrumental_resolution(sky_cube,lambda_obs, Resolution)
-print,'Instrumental resolution took:',systime(1)-tres
 
 ;Add noise.
+if ~keyword_set(nonoise) then begin
 tnoise = systime(1)
-cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp)
-sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp)
-print,'Adding noise took:',systime(1)-tnoise
+   cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp)
+   sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp)
+endif else begin
+   cube_noisy = cube_resolved
+   sky_noisy = sky_resolved
+endelse
+
+
+
+return,cube_noisy
+end
 
 ;Next, measure a fiber spectrum.
 tfiber = systime(1)
@@ -311,7 +309,6 @@ spec1 = fiber(xgrid,ygrid,cube_noisy,offset1[0],offset1[1],fibersize)
 spec2 = fiber(xgrid,ygrid,cube_noisy,offset2[0],offset2[1],fibersize)
 speccen = fiber(xgrid,ygrid,cube_noisy,0.,0.,fibersize)
 sky_noisy_fiber = fiber(xgrid,ygrid,sky_noisy,0.,0.,fibersize)
-print,'Fiber measurements took: ',systime(1)-tfiber
 
 ;Finally, display the disk galaxy image, and show the fiber and slit
 ;footprints and spectra.
@@ -338,7 +335,6 @@ oplot,lambda_obs,spec1-sky_noisy_fiber,color=20
 tslit = systime(1)
 slitspec_p = slit(xgrid,ygrid,cube_noisy,lambda_obs,p[3],slit = slit_struct)
 slitspec_c = slit(xgrid,ygrid,cube_noisy,lambda_obs,p[3]+!Pi/2.,slit = slit_struct)
-print,'Slit spectroscopy took:',systime(1)-tslit
 
 
 loadct,0,/silent
@@ -368,6 +364,5 @@ display,sky_subtracted_c,findgen(npix),lambda_obs,/silent,$
 psclose
 prepare_plots,/reset
 
-print,'Total runtime:',systime(1)-time
 stop
 end
