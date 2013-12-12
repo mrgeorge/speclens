@@ -235,6 +235,25 @@ def getInclination(gal_q):
     """
     return np.arccos(gal_q) # radians
 
+def convertInclination(galBA=None, galCA=None, inc=None):
+    """Convert between inclination and 3d axis ratios
+
+    Given 2 of 3 args, return the 3rd
+    """
+    assert((galBA is None) + (galCA is None) + (inc is None) == 1)
+
+    if(galBA is None):
+        galBA = np.sqrt(1. - np.sin(inc)**2 * (1. - galCA**2))
+        return galBA
+    elif(galCA is None):
+        galCA = np.sqrt(1. - (1. - galBA**2)/np.sin(inc)**2)
+        return galCA
+    else:
+        inc = np.arcsin(np.sqrt((1. - galBA**2)/(1. - galCA**2)))
+        return inc
+
+    # how is galBA related to observed BA?
+        
 def getOmega(rad,pars,option='flat'):
     """Return angular rotation rate, i.e. v(r)/r
 
