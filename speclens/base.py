@@ -45,7 +45,7 @@ class Observation(object):
             self.galaxy.diskRadius, self.galaxy.bulgeFraction,
             np.cos(np.deg2rad(self.diskInclination)), self.diskPA,
             self.galaxy.diskFlux, "flat", [self.galaxy.diskVCirc],
-            self.g1, seqlf.g2)
+            self.g1, self.g2)
         self.vmap=vmapArr
         self.fvmap=fluxVMapArr
         self.image=imgArr
