@@ -238,7 +238,13 @@ def getInclination(gal_q):
 def convertInclination(galBA=None, galCA=None, inc=None):
     """Convert between inclination and 3d axis ratios
 
-    Given 2 of 3 args, return the 3rd
+    Given 2 of 3 inputs, return the 3rd
+    
+    Input: 
+        galBA - projected minor/major axis ratio (i.e. the imaging
+                observable)
+        galCA - edge-on disk thickness/major axis ratio
+        inc - disk inclination in radians (0 = face on)
     """
     assert((galBA is None) + (galCA is None) + (inc is None) == 1)
 
@@ -252,8 +258,6 @@ def convertInclination(galBA=None, galCA=None, inc=None):
         inc = np.arcsin(np.sqrt((1. - galBA**2)/(1. - galCA**2)))
         return inc
 
-    # how is galBA related to observed BA?
-        
 def getOmega(rad,pars,option='flat'):
     """Return angular rotation rate, i.e. v(r)/r
 
