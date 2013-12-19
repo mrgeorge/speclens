@@ -227,14 +227,6 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-
-def getInclination(gal_q):
-    """Return inclination in radians for a flat think disk
-
-    See http://eo.ucar.edu/staff/dward/sao/spirals/methods.htm
-    """
-    return np.arccos(gal_q) # radians
-
 def convertInclination(galBA=None, galCA=None, inc=None):
     """Convert between inclination and 3d axis ratios
 
@@ -280,7 +272,7 @@ def getOmega(rad,pars,option='flat'):
         vel=np.sqrt(mass/rad)
         return pars[0]*vel/rad
 
-def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
+def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
     """Construct galsim objects for image, velocity map, and flux-weighted velocity map.
 
     Inputs:
@@ -289,7 +281,8 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
         disk_n - disk Sersic index
         disk_r - disk half-light radius
         bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
-        gal_q - axis ratio
+        gal_q - projected image axis ratio
+        gal_thick - edge-on axis ratio
         gal_beta - position angle in degrees
         gal_flux - normalization of image flux
         atmos_fwhm - FWHM of gaussian PSF
@@ -333,7 +326,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=getInclination(gal_q)
+    inc=convertInclination(galBA=gal_q, galCA=gal_thick)
     sini=np.sin(inc)
     tani=np.tan(inc)
     gal_beta_rad=np.deg2rad(gal_beta)
@@ -375,7 +368,7 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux
 
     return (vmap,fluxVMap,gal)
 
-def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2):
+def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2):
     """Construct pixel arrays for image, velocity map, and flux-weighted velocity map.
 
     Inputs:
@@ -384,7 +377,8 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
         disk_n - disk Sersic index
         disk_r - disk half-light radius
         bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
-        gal_q - axis ratio
+        gal_q - projected image axis ratio
+        gal_thick - edge-on axis ratio
         gal_beta - position angle in degrees
         gal_flux - normalization of image flux
         rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
@@ -427,7 +421,7 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=getInclination(gal_q)
+    inc=convertInclination(galBA=gal_q, galCA=gal_thick)
     sini=np.sin(inc)
     tani=np.tan(inc)
     gal_beta_rad=np.deg2rad(gal_beta)
@@ -454,7 +448,7 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flu
     return (vmapArr,fluxVMapArr,imgArr)
 
 def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
-                    gal_q, gal_beta, gal_ca): 
+                    gal_q, gal_thick, gal_beta, gal_ca): 
     """Draw a galaxy image using Bessel functions
 
     Follows Spergel 2010 to generate analytic surface brightness
@@ -468,7 +462,7 @@ def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
     yp_disk = -xx * np.sin(gal_beta_rad) + yy * np.cos(gal_beta_rad)
     phi_r = np.arctan2(yp_disk,xp_disk)
     rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
-    eps_disk = np.sqrt(1.-(1.-gal_ca**2)*np.cos(getInclination(gal_q))**2)
+    eps_disk = np.sqrt(1.-(1.-gal_ca**2)*np.cos(convertInclination(galBA=gal_q,galCA=gal_thick))**2)
     uu_disk = (rr_disk*pixScale)/disk_r*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/np.sqrt(1.-eps_disk**2))
     nu_disk = 0.5
     f_disk = (uu_disk/2.)**nu_disk*scipy.special.kv(nu_disk,uu_disk)/scipy.special.gamma(nu_disk+1.)
@@ -559,7 +553,7 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
     Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
     """
 
-    gal_beta,gal_q,vmax,g1,g2=pars
+    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
     
     numFib=xobs.size
     bulge_n=4.
@@ -571,7 +565,7 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
     rotCurvePars=np.array([vmax])
 
     if(convOpt=="galsim"):
-        vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+        vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
 
         if(showPlot):
             plot.showImage(gal,xobs,yobs,fibRad,showPlot=True)
@@ -583,7 +577,7 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
         vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
 
     elif(convOpt=="pixel"):
-        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
+        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
         if(showPlot):
             plot.showArr(imgArr)
             plot.showArr(fluxVMapArr)
@@ -596,7 +590,7 @@ def vmapModel(pars, xobs, yobs):
     """Evaluate model velocity field at given coordinates
 
     Inputs:
-        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+        pars - [gal_beta, gal_q, gal_thick, vmax, g1, g2] *unsheared* values
         xobs, yobs - the N positions (in arcsec) relative to the center at which
                      the *sheared* (observed) field is sampled
     Returns:
@@ -606,7 +600,7 @@ def vmapModel(pars, xobs, yobs):
 
     Note: vmapModel is like vmapObs without PSF and fiber convolution
     """
-    gal_beta,gal_q,vmax,g1,g2=pars
+    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
 
     # compute spectroscopic observable
     if(xobs is not None):
@@ -623,7 +617,7 @@ def vmapModel(pars, xobs, yobs):
         # projection along apparent major axis in rotated coords
         kvec=np.array([1,0,0])
     
-        inc=getInclination(gal_q)
+        inc=convertInclination(galBA=gal_q, galCA=gal_thick)
         sini=np.sin(inc)
         tani=np.tan(inc)
 
@@ -646,7 +640,7 @@ def ellModel(pars):
         ndarray([gal_beta, gal_q]) *sheared* values
     """
 
-    gal_beta,gal_q,vmax,g1,g2=pars
+    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
 
     disk_r=1. # we're not modeling sizes now
     ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
