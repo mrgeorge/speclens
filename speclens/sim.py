@@ -448,7 +448,7 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_be
     return (vmapArr,fluxVMapArr,imgArr)
 
 def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
-                    gal_q, gal_thick, gal_beta, gal_ca): 
+                    gal_q, gal_thick, gal_beta):
     """Draw a galaxy image using Bessel functions
 
     Follows Spergel 2010 to generate analytic surface brightness
@@ -462,7 +462,7 @@ def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
     yp_disk = -xx * np.sin(gal_beta_rad) + yy * np.cos(gal_beta_rad)
     phi_r = np.arctan2(yp_disk,xp_disk)
     rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
-    eps_disk = np.sqrt(1.-(1.-gal_ca**2)*np.cos(convertInclination(galBA=gal_q,galCA=gal_thick))**2)
+    eps_disk = np.sqrt(1.-(1.-gal_thick**2)*np.cos(convertInclination(galBA=gal_q,galCA=gal_thick))**2)
     uu_disk = (rr_disk*pixScale)/disk_r*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/np.sqrt(1.-eps_disk**2))
     nu_disk = 0.5
     f_disk = (uu_disk/2.)**nu_disk*scipy.special.kv(nu_disk,uu_disk)/scipy.special.gamma(nu_disk+1.)
