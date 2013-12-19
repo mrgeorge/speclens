@@ -435,7 +435,7 @@ def makeGalVMap2(model):
     xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
     yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
-    vmapArr=getOmega(radNorm,model.rotCurvePars,option=model.rotCurveOpt) * sini * xp
+    vmapArr=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
 
     # Weight velocity map by galaxy flux
     fluxVMapArr=vmapArr*imgArr
@@ -579,38 +579,37 @@ def vmapObs(model,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=No
 
     return vmapFibFlux/galFibFlux
 
-def vmapModel(pars, xobs, yobs):
+def vmapModel(model, xobs, yobs):
     """Evaluate model velocity field at given coordinates
 
     Inputs:
-        pars - [gal_beta, gal_q, gal_thick, vmax, g1, g2] *unsheared* values
+        model - object with these values 
+          [galPA, galBA, galCA, rotCurvePars rotCurveOpt, g1, g2] 
+          *unsheared* values
         xobs, yobs - the N positions (in arcsec) relative to the center at which
                      the *sheared* (observed) field is sampled
     Returns:
-        (vmodel, ellmodel)
-            vmodel is an N array of fiber velocities
-            ellmodel is the array of sheared imaging observables (gal_beta,gal_q)
+        vmodel is an N array of fiber velocities
 
     Note: vmapModel is like vmapObs without PSF and fiber convolution
     """
-    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
 
     # compute spectroscopic observable
     if(xobs is not None):
         # convert coords to source plane
-        pairs=shearPairs(np.array(zip(xobs,yobs)),-g1,-g2)
+        pairs=shearPairs(np.array(zip(xobs,yobs)),-model.g1,-model.g2)
         xx=pairs[:,0]
         yy=pairs[:,1]
 
         # rotated coords aligned with PA guess of major axis
         xCen,yCen=0,0 # assume centroid is well-measured
-        PArad=np.deg2rad(gal_beta)
+        PArad=np.deg2rad(model.galPA)
         xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
         yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
         # projection along apparent major axis in rotated coords
         kvec=np.array([1,0,0])
     
-        inc=convertInclination(galBA=gal_q, galCA=gal_thick)
+        inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
         sini=np.sin(inc)
         tani=np.tan(inc)
 
@@ -618,26 +617,25 @@ def vmapModel(pars, xobs, yobs):
         nSamp=xobs.size
         vmodel=np.zeros(nSamp)
         radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
-        vmodel=getOmega(radNorm,rotCurvePars,option="flat") * sini * xp
+        vmodel=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
     else:
         vmodel=None
 
     return vmodel
 
-def ellModel(pars):
+def ellModel(model):
     """Compute sheared ellipse pars for a model galaxy
 
     Inputs:
-        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+        model - object with these values 
+          [galPA, galBA, galCA, rotCurvePars rotCurveOpt, g1, g2] 
+          *unsheared* values
     Returns:
         ndarray([gal_beta, gal_q]) *sheared* values
     """
 
-    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
-
-    disk_r=1. # we're not modeling sizes now
-    ellipse=(disk_r,gal_q,gal_beta) # unsheared ellipse
-    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,g1,g2)
+    ellipse=(model.diskRadius,model.galBA,model.galPA) # unsheared ellipse
+    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,model.g1,model.g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
     return ellmodel
