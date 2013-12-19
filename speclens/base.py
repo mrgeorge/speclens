@@ -5,17 +5,17 @@ class Galaxy(object):
     """Galaxy class defining intrinsic parameters of a galaxy object"""
 
     def __init__(self, diskRadius=1., diskVRadius=2.2, diskCA=0.2,
-                 diskSersic=1., diskVCirc=200., diskFlux=1.,
-                 bulgeFraction=0., bulgeRadius=1., bulgeSersic=4.):
+                 diskSersic=1., diskVCirc=200., bulgeFraction=0.,
+                 bulgeRadius=1., bulgeSersic=4., galFlux=1.):
         self.diskRadius=diskRadius
         self.diskVRadius=diskVRadius
         self.diskCA=diskCA
         self.diskSersic=diskSersic
         self.diskVCirc=diskVCirc
-        self.diskFlux=diskFlux
         self.bulgeFraction=bulgeFraction
         self.bulgeRadius=bulgeRadius
         self.bulgeSersic=bulgeSersic
+        self.galFlux=galFlux
 
 class Observation(object):
     """Observation class takes a galaxy and produces observables"""
@@ -41,7 +41,7 @@ class Observation(object):
             self.galaxy.bulgeRadius, self.galaxy.diskSersic,
             self.galaxy.diskRadius, self.galaxy.bulgeFraction,
             np.cos(np.deg2rad(self.diskInclination)), self.diskPA,
-            self.galaxy.diskFlux, "flat", [self.galaxy.diskVCirc],
+            self.galaxy.galFlux, "flat", [self.galaxy.diskVCirc],
             self.g1, self.g2)
         self.vmap=vmapArr
         self.fvmap=fluxVMapArr
@@ -96,8 +96,9 @@ class Model(object):
             """
             self.pars=[self.diskPA, self.diskBA, self.vCirc, self.g1, self.g2]
             self.labels=np.array(["PA","b/a","vmax","g1","g2"])
-            self.guess=np.array([10.,0.1,100.,0.,0.])
-            self.guessScale=np.array([10.,0.3,50.,0.02,0.02])
+            self.guess=np.array([10.,0.1,200.,0.,0.])
+            self.guessScale=np.array([30.,0.3,50.,0.02,0.02])
+            self.priors=[None,[0.01,0.99],(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
 
         else:
             raise ValueError(name)
@@ -107,10 +108,10 @@ class Model(object):
         self.diskVRadius=2.2
         self.diskCA=0.2
         self.diskSersic=1.
-        self.diskFlux=1.
         self.bulgeFraction=0.
         self.bulgeRadius=1.
         self.bulgeSersic=4.
+        self.galFlux=1.
         self.rotCurveOpt="flat"
         self.rotCurvePars=[200.]
         self.vCirc=self.rotCurvePars[0]
@@ -128,9 +129,3 @@ class Model(object):
         self.vSampPA=self.diskPA
         self.vSampConvolve=True
         self.convOpt="pixel"
-            
-    def fixPars(self, fixed):
-        self.fixed=fixed
-
-    def setPriors(self, priors):
-        self.priors=priors
