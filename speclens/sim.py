@@ -250,46 +250,48 @@ def convertInclination(galBA=None, galCA=None, inc=None):
         inc = np.arcsin(np.sqrt((1. - galBA**2)/(1. - galCA**2)))
         return inc
 
-def getOmega(rad,pars,option='flat'):
+def getOmega(rad,rotCurvePars,rotCurveOpt='flat'):
     """Return angular rotation rate, i.e. v(r)/r
 
     Inputs:
         rad - ndarray of radii at which to sample
-        pars - float or array of option-dependent rotation curve parameters
-        option - "flat", "solid", or "nfw" (default "flat")
+        rotCurvePars - float or array of option-dependent rotation curve parameters
+        rotCurveOpt - "flat", "solid", or "nfw" (default "flat")
     Returns:
         omega - ndarray same length as rad with rotation rates
     """
 
-    if(option=='flat'): # v(r)=pars[0]
-        return pars[0]/rad
-    elif(option=='solid'): # v(r)=pars[0]*rad/pars[1]
-        return pars[0]/pars[1]
-    elif(option=='nfw'):
+    if(rotCurveOpt=='flat'): # v(r)=rotCurvePars[0]
+        return rotCurvePars[0]/rad
+    elif(rotCurveOpt=='solid'): # v(r)=rotCurvePars[0]*rad/rotCurvePars[1]
+        return rotCurvePars[0]/rotCurvePars[1]
+    elif(rotCurveOpt=='nfw'):
         # v ~ sqrt(M(<r)/r)
         # M(<r) ~ [log(1 + r/rs) - r/(r+rs)]
-        mass=np.log(1.+rad/pars[1]) - rad/(rad+pars[1])
+        mass=np.log(1.+rad/rotCurvePars[1]) - rad/(rad+rotCurvePars[1])
         vel=np.sqrt(mass/rad)
-        return pars[0]*vel/rad
+        return rotCurvePars[0]*vel/rad
 
-def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2):
+def makeGalVMap(model):
     """Construct galsim objects for image, velocity map, and flux-weighted velocity map.
 
-    Inputs:
-        bulge_n - bulge Sersic index
-        bulge_r - bulge half-light radius
-        disk_n - disk Sersic index
-        disk_r - disk half-light radius
-        bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
-        gal_q - projected image axis ratio
-        gal_thick - edge-on axis ratio
-        gal_beta - position angle in degrees
-        gal_flux - normalization of image flux
-        atmos_fwhm - FWHM of gaussian PSF
+    Inputs (model object must contain the following):
+        bulgeSersic - bulge Sersic index
+        bulgeRadius - bulge half-light radius
+        diskSersic - disk Sersic index
+        diskRadius - disk half-light radius
+        bulgeFraction - bulge fraction (0=pure disk, 1=pure bulge)
+        galBA - projected image axis ratio
+        galCA - edge-on axis ratio
+        galPA - position angle in degrees
+        galFlux - normalization of image flux
+        atmosFWHM - FWHM of gaussian PSF
         rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
+        pixScale - arcseconds per pixel
+        nPix - number of pixels per side of each image
     Returns:
         (vmap,fluxVMap,gal) - tuple of galsim objects
 
@@ -297,26 +299,26 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_bet
     """
     
     # Define the galaxy velocity map
-    if(0 < bulge_frac < 1):
-        bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
-        disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
+    if(0 < model.bulgeFraction < 1):
+        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
+        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
 
-        gal=bulge_frac * bulge + (1.-bulge_frac) * disk
-    elif(bulge_frac == 0):
-        gal=galsim.Sersic(disk_n, half_light_radius=disk_r)
-    elif(bulge_frac == 1):
-        gal=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
+    elif(model.bulgeFraction == 0):
+        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+    elif(model.bulgeFraction == 1):
+        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
 
-    gal.setFlux(gal_flux)
+    gal.setFlux(model.galFlux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
+    gal_shape=galsim.Shear(q=model.galBA, beta=model.galPA*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
-    halfWidth=0.5*imgSizePix*pixScale
-    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
-    galImg=gal.draw(image=imgFrame,dx=pixScale)
+    halfWidth=0.5*model.nPix*model.pixScale
+    imgFrame=galsim.ImageF(model.nPix,model.nPix)
+    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
     imgArr=galImg.array.copy()   # must store these arrays as copies to avoid overwriting with shared imgFrame
 
     vmapArr=np.zeros_like(imgArr)
@@ -326,17 +328,17 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_bet
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=convertInclination(galBA=gal_q, galCA=gal_thick)
+    inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(gal_beta)
+    gal_beta_rad=np.deg2rad(model.galPA)
 
     # Fill velocity map array
     xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
     xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
     yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
-    vmapArr=getOmega(radNorm,rotCurvePars,option=rotCurveOpt) * sini * xp
+    vmapArr=getOmega(radNorm,model.rotCurvePars,option=model.rotCurveOpt) * sini * xp
     vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
 
     # Weight velocity map by galaxy flux and make galsim object
@@ -348,43 +350,45 @@ def makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_bet
         fluxVMapArr/=sumFVM
         gal.scaleFlux(1./sumFVM)
 
-    fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=pixScale)
+    fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=model.pixScale)
     fluxVMap=galsim.InterpolatedImage(fluxVMapImg,pad_factor=6.)
-    vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=pixScale)) # not flux-weighted
+    vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=model.pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
-    if((g1 != 0.) | (g2 != 0.)):
-        gal.applyShear(g1=g1,g2=g2)
-        fluxVMap.applyShear(g1=g1,g2=g2)
-        vmap.applyShear(g1=g1,g2=g2)
+    if((model.g1 != 0.) | (model.g2 != 0.)):
+        gal.applyShear(g1=model.g1,g2=model.g2)
+        fluxVMap.applyShear(g1=model.g1,g2=model.g2)
+        vmap.applyShear(g1=model.g1,g2=model.g2)
 
     # Convolve velocity map and galaxy with PSF
-    if(atmos_fwhm > 0):
+    if(model.atmosFWHM > 0):
         # Define atmospheric PSF
         #    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
-        atmos=galsim.Gaussian(fwhm=atmos_fwhm)
+        atmos=galsim.Gaussian(fwhm=model.atmosFWHM)
         fluxVMap=galsim.Convolve([atmos, fluxVMap])
         gal=galsim.Convolve([atmos, gal])
 
     return (vmap,fluxVMap,gal)
 
-def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2):
+def makeGalVMap2(model):
     """Construct pixel arrays for image, velocity map, and flux-weighted velocity map.
 
-    Inputs:
-        bulge_n - bulge Sersic index
-        bulge_r - bulge half-light radius
-        disk_n - disk Sersic index
-        disk_r - disk half-light radius
-        bulge_frac - bulge fraction (0=pure disk, 1=pure bulge)
-        gal_q - projected image axis ratio
-        gal_thick - edge-on axis ratio
-        gal_beta - position angle in degrees
-        gal_flux - normalization of image flux
+    Inputs (model object must contain the following):
+        bulgeSersic - bulge Sersic index
+        bulgeRadius - bulge half-light radius
+        diskSersic - disk Sersic index
+        diskRadius - disk half-light radius
+        bulgeFraction - bulge fraction (0=pure disk, 1=pure bulge)
+        galBA - projected image axis ratio
+        galCA - edge-on axis ratio
+        galPA - position angle in degrees
+        galFlux - normalization of image flux
         rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
+        pixScale - arcseconds per pixel
+        nPix - number of pixels per side of each image
     Returns:
         (vmapArr,fluxVMapArr,imgArr) - tuple of ndarray images
 
@@ -392,26 +396,26 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_be
     """
 
     # Define the galaxy velocity map
-    if(0 < bulge_frac < 1):
-        bulge=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
-        disk=galsim.Sersic(disk_n, half_light_radius=disk_r)
+    if(0 < model.bulgeFraction < 1):
+        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
+        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
 
-        gal=bulge_frac * bulge + (1.-bulge_frac) * disk
-    elif(bulge_frac == 0):
-        gal=galsim.Sersic(disk_n, half_light_radius=disk_r)
-    elif(bulge_frac == 1):
-        gal=galsim.Sersic(bulge_n, half_light_radius=bulge_r)
+        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
+    elif(model.bulgeFraction == 0):
+        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+    elif(model.bulgeFraction == 1):
+        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
 
-    gal.setFlux(gal_flux)
+    gal.setFlux(model.galFlux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=gal_q, beta=gal_beta*galsim.degrees)
+    gal_shape=galsim.Shear(q=model.galBA, beta=model.galPA*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
-    halfWidth=0.5*imgSizePix*pixScale
-    imgFrame=galsim.ImageF(imgSizePix,imgSizePix)
-    galImg=gal.draw(image=imgFrame,dx=pixScale)
+    halfWidth=0.5*model.nPix*model.pixScale
+    imgFrame=galsim.ImageF(model.nPix,model.nPix)
+    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
     imgArr=galImg.array.copy()    # must store these arrays as copies to avoid overwriting with shared imgFrame
 
     vmapArr=np.zeros_like(imgArr)
@@ -421,24 +425,24 @@ def makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_be
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=convertInclination(galBA=gal_q, galCA=gal_thick)
+    inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(gal_beta)
+    gal_beta_rad=np.deg2rad(model.galPA)
 
     # Fill velocity map array
     xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
     xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
     yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
-    vmapArr=getOmega(radNorm,rotCurvePars,option=rotCurveOpt) * sini * xp
+    vmapArr=getOmega(radNorm,model.rotCurvePars,option=model.rotCurveOpt) * sini * xp
 
     # Weight velocity map by galaxy flux
     fluxVMapArr=vmapArr*imgArr
 
     # Apply lensing shear to galaxy and velocity maps
-    if((g1 != 0.) | (g2 != 0.)):
-        shear=np.array([[1-g1,-g2],[-g2,1+g1]])/np.sqrt(1.-g1**2-g2**2)
+    if((model.g1 != 0.) | (model.g2 != 0.)):
+        shear=np.array([[1-model.g1,-model.g2],[-model.g2,1+model.g1]])/np.sqrt(1.-model.g1**2-model.g2**2)
         xs=shear[0,0]*(xx-xCen) + shear[0,1]*(yy-yCen) + xCen
         ys=shear[1,0]*(xx-xCen) + shear[1,1]*(yy-yCen) + yCen
         vmapArr=scipy.ndimage.map_coordinates(vmapArr.T,(xs,ys))
@@ -527,7 +531,7 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA
         
     return kernel
 
-def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=None,fibRad=None,fibConvolve=False,kernel=None):
+def vmapObs(model,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=None,fibRad=None,fibConvolve=False,kernel=None):
     """Get flux-weighted fiber-averaged velocities
 
     vmapObs computes fiber sampling in two ways, depending on convOpt
@@ -553,36 +557,25 @@ def vmapObs(pars,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=Non
     Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
     """
 
-    gal_beta,gal_q,gal_thick,vmax,g1,g2=pars
-    
-    numFib=xobs.size
-    bulge_n=4.
-    bulge_r=1.
-    disk_n=1.
-    bulge_frac=0.
-    gal_flux=1.e6
-    rotCurveOpt="flat"
-    rotCurvePars=np.array([vmax])
-
     if(convOpt=="galsim"):
-        vmap,fluxVMap,gal=makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+        vmap,fluxVMap,gal=makeGalVMap(model)
 
         if(showPlot):
-            plot.showImage(gal,xobs,yobs,fibRad,showPlot=True)
-            plot.showImage(vmap,xobs,yobs,fibRad,showPlot=True)
-            plot.showImage(fluxVMap,xobs,yobs,fibRad,showPlot=True)
+            plot.showImage(gal,xobs,yobs,model.vSampSize,showPlot=True)
+            plot.showImage(vmap,xobs,yobs,model.vSampSize,showPlot=True)
+            plot.showImage(fluxVMap,xobs,yobs,model.vSampSize,showPlot=True)
 
         # Get the flux in each fiber
-        galFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,gal)
-        vmapFibFlux=getFiberFluxes(xobs,yobs,fibRad,fibConvolve,fluxVMap)
+        galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal)
+        vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap)
 
     elif(convOpt=="pixel"):
-        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_thick,gal_beta,gal_flux,rotCurveOpt,rotCurvePars,g1,g2)
+        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(model)
         if(showPlot):
             plot.showArr(imgArr)
             plot.showArr(fluxVMapArr)
-        vmapFibFlux=np.array([np.sum(kernel[ii]*fluxVMapArr) for ii in range(numFib)])
-        galFibFlux=np.array([np.sum(kernel[ii]*imgArr) for ii in range(numFib)])
+        vmapFibFlux=np.array([np.sum(kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
+        galFibFlux=np.array([np.sum(kernel[ii]*imgArr) for ii in range(model.nVSamp)])
 
     return vmapFibFlux/galFibFlux
 
