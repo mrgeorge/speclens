@@ -25,7 +25,7 @@ def makeGaussPrior(mean, sigma):
 def makeGaussTruncPrior(mean, sigma, range):
     return lambda x: ((x-mean)/sigma)**2 + priorFlat(x, range)
     
-def interpretPriors(priors):
+def interpretPriors(model):
     """Generate functions to evaluate priors and fix variables.
 
     Inputs:
@@ -39,23 +39,24 @@ def interpretPriors(priors):
             tuple(a,b,c,d) - gaussian prior with mean a and stddev b, truncated at c and d
 
     Returns:
-        priorFuncs - ndarray of length N (# of free parameters to fit)
-        fixed - ndarray of length M; None for free pars, float for fixed pars
-        guess - ndarray of length N with initial guesses
-        guessScale - ndarray of length N with scale for range of initial guesses
+        model object is updated with the following arrays:
+            priorFuncs - ndarray of length N (# of free parameters to fit)
+            fixed - ndarray of length M; None for free pars, float for fixed pars
+            guess - ndarray of length N with initial guesses
+            guessScale - ndarray of length N with scale for range of initial guesses
     """
 
     # Define initial guess and range for emcee
-    # Recall pars=[gal_beta, gal_q, vmax, g1, g2]
-    guess=np.array([10.,0.1,100.,0.,0.])
-    guessScale=np.array([10.,0.3,50.,0.02,0.02])
-    nPars=len(guess) # Number of pars in FULL MODEL (some may get fixed and not be sent to emcee)
-    
+    # these arrays will be shortened if there are fixed parameters
+    guess=np.copy(model.origGuess)
+    guessScale=np.copy(model.origGuessScale)
+    nPars=len(model.priors) # Number of pars in FULL MODEL (some may get fixed and not be sent to emcee)
+
     fixed=np.repeat(None, nPars)
     priorFuncs=np.repeat(None, nPars)
-    if(priors is not None):
+    if(model.priors is not None):
         for ii in xrange(nPars):
-            prior=priors[ii]
+            prior=model.priors[ii]
             # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
             if(prior is not None):
                 if((isinstance(prior, int)) | (isinstance(prior, float))):
@@ -90,14 +91,19 @@ def interpretPriors(priors):
         guessScale=np.delete(guessScale,delarr)
         priorFuncs=np.delete(priorFuncs,delarr)
 
-    return (priorFuncs,fixed,guess,guessScale)
+    model.priorFuncs=priorFuncs
+    model.guess=guess
+    model.guessScale=guessScale
+    model.fixed=fixed
+
+    return
 
 
 ####
 # Evaluate Likelihood
 ####
 
-def lnProbVMapModel(pars, priors, xobs, yobs, vobs, verr, ellobs, ellerr, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel):
+def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
     """Return ln(P(model|data)) = -0.5*chisq to evaluate likelihood surface.
 
     Take model parameters, priors, and data and compute chisq=sum[((model-data)/error)**2].
@@ -114,76 +120,70 @@ def lnProbVMapModel(pars, priors, xobs, yobs, vobs, verr, ellobs, ellerr, disk_r
         verr - errors on vobs
         ellobs - imaging observables
         ellerr - errors on ellobs
-        disk_r - disk half-light radius in arcsec
-        convOpt - None, "galsim", or "pixel"
-        atmos_fwhm - FWHM of gaussian PSF
-        fibRad - fiber radius in arcsecs
-        fibConvolve - bool for whether to convolve with fiber
-                      (note, atmos and fiber convolution controlled separately)
-        kernel - convolution kernel if convOpt=="pixel", see sim.makeConvolutionKernel
         
     Returns:
         lnP - a float (this is what emcee needs)
     """
 
-    priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
-
     # wrap PA to fall between 0 and 360
-    if(fixed[0] is None):
+    if(model.fixed[0] is None):
         pars[0]=pars[0] % 360.
     else:
-        fixed[0]=fixed[0] % 360.
+        model.fixed[0]=model.fixed[0] % 360.
 
     # First evaluate the prior to see if this set of pars should be ignored
     chisq_prior=0.
-    if(priorFuncs is not None):
-        for ii in range(len(priorFuncs)):
-            func=priorFuncs[ii]
+    if(model.priorFuncs is not None):
+        for ii in range(len(model.priorFuncs)):
+            func=model.priorFuncs[ii]
             if(func is not None):
                 chisq_prior+=func(pars[ii])
         if(chisq_prior == np.Inf):
             return -np.Inf
 
     # re-insert any fixed parameters into pars array
-    nPars=len(fixed)
+    nPars=len(model.fixed)
     fullPars=np.zeros(nPars)
     parsInd=0
     for ii in xrange(nPars):
-        if(fixed[ii] is None):
+        if(model.fixed[ii] is None):
             fullPars[ii]=pars[parsInd]
             parsInd+=1
         else:
-            fullPars[ii]=fixed[ii]
+            fullPars[ii]=model.fixed[ii]
+
+    # Reassign model object attributes with pars array
+    model.updatePars(fullPars)
 
     if((xobs is None) & (ellobs is None)): # no data, only priors
         chisq_like=0.
     else:
         if((xobs is None) & (ellobs is not None)): # use only imaging data
-            model=sim.ellModel(fullPars)
-            data=ellobs
-            error=ellerr
+            modelVals=sim.ellModel(model)
+            dataVals=ellobs
+            errorVals=ellerr
         elif((xobs is not None) & (ellobs is None)): # use only velocity data
-            if(convOpt is not None):
-                model=sim.vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
+            if(model.convOpt is not None):
+                modelVals=sim.vmapObs(model,xobs,yobs)
             else: # this is faster if we don't need to convolve with psf or fiber
-                model=sim.vmapModel(fullPars,xobs,yobs)
-            data=vobs
-            error=verr
+                modelVals=sim.vmapModel(model,xobs,yobs)
+            dataVals=vobs
+            errorVals=verr
         elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-            if(convOpt is not None):
-                vmodel=sim.vmapObs(fullPars,xobs,yobs,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
+            if(model.convOpt is not None):
+                vmodel=sim.vmapObs(model,xobs,yobs)
             else: # this is faster if we don't need to convolve with psf or fiber
-                vmodel=sim.vmapModel(fullPars,xobs,yobs)
-            model=np.concatenate([vmodel,sim.ellModel(fullPars)])
-            data=np.concatenate([vobs,ellobs])
-            error=np.concatenate([verr,ellerr])
+                vmodel=sim.vmapModel(model,xobs,yobs)
+            modelVals=np.concatenate([vmodel,sim.ellModel(model)])
+            dataVals=np.concatenate([vobs,ellobs])
+            errorVals=np.concatenate([verr,ellerr])
 
-        chisq_like=np.sum(((model-data)/error)**2)
+        chisq_like=np.sum(((modelVals-dataVals)/errorVals)**2)
 
     return -0.5*(chisq_like+chisq_prior)
 
 
-def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=None,fibRad=1.,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
+def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
     """Call emcee and return sampler to fit model to fiber velocities
 
     Inputs:
@@ -204,22 +204,22 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
     # SETUP DATA
     if(vobs is not None):
         numFib=vobs.size
-        pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig,fibPA=fibPA)
+        pos,fibShape=sim.getFiberPos(model.nVSamp,model.vSampSize,model.vSampConfig,fibPA=model.vSampPA)
         xobs,yobs=pos
         vel=np.array(vobs).copy()
         velErr=np.repeat(sigma,numFib)
 
         # SETUP CONVOLUTION KERNEL
-        if(convOpt=="pixel"):
-            kernel=sim.makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA)
+        if(model.convOpt=="pixel"):
+            model.kernel=sim.makeConvolutionKernel(xobs,yobs,model)
         else: #convOpt is "galsim" or None
-            kernel=None
+            model.kernel=None
     else:
         xobs=None
         yobs=None
         vel=None
         velErr=None
-        kernel=None
+        model.kernel=None
 
     if(imObs is not None):
         ellObs=np.array(imObs).copy()
@@ -241,12 +241,12 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
 
 
     # SETUP PARS and PRIORS
-    priorFuncs,fixed,guess,guessScale = interpretPriors(priors)
-    nPars=len(guess)
+    interpretPriors(model.priors)
+    nPars=len(model.guess)
 
     # RUN MCMC
-    walkerStart=np.array([np.random.randn(nWalkers)*guessScale[ii]+guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[priors, xobs, yobs, vel, velErr, ellObs, ellErr, disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, kernel])
+    walkerStart=np.array([np.random.randn(nWalkers)*model.guessScale[ii]+model.guess[ii] for ii in xrange(nPars)]).T
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[model, xobs, yobs, vel, velErr, ellObs, ellErr])
     print "emcee burnin"
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
@@ -256,18 +256,18 @@ def vmapFit(vobs,sigma,imObs,imErr,priors,disk_r=None,convOpt=None,atmos_fwhm=No
 
     return sampler
 
-def fitObs(specObs,specErr,imObs,imErr,priors,**kwargs):
+def fitObs(specObs,specErr,imObs,imErr,model,**kwargs):
     """Wrapper to vmapFit to compute chains for each set of observables
 
     Passes kwargs to vmapFit
     """
 
     print "Imaging"
-    samplerI=vmapFit(None,specErr,imObs,imErr,priors,**kwargs)
+    samplerI=vmapFit(None,specErr,imObs,imErr,model,**kwargs)
     print "Spectroscopy"
-    samplerS=vmapFit(specObs,specErr,None,imErr,priors,**kwargs)
+    samplerS=vmapFit(specObs,specErr,None,imErr,model,**kwargs)
     print "Combined"
-    samplerIS=vmapFit(specObs,specErr,imObs,imErr,priors,**kwargs)
+    samplerIS=vmapFit(specObs,specErr,imObs,imErr,model,**kwargs)
     
     flatchainI=samplerI.flatchain
     flatlnprobI=samplerI.flatlnprobability
