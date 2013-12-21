@@ -94,16 +94,35 @@ class Model(object):
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.pars=[self.diskPA, self.diskBA, self.vCirc, self.g1, self.g2]
+            self.origPars=[self.diskPA, self.diskBA, self.vCirc, self.g1, self.g2]
             self.labels=np.array(["PA","b/a","vmax","g1","g2"])
-            self.guess=np.array([10.,0.1,200.,0.,0.])
-            self.guessScale=np.array([30.,0.3,50.,0.02,0.02])
+            self.origGuess=np.array([10.,0.1,200.,0.,0.])
+            self.origGuessScale=np.array([30.,0.3,50.,0.02,0.02])
             self.priors=[None,[0.01,0.99],(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
 
         else:
             raise ValueError(name)
 
+    def updatePars(self, pars):
+        """Take a set of model pars and update stored values
+
+        Since fit.lnProbVMapModel requires a pars array and other
+        functions require a model object, this function takes a given pars
+        array and reassigns the stored values in the model object.
+        """
+        if(self.name=="A"):
+            self.diskPA, self.diskBA, self.vCirc, self.g1, self.g2 = pars
+        else:
+            raise ValueError(self.name)
+
     def setDefaultVals(self):
+        """
+        convOpt - how to compute images and convolutions ("galsim" or "pixel")
+        atmos_fwhm - FWHM of gaussian PSF (default None)
+        fibRad - fiber radius in arcsecs (default None)
+        fibConvolve - if False (default), just sample the image at central position 
+                      without convolving, else convolve
+        """
         self.diskRadius=1.
         self.diskVRadius=2.2
         self.diskCA=0.2
