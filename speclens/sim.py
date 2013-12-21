@@ -480,7 +480,7 @@ def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
     return image
 
     
-def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA):
+def makeConvolutionKernel(xobs,yobs,model):
     """Construct the fiber x PSF convolution kernel
 
     When using pixel arrays (instead of galsim objects),
@@ -491,47 +491,50 @@ def makeConvolutionKernel(xobs,yobs,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA
     Inputs:
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
-        atmos_fwhm - FWHM of gaussian PSF
-        fibRad - fiber radius in arcsecs
-        fibConvolve - if False, just sample the image at central position 
-                      without convolving, else convolve
-        fibShape - string "circle" or "square"
-        fibPA - position angle for configs with square fibers 
-                (can be None for fibShape="circle")
+        model - object containing the following attributes
+            atmosFWHM - FWHM of gaussian PSF
+            vSampSize - fiber radius in arcsecs or IFU/slit pixel size
+            vSampConvolve - if False, just sample the image at central position 
+                          without convolving, else convolve
+            vSampShape - string "circle" or "square"
+            vSampPA - position angle for configs with square fibers 
+                    (can be None for fibShape="circle")
+            nPix - number of pixels on image side
+            pixScale - arcseconds per pixel
     Returns:
         kernel - an ndarray of size [xobs.size, imgSizePix, imgSizePix]
     """
-    numFib=xobs.size
-    half=imgSizePix/2
-    xx,yy=np.meshgrid((np.arange(imgSizePix)-half)*pixScale,(np.arange(imgSizePix)-half)*pixScale)
-    if(atmos_fwhm > 0):
-        atmos_sigma=atmos_fwhm/(2.*np.sqrt(2.*np.log(2.)))
-        if(fibConvolve): # PSF and Fiber convolution
+
+    half=model.nPix/2
+    xx,yy=np.meshgrid((np.arange(model.nPix)-half)*model.pixScale,(np.arange(model.nPix)-half)*model.pixScale)
+    if(model.atmosFWHM > 0):
+        atmos_sigma=model.atmosFWHM/(2.*np.sqrt(2.*np.log(2.)))
+        if(model.vSampConvolve): # PSF and Fiber convolution
             psfArr=np.exp(-(xx**2 + yy**2)/(2.*atmos_sigma**2))
-            fibArrs=np.zeros((numFib,imgSizePix,imgSizePix))
-            if(fibShape=="circle"):
-                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
-            elif(fibShape=="square"):
-                PArad=np.deg2rad(fibPA)
-                sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*fibRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*fibRad)) for pos in zip(xobs,yobs)])
+            fibArrs=np.zeros((model.nVSamp,model.nPix,model.nPix))
+            if(model.vSampShape=="circle"):
+                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampRad**2) for pos in zip(xobs,yobs)])
+            elif(model.vSampShape=="square"):
+                PArad=np.deg2rad(model.vSampPA)
+                sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampSize)) for pos in zip(xobs,yobs)])
             fibArrs[sel]=1.
-            kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(numFib)])
+            kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(model.nVSamp)])
         else:
             # this is basically the psf convolved with a delta function at the center of each fiber
             kernel=np.array([np.exp(-((xx-pos[0])**2 + (yy-pos[1])**2)/(2.*atmos_sigma**2)) for pos in zip(xobs,yobs)])
     else:
         # Fiber only
-        kernel=np.zeros((numFib,imgSizePix,imgSizePix))
-        if(fibShape=="circle"):
-            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < fibRad**2) for pos in zip(xobs,yobs)])
-        elif(fibShape=="square"):
-            PArad=np.deg2rad(fibPA)
-            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*fibRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*fibRad)) for pos in zip(xobs,yobs)])
+        kernel=np.zeros((model.nVSamp,model.nPix,model.nPix))
+        if(model.vSampShape=="circle"):
+            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampSize**2) for pos in zip(xobs,yobs)])
+        elif(model.vSampShape=="square"):
+            PArad=np.deg2rad(model.vSampPA)
+            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampRad)) for pos in zip(xobs,yobs)])
         kernel[sel]=1.
         
     return kernel
 
-def vmapObs(model,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=None,fibRad=None,fibConvolve=False,kernel=None):
+def vmapObs(model,xobs,yobs,showPlot=False):
     """Get flux-weighted fiber-averaged velocities
 
     vmapObs computes fiber sampling in two ways, depending on convOpt
@@ -539,18 +542,10 @@ def vmapObs(model,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=No
         for convOpt=pixel, need to specify kernel
 
     Inputs:
-        pars - [gal_beta, gal_q, vmax, g1, g2] *unsheared* values
+        model - object with galaxy and observable parameters
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
-        disk_r - disk half-light radius
         showPlot - bool for presenting plots (default False)
-        convOpt - how to compute images and convolutions ("galsim" or "pixel")
-        atmos_fwhm - FWHM of gaussian PSF (default None)
-        fibRad - fiber radius in arcsecs (default None)
-        fibConvolve - if False (default), just sample the image at central position 
-                      without convolving, else convolve
-        kernel - an ndarray of size [xobs.size, imgSizePix, imgSizePix]
-                 from makeConvolutionKernel
     Returns:
         ndarray of flux-weighted fiber-averaged velocities
 
@@ -574,8 +569,8 @@ def vmapObs(model,xobs,yobs,disk_r,showPlot=False,convOpt="galsim",atmos_fwhm=No
         if(showPlot):
             plot.showArr(imgArr)
             plot.showArr(fluxVMapArr)
-        vmapFibFlux=np.array([np.sum(kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
-        galFibFlux=np.array([np.sum(kernel[ii]*imgArr) for ii in range(model.nVSamp)])
+        vmapFibFlux=np.array([np.sum(model.kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
+        galFibFlux=np.array([np.sum(model.kernel[ii]*imgArr) for ii in range(model.nVSamp)])
 
     return vmapFibFlux/galFibFlux
 
