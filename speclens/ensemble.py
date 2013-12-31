@@ -11,7 +11,7 @@ import galsim # for PS or NFW shear prior
 import sim
 import fit
 
-def generateEnsemble(nGal,priors,shearOpt=None,seed=None):
+def generatePars(nGal,priors,shearOpt=None,seed=None):
     """Generate set of galaxies with shapes following a set of priors
 
     Inputs:
@@ -63,7 +63,7 @@ def generateEnsemble(nGal,priors,shearOpt=None,seed=None):
 
     return pars
     
-def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOpt=None,atmos_fwhm=None,numFib=6,fibRad=1,fibConvolve=False,fibConfig="hexNoCen",fibPA=None,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
+def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
     """Generate input model parameters and observables for one galaxy
 
     Inputs:
@@ -87,34 +87,30 @@ def makeObs(inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],disk_r=None,convOp
         (xvals,yvals,vvals,ellObs,inputPars) tuple    
     """
 
-    inputPars=generateEnsemble(1,inputPriors,shearOpt=None,seed=seed).squeeze()
+    # Setup galaxy properties
+    inputPars=generatePars(1,model.inputPriors,shearOpt=None,seed=seed).squeeze()
+    model.origPars=inputPars # overwrite the default pars array used
+                             # to initialize model
+    model.updatePars(inputPars) # overwrite individual attributes
 
-    # first get imaging observables (with noise) to get PA for slit/ifu alignment
-    ellObs=sim.ellModel(inputPars)
-    if(seed is not None):
-        np.random.seed(100*seed)
+    
+    # get imaging and spectroscopic observables
+    # note, no noise added here 
+    # if PA offsets are desired, set model.vSampPA first
+    ellObs=sim.ellModel(model)
 
-    if(ellErr is not None):
-        imNoise=np.random.randn(ellObs.size)*ellErr
-        ellObs+=imNoise
-
-    fibPA=ellObs[0] # align fibers to observed PA (no effect for circular fibers)
-
-    pos,fibShape=sim.getFiberPos(numFib,fibRad,fibConfig,fibPA)
+    pos,fibShape=sim.getFiberPos(model.nVSamp,model.vSampSize,
+                                 model.vSampConfig,model.vSampPA)
     xvals,yvals=pos
-    if(convOpt is not None):
-        kernel=sim.makeConvolutionKernel(xvals,yvals,atmos_fwhm,fibRad,fibConvolve,fibShape,fibPA)
-        vvals=sim.vmapObs(inputPars,xvals,yvals,disk_r,convOpt=convOpt,atmos_fwhm=atmos_fwhm,fibRad=fibRad,fibConvolve=fibConvolve,kernel=kernel)
+    if(model.convOpt is not None):
+        model.kernel=sim.makeConvolutionKernel(xvals,yvals,model)
+        vvals=sim.vmapObs(model,xvals,yvals)
     else: # this is faster if we don't need to convolve with psf or fiber
-        vvals=sim.vmapModel(inputPars,xvals,yvals)
-
-    if(sigma is not None):
-        specNoise=np.random.randn(numFib)*sigma
-        vvals+=specNoise
+        vvals=sim.vmapModel(model,xvals,yvals)
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def runGal(dataDir,plotDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsPriors,figExt="pdf",**kwargs):
+def runGal(dataDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figExt="pdf",**kwargs):
     """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
 
     This is what create_qsub_galArr calls to run each galaxy
@@ -124,7 +120,7 @@ def runGal(dataDir,plotDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsP
         plotDir - directory to write output plots
         galID - label to name each galaxy file separately
         inputPars - ndarray of nGal sets of model parameters
-                    from makeObs or sim.generateEnsemble
+                    from makeObs or generatePars
         labels - string parameter names for plot axes
         vvals - observed velocity values
         sigma - error on vvals
@@ -138,11 +134,11 @@ def runGal(dataDir,plotDir,galID,inputPars,labels,vvals,sigma,ellObs,ellErr,obsP
         nothing, chains and plots written to dataDir, plotDir
     """
 
-    chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,obsPriors,**kwargs)
-    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=labels),dataDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=labels),dataDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=labels),dataDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=labels,showPlot=False,filename=plotDir+"/gal_{:03d}.{}".format(galID,figExt))
+    chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,model,**kwargs)
+    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),dataDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),dataDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),dataDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=model.labels,showPlot=False,filename=plotDir+"/gal_{:03d}.{}".format(galID,figExt))
 
 
 def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4]),fileType="chain"):
@@ -207,9 +203,9 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
                         (dir+"statsIS_{:03d}.fits.gz".format(ii) in statsISFiles))
         if(filesExist):
             if(listInput):
-                inputPars[ii,:]=sim.generateEnsemble(1,inputPriors[ii],shearOpt=None,seed=ii).squeeze()[free]
+                inputPars[ii,:]=generatePars(1,inputPriors[ii],shearOpt=None,seed=ii).squeeze()[free]
             else:
-                inputPars[ii,:]=sim.generateEnsemble(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
+                inputPars[ii,:]=generatePars(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
 
             if(fileType=="chain"):
                 recI=io.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
