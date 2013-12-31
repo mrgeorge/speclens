@@ -85,6 +85,10 @@ class Model(object):
         self.name=name
         self.setDefaultVals()
 
+        # Define priors and guess for each type of model
+        # Note: priors are those used for fitting, 
+        #       not the distributions for generating ensembles.
+        #       The latter are called inputPriors
         if(name=="A"):
             self.description="""Thin disk, flat rotation curve
 
@@ -99,6 +103,7 @@ class Model(object):
             self.origGuess=np.array([10.,0.1,200.,0.,0.])
             self.origGuessScale=np.array([30.,0.3,50.,0.02,0.02])
             self.priors=[None,[0.01,0.99],(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
+            self.inputPriors=[[0.01,359.99],[0.01,0.99],(200.,20.),(0.,0.05),(0.,0.05)]
 
         else:
             raise ValueError(name)
