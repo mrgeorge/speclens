@@ -102,6 +102,7 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
     pos,fibShape=sim.getFiberPos(model.nVSamp,model.vSampSize,
                                  model.vSampConfig,model.vSampPA)
     xvals,yvals=pos
+    model.vSampShape=fibShape
     if(model.convOpt is not None):
         model.kernel=sim.makeConvolutionKernel(xvals,yvals,model)
         vvals=sim.vmapObs(model,xvals,yvals)
