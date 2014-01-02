@@ -241,7 +241,7 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
 
 
     # SETUP PARS and PRIORS
-    interpretPriors(model.priors)
+    interpretPriors(model)
     nPars=len(model.guess)
 
     # RUN MCMC
