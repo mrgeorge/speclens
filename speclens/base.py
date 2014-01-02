@@ -92,8 +92,8 @@ class Model(object):
         if(name=="A"):
             self.description="""Thin disk, flat rotation curve
 
-                gal_beta - disk position angle in degrees [0,360)
-                gal_q - projected image axis ratio (0,1)
+                diskPA - disk position angle in degrees [0,360)
+                diskBA - projected image axis ratio (0,1)
                 vmax - circular velocity (>0)
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
@@ -103,7 +103,24 @@ class Model(object):
             self.origGuess=np.array([10.,0.1,200.,0.,0.])
             self.origGuessScale=np.array([30.,0.3,50.,0.02,0.02])
             self.priors=[None,[0.01,0.99],(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
-            self.inputPriors=[[0.01,359.99],[0.01,0.99],(200.,20.),(0.,0.05),(0.,0.05)]
+            self.inputPriors=[[0.01,359.99],[0.01,0.99],200.,(0.,0.05),(0.,0.05)]
+
+        elif(name=="B"):
+            self.description="""Thick disk, flat rotation curve
+
+                diskPA - disk position angle in degrees [0,360)
+                diskBA - projected image axis ratio (0,1)
+                diskCA - edge on disk thickness ratio (0=thin,1=sphere)
+                vmax - circular velocity (>0)
+                g1 - shear 1 (abs<0.5)
+                g2 - shear 2 (abs<0.5)
+            """
+            self.origPars=[self.diskPA, self.diskBA, self.diskCA, self.vCirc, self.g1, self.g2]
+            self.labels=np.array(["PA","b/a","c/a","vmax","g1","g2"])
+            self.origGuess=np.array([10.,0.1,0.1,200.,0.,0.])
+            self.origGuessScale=np.array([30.,0.3,0.1,50.,0.02,0.02])
+            self.priors=[None,[0.01,0.99],(0.2,0.1,0.,1.),(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
+            self.inputPriors=[[0.01,359.99],0.2,[0.01,0.99],200.,(0.,0.05),(0.,0.05)]
 
         else:
             raise ValueError(name)
@@ -117,6 +134,8 @@ class Model(object):
         """
         if(self.name=="A"):
             self.diskPA, self.diskBA, self.vCirc, self.g1, self.g2 = pars
+        elif(self.name=="B"):
+            self.diskPA, self.diskBA, self.diskCA, self.vCirc, self.g1, self.g2 = pars
         else:
             raise ValueError(self.name)
 
