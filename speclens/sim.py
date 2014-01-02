@@ -227,27 +227,27 @@ def getEllipseAxes(ellipse):
 
     return lines
 
-def convertInclination(galBA=None, galCA=None, inc=None):
+def convertInclination(diskBA=None, diskCA=None, inc=None):
     """Convert between inclination and 3d axis ratios
 
     Given 2 of 3 inputs, return the 3rd
     
     Input: 
-        galBA - projected minor/major axis ratio (i.e. the imaging
+        diskBA - projected minor/major axis ratio (i.e. the imaging
                 observable)
-        galCA - edge-on disk thickness/major axis ratio
+        diskCA - edge-on disk thickness/major axis ratio
         inc - disk inclination in radians (0 = face on)
     """
-    assert((galBA is None) + (galCA is None) + (inc is None) == 1)
+    assert((diskBA is None) + (diskCA is None) + (inc is None) == 1)
 
-    if(galBA is None):
-        galBA = np.sqrt(1. - np.sin(inc)**2 * (1. - galCA**2))
-        return galBA
-    elif(galCA is None):
-        galCA = np.sqrt(1. - (1. - galBA**2)/np.sin(inc)**2)
-        return galCA
+    if(diskBA is None):
+        diskBA = np.sqrt(1. - np.sin(inc)**2 * (1. - diskCA**2))
+        return diskBA
+    elif(diskCA is None):
+        diskCA = np.sqrt(1. - (1. - diskBA**2)/np.sin(inc)**2)
+        return diskCA
     else:
-        inc = np.arcsin(np.sqrt((1. - galBA**2)/(1. - galCA**2)))
+        inc = np.arcsin(np.sqrt((1. - diskBA**2)/(1. - diskCA**2)))
         return inc
 
 def getOmega(rad,rotCurvePars,rotCurveOpt='flat'):
@@ -281,9 +281,9 @@ def makeGalVMap(model):
         diskSersic - disk Sersic index
         diskRadius - disk half-light radius
         bulgeFraction - bulge fraction (0=pure disk, 1=pure bulge)
-        galBA - projected image axis ratio
-        galCA - edge-on axis ratio
-        galPA - position angle in degrees
+        diskBA - projected image axis ratio
+        diskCA - edge-on axis ratio
+        diskPA - position angle in degrees
         galFlux - normalization of image flux
         atmosFWHM - FWHM of gaussian PSF
         rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
@@ -312,7 +312,7 @@ def makeGalVMap(model):
     gal.setFlux(model.galFlux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=model.galBA, beta=model.galPA*galsim.degrees)
+    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
@@ -328,10 +328,10 @@ def makeGalVMap(model):
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
+    inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(model.galPA)
+    gal_beta_rad=np.deg2rad(model.diskPA)
 
     # Fill velocity map array
     xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
@@ -379,9 +379,9 @@ def makeGalVMap2(model):
         diskSersic - disk Sersic index
         diskRadius - disk half-light radius
         bulgeFraction - bulge fraction (0=pure disk, 1=pure bulge)
-        galBA - projected image axis ratio
-        galCA - edge-on axis ratio
-        galPA - position angle in degrees
+        diskBA - projected image axis ratio
+        diskCA - edge-on axis ratio
+        diskPA - position angle in degrees
         galFlux - normalization of image flux
         rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
@@ -409,7 +409,7 @@ def makeGalVMap2(model):
     gal.setFlux(model.galFlux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=model.galBA, beta=model.galPA*galsim.degrees)
+    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
@@ -425,10 +425,10 @@ def makeGalVMap2(model):
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
+    inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(model.galPA)
+    gal_beta_rad=np.deg2rad(model.diskPA)
 
     # Fill velocity map array
     xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
@@ -466,7 +466,7 @@ def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
     yp_disk = -xx * np.sin(gal_beta_rad) + yy * np.cos(gal_beta_rad)
     phi_r = np.arctan2(yp_disk,xp_disk)
     rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
-    eps_disk = np.sqrt(1.-(1.-gal_thick**2)*np.cos(convertInclination(galBA=gal_q,galCA=gal_thick))**2)
+    eps_disk = np.sqrt(1.-(1.-gal_thick**2)*np.cos(convertInclination(diskBA=gal_q,diskCA=gal_thick))**2)
     uu_disk = (rr_disk*pixScale)/disk_r*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/np.sqrt(1.-eps_disk**2))
     nu_disk = 0.5
     f_disk = (uu_disk/2.)**nu_disk*scipy.special.kv(nu_disk,uu_disk)/scipy.special.gamma(nu_disk+1.)
@@ -513,7 +513,7 @@ def makeConvolutionKernel(xobs,yobs,model):
             psfArr=np.exp(-(xx**2 + yy**2)/(2.*atmos_sigma**2))
             fibArrs=np.zeros((model.nVSamp,model.nPix,model.nPix))
             if(model.vSampShape=="circle"):
-                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampRad**2) for pos in zip(xobs,yobs)])
+                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampSize**2) for pos in zip(xobs,yobs)])
             elif(model.vSampShape=="square"):
                 PArad=np.deg2rad(model.vSampPA)
                 sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampSize)) for pos in zip(xobs,yobs)])
@@ -529,7 +529,7 @@ def makeConvolutionKernel(xobs,yobs,model):
             sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampSize**2) for pos in zip(xobs,yobs)])
         elif(model.vSampShape=="square"):
             PArad=np.deg2rad(model.vSampPA)
-            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampRad) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampRad)) for pos in zip(xobs,yobs)])
+            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampSize)) for pos in zip(xobs,yobs)])
         kernel[sel]=1.
         
     return kernel
@@ -552,7 +552,7 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
     """
 
-    if(convOpt=="galsim"):
+    if(model.convOpt=="galsim"):
         vmap,fluxVMap,gal=makeGalVMap(model)
 
         if(showPlot):
@@ -564,7 +564,7 @@ def vmapObs(model,xobs,yobs,showPlot=False):
         galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal)
         vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap)
 
-    elif(convOpt=="pixel"):
+    elif(model.convOpt=="pixel"):
         vmapArr,fluxVMapArr,imgArr=makeGalVMap2(model)
         if(showPlot):
             plot.showArr(imgArr)
@@ -579,7 +579,7 @@ def vmapModel(model, xobs, yobs):
 
     Inputs:
         model - object with these values 
-          [galPA, galBA, galCA, rotCurvePars rotCurveOpt, g1, g2] 
+          [diskPA, diskBA, diskCA, rotCurvePars rotCurveOpt, g1, g2] 
           *unsheared* values
         xobs, yobs - the N positions (in arcsec) relative to the center at which
                      the *sheared* (observed) field is sampled
@@ -598,13 +598,13 @@ def vmapModel(model, xobs, yobs):
 
         # rotated coords aligned with PA guess of major axis
         xCen,yCen=0,0 # assume centroid is well-measured
-        PArad=np.deg2rad(model.galPA)
+        PArad=np.deg2rad(model.diskPA)
         xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
         yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
         # projection along apparent major axis in rotated coords
         kvec=np.array([1,0,0])
     
-        inc=convertInclination(galBA=model.galBA, galCA=model.galCA)
+        inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
         sini=np.sin(inc)
         tani=np.tan(inc)
 
@@ -623,13 +623,13 @@ def ellModel(model):
 
     Inputs:
         model - object with these values 
-          [galPA, galBA, galCA, rotCurvePars rotCurveOpt, g1, g2] 
+          [diskPA, diskBA, diskCA, rotCurvePars rotCurveOpt, g1, g2] 
           *unsheared* values
     Returns:
         ndarray([gal_beta, gal_q]) *sheared* values
     """
 
-    ellipse=(model.diskRadius,model.galBA,model.galPA) # unsheared ellipse
+    ellipse=(model.diskRadius,model.diskBA,model.diskPA) # unsheared ellipse
     disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,model.g1,model.g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
