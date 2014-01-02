@@ -144,12 +144,12 @@ class Model(object):
         self.diskBA=0.7
         self.g1=0.
         self.g2=0.
-        self.atmosFWHM=None
+        self.atmosFWHM=1.
         self.pixScale=0.1  # arcseconds per pixel
         self.nPix=100
-        self.vSampConfig="crossSlit"
-        self.vSampSize=0.5  # arcseconds
-        self.nVSamp=20
+        self.vSampConfig="hexNoCen"
+        self.vSampSize=1.  # arcseconds (radius for fibers, side length for pixels)
+        self.nVSamp=6
         self.vSampPA=self.diskPA
         self.vSampConvolve=True
         self.convOpt="pixel"
