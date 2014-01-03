@@ -120,7 +120,7 @@ class Model(object):
             self.origGuess=np.array([10.,0.1,0.1,200.,0.,0.])
             self.origGuessScale=np.array([30.,0.3,0.1,50.,0.02,0.02])
             self.priors=[None,[0.01,0.99],(0.2,0.1,0.,1.),(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
-            self.inputPriors=[[0.01,359.99],0.2,[0.01,0.99],200.,(0.,0.05),(0.,0.05)]
+            self.inputPriors=[[0.01,359.99],[0.2,0.99],0.2,200.,(0.,0.05),(0.,0.05)]
 
         else:
             raise ValueError(name)
