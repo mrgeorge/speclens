@@ -63,7 +63,7 @@ def generatePars(nGal,priors,shearOpt=None,seed=None):
 
     return pars
     
-def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
+def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,generatePars=True):
     """Generate input model parameters and observables for one galaxy
 
     Inputs:
@@ -83,16 +83,20 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None):
         sigma - rms velocity error in km/s (default 30.)
         ellErr - ndarray (gal_beta_err degrees, gal_q_err), default [10,0.1]
         seed - random number generator repeatability (default None)
+        generatePars - if True (default), make a random instance of inputPars
+                       given inputPriors, else use model.origPars
     Returns:
         (xvals,yvals,vvals,ellObs,inputPars) tuple    
     """
 
     # Setup galaxy properties
-    inputPars=generatePars(1,model.inputPriors,shearOpt=None,seed=seed).squeeze()
-    model.origPars=inputPars # overwrite the default pars array used
-                             # to initialize model
-    model.updatePars(inputPars) # overwrite individual attributes
-
+    if(generatePars):
+        inputPars=generatePars(1,model.inputPriors,shearOpt=None,seed=seed).squeeze()
+        model.origPars=inputPars # overwrite the default pars array used
+                                 # to initialize model
+        model.updatePars(inputPars) # overwrite individual attributes
+    else:
+        inputPars=model.origPars
     
     # get imaging and spectroscopic observables
     # note, no noise added here 
