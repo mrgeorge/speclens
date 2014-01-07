@@ -59,7 +59,7 @@ common galaxy_template_block,lambda_template,template_spectrum
 if (n_elements(template_spectrum) eq 0) OR keyword_set(reset) then begin
    template_struct = mrdfits('Galaxy_Spectra/kcorrect-templates.fits',1,/silent)
    lambda_template = template_struct.lambda
-   template_spectrum = template_struct.spec[*,1]*1e-10
+   template_spectrum = template_struct.spec[*,1]*1e-8
 endif
 z_fid = .50 ; -- which corresponds to this cosmological redshift; we need this for surface-brightness dimming.
 d_fid = lumdist(z_fid,H0=67.3, omega_m = 0.315, Lambda0 = (1-0.315),/silent)
@@ -68,7 +68,6 @@ spec = interpol(template_spectrum,lambda_template,lambda_in) * (d_fid / dist)^2 
 if n_elements(atm_transmission) eq 0 then begin
    atm_transmission = atmospheric_transmission(lambda_in) 
 endif
-
 spec = spec * atm_transmission
 return,spec * (d_fid / dist)^2 * (1+z_fid)^4 /(1+z)^4
 end
@@ -176,7 +175,7 @@ endfor
 return,new_cube
 end
 
-function add_noise_gaussian,cube,lambda,texp,diameter=diameter
+function add_noise_gaussian,cube,lambda,texp,diameter=diameter,nonoise=nonoise
 ;Assume that cube is in erg/s/cm^2, texp in s, and lambda in Angstroms
 ;Then, the number photon counts is cube[lambda] / (h * c / lambda)
 ;But this must be scaled up by the collecting area.
@@ -186,12 +185,17 @@ area = !pi * (diameter*100.)^2
 
 h = 6.62607e-27 ;erg s
 c = 3e10 ;cm/s
+lambda_cm = lambda * 1e-8
 nlambda = n_elements(lambda)
 npix = ( size(cube[*,*,0],/dim))[0]
 new_cube = cube
 for i = 0L,nlambda-1 do begin
-   counts_2d = cube[*,*,i] / (h*c/lambda[i]) *  area
-   new_cube[*,*,i] = (sqrt(counts_2d)*randomn(seed,npix,npix) + counts_2d) * (h*c/lambda[i]) / area
+   counts_2d = cube[*,*,i] / (h*c/lambda_cm[i]) *  area * texp
+   if ~keyword_set(nonoise) then begin
+      new_cube[*,*,i] = (sqrt(counts_2d)*randomn(seed,npix,npix) + counts_2d) * (h*c/lambda_cm[i]) / area / texp
+   endif else begin
+      new_cube[*,*,i] = counts_2d * (h*c/lambda_cm[i]) / area / texp
+   endelse
 endfor
 return,new_cube
 end
@@ -200,7 +204,7 @@ end
 
 
 function datacube_simulate,p,texp=texp,sky_cube = sky_noisy, image = image, lambda = lambda_obs, $
-                           xgrid = xgrid, ygrid = ygrid,nonoise=nonoise
+                           xgrid = xgrid, ygrid = ygrid, nonoise=nonoise
 time = systime(1)
 if n_elements(texp) eq 0 then texp = 1000.; exposure time
 ;Define a parameters vector:
@@ -286,16 +290,8 @@ cube_resolved = instrumental_resolution(cube_smeared,lambda_obs, Resolution)
 sky_resolved = instrumental_resolution(sky_cube,lambda_obs, Resolution)
 
 ;Add noise.
-if ~keyword_set(nonoise) then begin
-tnoise = systime(1)
-   cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp)
-   sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp)
-endif else begin
-   cube_noisy = cube_resolved
-   sky_noisy = sky_resolved
-endelse
-
-
+cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp, nonoise=nonoise)
+sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp, nonoise=nonoise)
 
 return,cube_noisy
 end

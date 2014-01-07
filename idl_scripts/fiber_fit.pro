@@ -24,14 +24,25 @@ return,spec_arr
 end
 
 function compute_fiber_log_likelihood,pars
-COMMON FIBER_CONFIG_BLOCK, xgrid_block,ygrid_block,true_spectra_block,fiberwidth_block,offset_vector_block
+COMMON FIBER_CONFIG_BLOCK, xgrid_block,ygrid_block,true_spectra_block,fiberwidth_block,offset_vector_block,ivar_block,texp
 
-datacube_model = datacube_simulate(pars,texp=1.,sky=sky_cube,xgrid = xgrid, ygrid = ygrid,$
+datacube_model = datacube_simulate(pars,texp=texp,sky=sky_cube,xgrid = xgrid, ygrid = ygrid,$
                                    lambda=lambda,/nonoise)
 skysub_datacube = datacube_model - sky_cube
 fiber_spectra = all_fiber_spectra(xgrid,ygrid,skysub_datacube,fiberwidth_block,offset_vector_block)
-chi = total((skysub_datacube - true_spectra_block)^2/2.,/double)
-logL = -chi
+chi2 = total((fiber_spectra - true_spectra_block)^2*ivar_block/2.,/double)
+logL = -chi2
+return,logL
+end
+
+function compute_fiber_chi,pars,model=model
+COMMON FIBER_CONFIG_BLOCK, xgrid_block,ygrid_block,true_spectra_block,fiberwidth_block,offset_vector_block,ivar_block,texp
+datacube_model = datacube_simulate(pars,texp=texp,sky=sky_cube,xgrid = xgrid, ygrid = ygrid,$
+                                   lambda=lambda, /nonoise)
+skysub_datacube = datacube_model - sky_cube
+fiber_spectra = all_fiber_spectra(xgrid,ygrid,skysub_datacube,fiberwidth_block,offset_vector_block)
+model = fiber_spectra
+chi = reform((fiber_spectra - true_spectra_block)*sqrt(ivar_block),n_elements(fiber_spectra))
 return,chi
 end
 
@@ -67,7 +78,7 @@ end
 
 
 pro fiber_fit
-COMMON FIBER_CONFIG_BLOCK, xgrid_block,ygrid_block,spectra_truth_block,fiberwidth_block,offset_vector_block
+COMMON FIBER_CONFIG_BLOCK, xgrid_block,ygrid_block,spectra_truth_block,fiberwidth_block,offset_vector_block,ivar_block,texp
 ;First, make a set of high S/N spectra to use as the template.
 ;--------------------------------------------------
 ;Define parameters:
@@ -80,22 +91,43 @@ p[4] = 0.5                      ; redshift
 p[5] = 1.                       ; line intensity
 p[6] = 220.                     ; circular velocity
 ;--------------------------------------------------
-datacube_truth = datacube_simulate(p,texp=100.,sky=sky_cube,xgrid = xgrid, ygrid = ygrid,$
+texp = 1000.
+datacube_truth = datacube_simulate(p, texp=texp, sky=sky_cube, xgrid = xgrid, ygrid = ygrid,$
                                    lambda=lambda)
 
 
 ;Choose positions for the offset fibers.
 offset1 = 4*[-2.2*p[1]/sqrt(2),2.2*p[1]/sqrt(2)]
-offset2 = -offset1
+offset2 = 4*[-2.2*p[1]/sqrt(2),-2.2*p[1]/sqrt(2)]
 offset3 = [0.,0.]
 offset_vector = [[offset1],[offset2],[offset3]]
+
+n_offsets = (size(offset_vector,/dim))[1]
+
+;Now add noise to the offsets.
+offset_vector = offset_vector ;+ 0.25;randomn(seed,2,n_offsets)
+
+
 fibersize = 4.
 
 ;Sky subtract, and combine the fiber spectra into a single data vector
 spec_arr = all_fiber_spectra(xgrid,ygrid,datacube_truth,fibersize,offset_vector)
 sky_arr  = all_fiber_spectra(xgrid,ygrid,sky_cube,fibersize,offset_vector)
 spec_arr = spec_arr - sky_arr
+stop
+;But do the fitting as if there were no offset.
+offset_vector = [[offset1],[offset2],[offset3]]
 
+
+;Compute the inverse variance by converting the flux to counts.
+h = 6.62607e-27 ;erg s
+c = 3e10 ;cm/s
+lambda_cm = lambda * 1e-8
+dev_counts = sqrt(spec_arr/(h*c/lambda_cm))/texp ;Account for exposure time when calculating ivar.
+dev_flux = dev_counts * (h*c/lambda_cm)
+ivar = 1./dev_flux^2
+ivar[where(~finite(ivar))]=0.
+ivar_block = ivar # replicate(1d,n_offsets)
 
 ;configure the fiber position and model fitting
 xgrid_block = xgrid & ygrid_block = ygrid
@@ -106,7 +138,26 @@ offset_vector_block = offset_vector
 ;Run MCMC. 
 start =p
 scale = [0., 0., 0.01, 0.01, 0., 0., 0.]
-chain = fiber_mcmc(start,scale, logL = logL, nl = 500.)
+chain = fiber_mcmc(start,scale, logL = logL, nl = 1000.)
+window,0
+histogauss,chain[2,*],a,charsize=1.5,xtitle='inclination'
+vline,p[2],color=200
+window,1
+histogauss,chain[3,*],a,charsize=1.5,xtitle='position angle'
+vline,p[3],color=200
+print,'Bias in the estimated inclination angle: ',string(mean(chain[2,*]-p[2])*180/!Pi,form='(D0)'),' degrees'
+print,'Bias in the estimated position angle: ',string(mean(chain[3,*]-p[3])*180/!Pi,form='(D0)'),' degrees'
+stop
+
+;Do mpfit.
+start = p
+parinfo = replicate({value:0.D, fixed:0, limited:[0,0], $
+                       limits:[0.D,0]}, n_elements(p))
+parinfo[*].fixed = 1
+parinfo[*].value = p
+parinfo[where(scale ne 0)].fixed = 0
+pfit = mpfit('compute_fiber_chi',start,parinfo=parinfo,perr=perr,covar=covar,status=status)
+
 stop
 end
 
