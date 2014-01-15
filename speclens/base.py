@@ -137,10 +137,10 @@ class Model(object):
         array and reassigns the stored values in the model object.
         """
         if(self.name=="A"):
-            self.diskPA, cosi, self.vCirc, self.g1, self.g2 = pars
+            self.diskPA, self.cosi, self.vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(cosi))
         elif(self.name=="B"):
-            self.diskPA, cosi, self.diskCA, self.vCirc, self.g1, self.g2 = pars
+            self.diskPA, self.cosi, self.diskCA, self.vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(cosi))
         else:
             raise ValueError(self.name)
@@ -156,17 +156,18 @@ class Model(object):
         self.diskRadius=1.
         self.diskVRadius=2.2
         self.diskCA=0.2
-        self.diskSersic=1.
+        self.diskNu=0.5
         self.bulgeFraction=0.
         self.bulgeRadius=1.
-        self.bulgeSersic=4.
+        self.bulgeNu=-0.6
         self.galFlux=1.
         self.rotCurveOpt="flat"
         self.rotCurvePars=[200.]
         self.vCirc=self.rotCurvePars[0]
         self.redshift=0.5
         self.diskPA=0.
-        self.diskBA=0.7
+        self.cosi=np.cos(np.deg2rad(30.))
+        self.diskBA=sim.convertInclination(diskCA=self.diskCA,inc=np.arccos(self.cosi))
         self.g1=0.
         self.g2=0.
         self.atmosFWHM=1.
