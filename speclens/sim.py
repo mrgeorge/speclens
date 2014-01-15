@@ -390,55 +390,60 @@ def makeGalVMap2(model):
         pixScale - arcseconds per pixel
         nPix - number of pixels per side of each image
     Returns:
-        (vmapArr,fluxVMapArr,imgArr) - tuple of ndarray images
+        (vmapArr,fluxVMapArr,thinImgArr,imgArr) - tuple of ndarray images
 
     Note: See also makeGalVMap, which uses galsim objects instead of pixel arrays
     """
 
-    # Define the galaxy velocity map
-    if(0 < model.bulgeFraction < 1):
-        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+    # Define the galaxy
+#    if(0 < model.bulgeFraction < 1):
+#        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
+#        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+#
+#        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
+#    elif(model.bulgeFraction == 0):
+#        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+#    elif(model.bulgeFraction == 1):
+#        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
+#
+#    gal.setFlux(model.galFlux)
+#    
+#    # Set shape of galaxy from axis ratio and position angle
+#    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
+#    gal.applyShear(gal_shape)
+#
+#    # Generate galaxy image and empty velocity map array
+#    halfWidth=0.5*model.nPix*model.pixScale
+#    imgFrame=galsim.ImageF(model.nPix,model.nPix)
+#    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
+#    imgArr=galImg.array.copy()    # must store these arrays as copies to avoid overwriting with shared imgFrame
 
-        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
-    elif(model.bulgeFraction == 0):
-        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
-    elif(model.bulgeFraction == 1):
-        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-
-    gal.setFlux(model.galFlux)
+    imgArr=makeImageBessel(model)
     
-    # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
-    gal.applyShear(gal_shape)
-
-    # Generate galaxy image and empty velocity map array
-    halfWidth=0.5*model.nPix*model.pixScale
-    imgFrame=galsim.ImageF(model.nPix,model.nPix)
-    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
-    imgArr=galImg.array.copy()    # must store these arrays as copies to avoid overwriting with shared imgFrame
-
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
 
     # Set up velocity map parameters
-    xCen=0.5*(galImg.xmax-galImg.xmin)
-    yCen=0.5*(galImg.ymax-galImg.ymin)
+    xCen=0.5*model.nPix
+    yCen=0.5*model.nPix
 
-    inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
+    inc=np.arccos(model.cosi)
     sini=np.sin(inc)
     tani=np.tan(inc)
     gal_beta_rad=np.deg2rad(model.diskPA)
 
     # Fill velocity map array
-    xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
+    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))
     xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
     yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
     vmapArr=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
 
     # Weight velocity map by galaxy flux
-    fluxVMapArr=vmapArr*imgArr
+    # Note we assume the emission line flux is from a thin disk
+    # rather than weighting by the flux from the stellar image
+    thinImgArr=makeImageBessel(model,diskCA=0.,bulgeFraction=0.)
+    fluxVMapArr=vmapArr*thinImgArr
 
     # Apply lensing shear to galaxy and velocity maps
     if((model.g1 != 0.) | (model.g2 != 0.)):
@@ -447,36 +452,69 @@ def makeGalVMap2(model):
         ys=shear[1,0]*(xx-xCen) + shear[1,1]*(yy-yCen) + yCen
         vmapArr=scipy.ndimage.map_coordinates(vmapArr.T,(xs,ys))
         fluxVMapArr=scipy.ndimage.map_coordinates(fluxVMapArr.T,(xs,ys))
+        thinImgArr=scipy.ndimage.map_coordinates(thinImgArr.T,(xs,ys))
         imgArr=scipy.ndimage.map_coordinates(imgArr.T,(xs,ys))
 
-    return (vmapArr,fluxVMapArr,imgArr)
+    return (vmapArr,fluxVMapArr,thinImgArr,imgArr)
 
-def makeImageBessel(bulge_n, bulge_r, disk_n, disk_r, bulge_frac,
-                    gal_q, gal_thick, gal_beta):
+def makeImageBessel(model,diskCA=None,bulgeFraction=None):
     """Draw a galaxy image using Bessel functions
 
     Follows Spergel 2010 to generate analytic surface brightness
     profiles. To be tested against galsim approach.
+
+    Inputs (model object must contain the following):
+        bulgeNu - bulge slope (Sersic index 4 -> nu~-0.6)
+        bulgeRadius - bulge half-light radius
+        diskNu - disk slope (Sersic index 1 -> nu~0.5)
+        diskRadius - disk half-light radius
+        bulgeFraction - bulge fraction (0=pure disk, 1=pure bulge)
+        cosi - cosine of disk inclination (cosi=1 == i=0 == face on)
+        diskCA - edge-on axis ratio
+        diskPA - position angle in degrees
+        galFlux - normalization of image flux
+        pixScale - arcseconds per pixel
+        nPix - number of pixels per side of each image
+
+    Optional inputs (to use different thickness or bulge fraction than
+    model value (model is unchanged)). Allows easy creation of thick
+    and thin disk images without altering model object (e.g. for
+    flux-weighting the emission line velocity map using a thin disk)
+
+        diskCA - default None
+        bulgeFraction - default None
+                 
+    Returns:
+        image - 2d array of observable image
     """
 
-    xx, yy = np.meshgrid(np.arange(imgSizePix)-0.5*imgSizePix,
-                         np.arange(imgSizePix)-0.5*imgSizePix) 
-    gal_beta_rad=np.deg2rad(gal_beta)
-    xp_disk = xx * np.cos(gal_beta_rad) + yy * np.sin(gal_beta_rad)
-    yp_disk = -xx * np.sin(gal_beta_rad) + yy * np.cos(gal_beta_rad)
-    phi_r = np.arctan2(yp_disk,xp_disk)
-    rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
-    eps_disk = np.sqrt(1.-(1.-gal_thick**2)*np.cos(convertInclination(diskBA=gal_q,diskCA=gal_thick))**2)
-    uu_disk = (rr_disk*pixScale)/disk_r*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/np.sqrt(1.-eps_disk**2))
-    nu_disk = 0.5
-    f_disk = (uu_disk/2.)**nu_disk*scipy.special.kv(nu_disk,uu_disk)/scipy.special.gamma(nu_disk+1.)
+    if(diskCA is None):
+        diskCA=model.diskCA
     
-    rr_bulge = np.sqrt(xx**2 + yy**2)
-    uu_bulge = (rr_bulge*pixScale)/bulge_r
-    nu_bulge = -0.6
-    f_bulge = (uu_bulge/2.)**nu_bulge*scipy.special.kv(nu_bulge,uu_bulge)/scipy.special.gamma(nu_bulge+1.)
+    xx, yy = np.meshgrid(np.arange(model.nPix)-0.5*model.nPix,
+                         np.arange(model.nPix)-0.5*model.nPix)
 
-    image = (1.-bulge_frac)*f_disk + bulge_frac*f_bulge
+    if(model.bulgeFraction < 1.):
+        paRad=np.deg2rad(model.diskPA)
+        xp_disk = xx * np.cos(paRad) + yy * np.sin(paRad)
+        yp_disk = -xx * np.sin(paRad) + yy * np.cos(paRad)
+        phi_r = np.arctan2(yp_disk,xp_disk)-np.pi/2. # rotated by pi/2 so PA=0 is at x,y=1,0
+        rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
+        eps_disk = np.sqrt(1.-(1.-diskCA**2)*model.cosi**2)
+        uu_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/(1.-eps_disk**2))
+        ww_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*(phi_r-paRad)))/np.sqrt(1.-eps_disk**2))
+        f_disk = (uu_disk/2.)**model.diskNu*scipy.special.kv(model.diskNu,uu_disk)/scipy.special.gamma(model.diskNu+1.)
+    else:
+        f_disk=0.
+        
+    if(model.bulgeFraction > 0.):
+        rr_bulge = np.sqrt(xx**2 + yy**2)
+        uu_bulge = (rr_bulge*model.pixScale)/model.bulgeRadius
+        f_bulge = (uu_bulge/2.)**model.bulgeNu*scipy.special.kv(model.bulgeNu,uu_bulge)/scipy.special.gamma(model.bulgeNu+1.)
+    else:
+        f_bulge=0.
+
+    image = (1.-model.bulgeFraction)*f_disk + model.bulgeFraction*f_bulge
     return image
 
     
@@ -565,12 +603,12 @@ def vmapObs(model,xobs,yobs,showPlot=False):
         vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap)
 
     elif(model.convOpt=="pixel"):
-        vmapArr,fluxVMapArr,imgArr=makeGalVMap2(model)
+        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model)
         if(showPlot):
             plot.showArr(imgArr)
             plot.showArr(fluxVMapArr)
         vmapFibFlux=np.array([np.sum(model.kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
-        galFibFlux=np.array([np.sum(model.kernel[ii]*imgArr) for ii in range(model.nVSamp)])
+        galFibFlux=np.array([np.sum(model.kernel[ii]*thinImgArr) for ii in range(model.nVSamp)])
 
     return vmapFibFlux/galFibFlux
 
