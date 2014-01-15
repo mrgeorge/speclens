@@ -502,7 +502,6 @@ def makeImageBessel(model,diskCA=None,bulgeFraction=None):
         rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
         eps_disk = np.sqrt(1.-(1.-diskCA**2)*model.cosi**2)
         uu_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/(1.-eps_disk**2))
-        ww_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*(phi_r-paRad)))/np.sqrt(1.-eps_disk**2))
         f_disk = (uu_disk/2.)**model.diskNu*scipy.special.kv(model.diskNu,uu_disk)/scipy.special.gamma(model.diskNu+1.)
     else:
         f_disk=0.
