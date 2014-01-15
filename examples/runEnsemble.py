@@ -33,10 +33,10 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
         thisModel=copy.deepcopy(model)
 
         # Get model galaxy and observables
-        xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(thisModel,sigma=sigma,ellErr=ellErr,seed=ii)
+        xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(thisModel,sigma=sigma,ellErr=ellErr,seed=ii,randomPars=True)
 
         # Fit these data with a model
-        speclens.ensemble.runGal(dataDir,plotDir,ii,inputPars,vvals,sigma,ellObs,ellErr,thisModel,figExt=figExt,addNoise=True,seed=ii)
+        speclens.ensemble.runGal(dataDir,plotDir,ii,inputPars,vvals,sigma,ellObs,ellErr,thisModel,figExt=figExt,addNoise=True,nWalkers=20,nBurn=5,nSteps=25,seed=ii)
 
 
 if __name__ == "__main__":
