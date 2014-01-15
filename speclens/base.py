@@ -98,9 +98,7 @@ class Model(object):
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.origPars=[self.diskPA, np.cos(sim.convertInclination(diskBA=self.diskBA,
-                                                                      diskCA=self.diskCA)),
-                           self.vCirc, self.g1, self.g2]
+            self.origPars=[self.diskPA, self.cosi, self.vCirc, self.g1, self.g2]
             self.labels=np.array(["PA","cos(i)","vmax","g1","g2"])
             self.origGuess=np.array([10.,0.5,200.,0.,0.])
             self.origGuessScale=np.array([30.,0.2,50.,0.02,0.02])
@@ -117,9 +115,7 @@ class Model(object):
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.origPars=[self.diskPA, np.cos(sim.convertInclination(diskBA=self.diskBA,
-                                                                      diskCA=self.diskCA)),
-                           self.diskCA, self.vCirc, self.g1, self.g2]
+            self.origPars=[self.diskPA, self.cosi, self.diskCA, self.vCirc, self.g1, self.g2]
             self.labels=np.array(["PA","cos(i)","c/a","vmax","g1","g2"])
             self.origGuess=np.array([10.,0.5,0.2,200.,0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.1,50.,0.02,0.02])
@@ -138,10 +134,10 @@ class Model(object):
         """
         if(self.name=="A"):
             self.diskPA, self.cosi, self.vCirc, self.g1, self.g2 = pars
-            self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(cosi))
+            self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
         elif(self.name=="B"):
             self.diskPA, self.cosi, self.diskCA, self.vCirc, self.g1, self.g2 = pars
-            self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(cosi))
+            self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
         else:
             raise ValueError(self.name)
 
