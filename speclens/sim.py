@@ -424,8 +424,8 @@ def makeGalVMap2(model):
     fluxVMapArr=np.zeros_like(imgArr)
 
     # Set up velocity map parameters
-    xCen=0.5*model.nPix
-    yCen=0.5*model.nPix
+    xCen=0.5*model.nPix-0.5 # half-pixel offsets help avoid nans at r=0
+    yCen=0.5*model.nPix-0.5
 
     inc=np.arccos(model.cosi)
     sini=np.sin(inc)
@@ -503,6 +503,14 @@ def makeImageBessel(model,diskCA=None,bulgeFraction=None):
         eps_disk = np.sqrt(1.-(1.-diskCA**2)*model.cosi**2)
         uu_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/(1.-eps_disk**2))
         f_disk = (uu_disk/2.)**model.diskNu*scipy.special.kv(model.diskNu,uu_disk)/scipy.special.gamma(model.diskNu+1.)
+
+        # handle the r=0 case (at least for nu>0)
+        # Note error in Spergel 2010 following Eq. 7,
+        #   small u behavior is f->1/(2nu), not 1/(2(nu+1))
+        #   (check examples in Eqs 6 & 7 to verify)
+        if(model.diskNu > 0):
+            f_disk[uu_disk==0] = 1./(2.*model.diskNu)
+
     else:
         f_disk=0.
         
