@@ -246,7 +246,7 @@ ygrid = transpose(xgrid)
 ;Note that vlos is in km/s. Positive sign means away from the observer
 image = disk_galaxy_image(xgrid,ygrid,p[1]/pixscale,p[2],p[3])*p[0]
 vlos = disk_velocity_field(xgrid,ygrid,p[6],p[1]/pixscale,p[2],p[3])
-c = 100000. ; Speed of light, km/s
+c = 300000. ; Speed of light, km/s
 
 ;Next, construct the data cube. First, set the baseline wavelength
 ;range:
@@ -299,7 +299,7 @@ end
 ;Next, measure a fiber spectrum.
 tfiber = systime(1)
 offset1 = 4*[-2.2*p[1]/sqrt(2),2.2*p[1]/sqrt(2)]
-offset2 = -offset1
+offset2 = 4*[-2.2*p[1]/sqrt(2),-2.2*p[1]/sqrt(2)]
 fibersize = 4.
 spec1 = fiber(xgrid,ygrid,cube_noisy,offset1[0],offset1[1],fibersize)
 spec2 = fiber(xgrid,ygrid,cube_noisy,offset2[0],offset2[1],fibersize)
