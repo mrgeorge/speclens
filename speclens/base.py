@@ -87,8 +87,7 @@ class Model(object):
 
         # Define priors and guess for each type of model
         # Note: priors are those used for fitting, 
-        #       not the distributions for generating ensembles.
-        #       The latter are called inputPriors
+        #       inputPriors are the distributions for generating ensembles.
         if(name=="A"):
             self.description="""Fixed disk thickness, flat rotation curve
 
@@ -111,16 +110,16 @@ class Model(object):
                 diskPA - disk position angle in degrees [0,360)
                 cosi - cosine of the disk inclination (0=edge on, 1=face on)
                 diskCA - edge on disk thickness ratio (0=thin,1=sphere)
-                vmax - circular velocity (>0)
+                log10(vmax) - circular velocity
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.origPars=[self.diskPA, self.cosi, self.diskCA, self.vCirc, self.g1, self.g2]
-            self.labels=np.array(["PA","cos(i)","c/a","vmax","g1","g2"])
-            self.origGuess=np.array([10.,0.5,0.2,200.,0.,0.])
-            self.origGuessScale=np.array([30.,0.2,0.1,50.,0.02,0.02])
-            self.priors=[None,[0.01,0.99],(0.2,0.1,0.,1.),(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
-            self.inputPriors=[[0.01,359.99],[0.01,0.99],0.2,200.,(0.,0.05),(0.,0.05)]
+            self.origPars=[self.diskPA, self.cosi, self.diskCA, np.log10(self.vCirc), self.g1, self.g2]
+            self.labels=np.array(["PA","cos(i)","c/a","log10(vmax)","g1","g2"])
+            self.origGuess=np.array([10.,0.5,0.2,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([30.,0.2,0.1,0.06,0.02,0.02])
+            self.priors=[None,[0.01,0.99],(0.2,0.05,0.,1.),(np.log10(200.),0.06),[-0.5,0.5],[-0.5,0.5]]
+            self.inputPriors=[[0.01,359.99],[0.01,0.99],0.2,np.log10(200.),(0.,0.05),(0.,0.05)]
 
         else:
             raise ValueError(name)
@@ -136,8 +135,9 @@ class Model(object):
             self.diskPA, self.cosi, self.vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
         elif(self.name=="B"):
-            self.diskPA, self.cosi, self.diskCA, self.vCirc, self.g1, self.g2 = pars
+            self.diskPA, self.cosi, self.diskCA, log10vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
+            self.vCirc = 10.**log10vCirc
         else:
             raise ValueError(self.name)
 
