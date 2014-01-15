@@ -25,7 +25,7 @@ function exp_2d,x,y,r0,inclination,xcen=xcen,ycen=ycen,nu=nu,thick=thick
   r = sqrt(x^2+y^2)/r0
   phi_r = atan(y,x)
   eps = sqrt(1d - (1d - thick^2)*cos(inclination)^2)
-  u = r/r0 *sqrt((1+eps*cos(2*phi_r))/sqrt(1-eps^2))
+  u = r/r0 *sqrt((1+eps*cos(2*phi_r)))/sqrt(1-eps^2)
   fnu = (u/2.)^nu*beselk(u,nu)/gamma(nu+1.)
   return,fnu/r0^2
 end
