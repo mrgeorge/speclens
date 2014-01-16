@@ -29,6 +29,7 @@ def interpretPriors(model):
     """Generate functions to evaluate priors and fix variables.
 
     Inputs:
+        (model object must contain the following:)
         priors - a list or tuple with an entry for each of M parameters 
           in the full model. Each parameter can have a prior set by one of
           the following formats:
@@ -37,13 +38,17 @@ def interpretPriors(model):
             list[a,b] - flat prior between a and b
             tuple(a,b) - gaussian prior with mean a and stddev b
             tuple(a,b,c,d) - gaussian prior with mean a and stddev b, truncated at c and d
-
+        origGuess - ndarray of length M with initial guess for each parameter
+        origGuessScale - ndarray of length M with approximate guess range for each parameter
+    
     Returns:
         model object is updated with the following arrays:
             priorFuncs - ndarray of length N (# of free parameters to fit)
             fixed - ndarray of length M; None for free pars, float for fixed pars
             guess - ndarray of length N with initial guesses
             guessScale - ndarray of length N with scale for range of initial guesses
+            (Note: guess and guessScale may be smaller than origGuess and origGuessScale
+                   if N<M, i.e. if there are fixed parameters.)
     """
 
     # Define initial guess and range for emcee
@@ -113,7 +118,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
     Inputs:
         pars - ndarray of N model parameters to be fit (N<=M)
-        priors - see interpretPriors for format
+        model object with fixed and priorFuncs defined
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
         vobs - float or ndarray of fiber velocities
@@ -191,12 +196,11 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         sigma - errorbars on vobs (e.g. 30 km/s)
         imObs - imaging data array to be fit
         imErr - errorbars on imObs
-        priors - see interpretPriors for format
-        disk_r, convOpt, atmos_fwhm, fibRad, fibConvolve, fibConfig, fibPA 
-            - see sim.vmapObs
+        model object with priors
         addNoise - bool for whether to fit noisy or noise-free observations
         nWalkers, nBurn, nSteps - see emcee documentation
-
+        seed - optional for random number repeatability
+    
     Returns:
         sampler - emcee object with posterior chains
     """
