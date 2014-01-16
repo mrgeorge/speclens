@@ -101,16 +101,13 @@ return,seeing
 end
 
 
-function apply_seeing,cube
+function apply_seeing,image
 ;Blurs the 2D image of the galaxy by some finite seeing model.
-cube_convol = cube * 0d
-nlambda = (size(cube,/dim))[2]
-ngrid = (size(cube,/dim))[1]
+image_convol = image*0.
+ngrid = (size(image,/dim))[1]
 kernel = seeing_kernel_fft(ngrid)
-for i=0L,nlambda-1 do begin
-   cube_convol[*,*,i] = convol_fft(cube[*,*,i],kernel,kernel_fft = kernel_fft)
-endfor
-return,cube_convol
+image_convol = convol_fft(image,kernel,kernel_fft = kernel_fft)
+return,image_convol
 end
 
 function instrumental_resolution,cube, lambda, R
@@ -256,6 +253,10 @@ lambda_obs_max = 7000.
 lambda_obs = lambda_obs_min + findgen(nlambda_obs)/float(nlambda_obs-1.)*(lambda_obs_max - lambda_obs_min)
 lambda_rest = lambda_obs / (1. +p[4]) ;Shift into the rest frame of the galaxy
 
+image_smeared = apply_seeing(image)
+; Normalize so that the flux density at the profile peak is the same as the 1-d spectrum.
+image_smeared = image_smeared / max(image_smeared) 
+
 ;Make the data cube.
 tcube = systime(1)
 cube = dblarr(npix,npix,nlambda_obs)
@@ -263,14 +264,11 @@ for i = 0L,npix-1 do begin
    for j = 0L,npix-1 do begin
       reset = (i eq 0) AND (j eq 0)
       zscale = vlos[i,j]/c
-      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm, reset = reset) * p[5] *image[i,j]/total(image)
+      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm, reset = reset) * p[5] *image_smeared[i,j]/total(image)
    endfor
 endfor
 
 
-;Blur by the seeing.
-tblur = systime(1)
-cube_smeared = apply_seeing(cube)
 
 
 ;Add the sky flux.
@@ -279,20 +277,19 @@ skyspec =  sky_spectrum(lambda_obs)
 sky_cube = cube * 0.
 for i = 0,npix-1 do begin
    for j=0,npix-1 do begin
-      cube_smeared[i,j,*] = cube_smeared[i,j,*]  + skyspec
+      cube[i,j,*] = cube[i,j,*]  + skyspec
       sky_cube[i,j,*] = skyspec
    endfor
 endfor
 
 ;Blur to instrumental resolution.
 tres = systime(1)
-cube_resolved = instrumental_resolution(cube_smeared,lambda_obs, Resolution)
+cube_resolved = instrumental_resolution(cube,lambda_obs, Resolution)
 sky_resolved = instrumental_resolution(sky_cube,lambda_obs, Resolution)
 
 ;Add noise.
 cube_noisy = add_noise_gaussian(cube_resolved,lambda_obs,texp, nonoise=nonoise)
 sky_noisy = add_noise_gaussian(sky_resolved,lambda_obs,texp, nonoise=nonoise)
-
 return,cube_noisy
 end
 
