@@ -119,8 +119,6 @@ def shearEllipse(ellipse,g1,g2):
         g2 - shear 2
     Returns:
         (disk_r_prime, gal_q_prime, gal_beta_prime) - sheared ellipse parameters
-
-    Note: This is only used for visualization
     """
     disk_r,gal_q,gal_beta=ellipse
     gamma=np.sqrt(g1**2 + g2**2)
