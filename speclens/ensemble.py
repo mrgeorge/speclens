@@ -129,13 +129,12 @@ def runGal(dataDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figEx
         galID - label to name each galaxy file separately
         inputPars - ndarray of nGal sets of model parameters
                     from makeObs or generatePars
-        labels - string parameter names for plot axes
         vvals - observed velocity values
         sigma - error on vvals
         ellObs - observed image values
         ellErr - error on ellObs
-        obsPriors - priors used when fitting data
-                    (note: these may be different than inputPriors)
+        model object used to describe fit priors and pars
+
         figExt - plot file format (default "pdf", or "png")
         **kwargs - args passed on to fit.fitObs
     Returns:
