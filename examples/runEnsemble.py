@@ -36,7 +36,7 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
         xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(thisModel,sigma=sigma,ellErr=ellErr,seed=ii,randomPars=True)
 
         # Fit these data with a model
-        speclens.ensemble.runGal(dataDir,plotDir,ii,inputPars,vvals,sigma,ellObs,ellErr,thisModel,figExt=figExt,addNoise=True,nWalkers=20,nBurn=5,nSteps=25,seed=ii)
+        speclens.ensemble.runGal(dataDir,plotDir,ii,inputPars,vvals,sigma,ellObs,ellErr,thisModel,figExt=figExt,addNoise=True,nWalkers=20,nBurn=5,nSteps=25,nThreads=1,seed=ii)
 
 
 if __name__ == "__main__":

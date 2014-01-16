@@ -42,8 +42,9 @@ def interpretPriors(model):
         origGuessScale - ndarray of length M with approximate guess range for each parameter
     
     Returns:
+        priorFuncs - ndarray of functions of length N (# of free parameters to fit)
+            (not stored as model attribute since these aren't pickleable)
         model object is updated with the following arrays:
-            priorFuncs - ndarray of length N (# of free parameters to fit)
             fixed - ndarray of length M; None for free pars, float for fixed pars
             guess - ndarray of length N with initial guesses
             guessScale - ndarray of length N with scale for range of initial guesses
@@ -96,12 +97,11 @@ def interpretPriors(model):
         guessScale=np.delete(guessScale,delarr)
         priorFuncs=np.delete(priorFuncs,delarr)
 
-    model.priorFuncs=priorFuncs
     model.guess=guess
     model.guessScale=guessScale
     model.fixed=fixed
 
-    return
+    return priorFuncs
 
 
 ####
@@ -138,9 +138,12 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
     # First evaluate the prior to see if this set of pars should be ignored
     chisq_prior=0.
-    if(model.priorFuncs is not None):
-        for ii in range(len(model.priorFuncs)):
-            func=model.priorFuncs[ii]
+    priorFuncs=interpretPriors(model) # interpretPriors does a few
+                                      # things, but here we only care
+                                      # about getting priorFuncs
+    if(priorFuncs is not None):
+        for ii in range(len(priorFuncs)):
+            func=priorFuncs[ii]
             if(func is not None):
                 chisq_prior+=func(pars[ii])
         if(chisq_prior == np.Inf):
@@ -188,7 +191,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
     return -0.5*(chisq_like+chisq_prior)
 
 
-def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
+def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,nThreads=1,seed=None):
     """Call emcee and return sampler to fit model to velocity and/or imaging data
 
     Inputs:
@@ -198,7 +201,7 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         imErr - errorbars on imObs
         model object with priors
         addNoise - bool for whether to fit noisy or noise-free observations
-        nWalkers, nBurn, nSteps - see emcee documentation
+        nWalkers, nBurn, nSteps, nThreads - see emcee documentation
         seed - optional for random number repeatability
     
     Returns:
@@ -250,7 +253,7 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
 
     # RUN MCMC
     walkerStart=np.array([np.random.randn(nWalkers)*model.guessScale[ii]+model.guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[model, xobs, yobs, vel, velErr, ellObs, ellErr])
+    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[model, xobs, yobs, vel, velErr, ellObs, ellErr],threads=nThreads)
     print "emcee burnin"
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
