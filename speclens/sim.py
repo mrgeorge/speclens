@@ -10,64 +10,64 @@ import plot
 pixScale=0.1
 imgSizePix=100
 
-def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
+def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
     """Return fiber center positions and fiber shape given config string.
 
     Inputs:
-        numFib - number of fibers
-        fibRad - fiber radius in arcsec for circular fibers
+        nSamp - number of fibers
+        sampSize - fiber radius in arcsec for circular fibers
                  or edge length for square fibers
-        fibConfig - configuration string (hex|hexNoCen|slit|ifu|triNoCen)
-        fibPA - position angle for configs with square fibers (default None)
+        sampConfig - configuration string (hex|hexNoCen|slit|ifu|triNoCen)
+        sampPA - position angle for configs with square fibers (default None)
     Returns:
         (pos, fibShape)
-            pos - 2 x numFib ndarray with fiber centers in arcsecs from origin
+            pos - 2 x nSamp ndarray with fiber centers in arcsecs from origin
             fibShape - string "circle" or "square"
     """        
 
-    pos=np.zeros((2,numFib))
+    pos=np.zeros((2,nSamp))
 
-    if(fibConfig=="hex"):
+    if(sampConfig=="hex"):
         fibShape="circle"
         pos[:,0]=np.array([0.,0.])
-        theta=np.linspace(0,2*np.pi,num=numFib-1,endpoint=False)
-        rad=2.*fibRad
+        theta=np.linspace(0,2*np.pi,num=nSamp-1,endpoint=False)
+        rad=2.*sampSize
         pos[0,1:]=rad*np.cos(theta)
         pos[1,1:]=rad*np.sin(theta)
-    elif(fibConfig=="hexNoCen"):
+    elif(sampConfig=="hexNoCen"):
         fibShape="circle"
-        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
-        rad=2.*fibRad
+        theta=np.linspace(0,2*np.pi,num=nSamp,endpoint=False)
+        rad=2.*sampSize
         pos[0,:]=rad*np.cos(theta)
         pos[1,:]=rad*np.sin(theta)
-    elif(fibConfig=="slit"):
+    elif(sampConfig=="slit"):
         fibShape="square"
-        slitX=np.linspace(-1,1,num=numFib)*0.5*fibRad*(numFib-1)
-        pos[0,:]=slitX*np.cos(np.deg2rad(fibPA))
-        pos[1,:]=slitX*np.sin(np.deg2rad(fibPA))
-    elif(fibConfig=="crossslit"):
+        slitX=np.linspace(-1,1,num=nSamp)*0.5*sampSize*(nSamp-1)
+        pos[0,:]=slitX*np.cos(np.deg2rad(sampPA))
+        pos[1,:]=slitX*np.sin(np.deg2rad(sampPA))
+    elif(sampConfig=="crossslit"):
         fibShape="square"
-        slit1X=np.linspace(-1,1,num=0.5*numFib)*0.5*fibRad*(0.5*numFib-1)
-        slit2X=np.linspace(-1,1,num=0.5*numFib)*0.5*fibRad*(0.5*numFib-1)
-        pos[0,:]=np.append(slit1X*np.cos(np.deg2rad(fibPA)), slit2X*np.cos(np.deg2rad(fibPA+90.)))
-        pos[1,:]=np.append(slit1X*np.sin(np.deg2rad(fibPA)), slit2X*np.sin(np.deg2rad(fibPA+90.)))
-    elif(fibConfig=="ifu"):
+        slit1X=np.linspace(-1,1,num=0.5*nSamp)*0.5*sampSize*(0.5*nSamp-1)
+        slit2X=np.linspace(-1,1,num=0.5*nSamp)*0.5*sampSize*(0.5*nSamp-1)
+        pos[0,:]=np.append(slit1X*np.cos(np.deg2rad(sampPA)), slit2X*np.cos(np.deg2rad(sampPA+90.)))
+        pos[1,:]=np.append(slit1X*np.sin(np.deg2rad(sampPA)), slit2X*np.sin(np.deg2rad(sampPA+90.)))
+    elif(sampConfig=="ifu"):
         fibShape="square"
-        numSide=np.sqrt(numFib)
+        numSide=np.sqrt(nSamp)
         if(np.int(numSide) != numSide):
             print "Error: ifu config needs a square number of fibers"
         else:
-            ifuX=np.linspace(-1,1,num=numSide)*0.5*fibRad*(numSide-1)
+            ifuX=np.linspace(-1,1,num=numSide)*0.5*sampSize*(numSide-1)
             xx,yy=np.meshgrid(ifuX,ifuX)
             xx=xx.flatten()
             yy=yy.flatten()
-            PArad=np.deg2rad(fibPA)
+            PArad=np.deg2rad(sampPA)
             pos[0,:]=xx*np.cos(PArad)-yy*np.sin(PArad)
             pos[1,:]=xx*np.sin(PArad)+yy*np.cos(PArad)
-    elif(fibConfig=="triNoCen"):
+    elif(sampConfig=="triNoCen"):
         fibShape="circle"
-        theta=np.linspace(0,2*np.pi,num=numFib,endpoint=False)
-        rad=fibRad
+        theta=np.linspace(0,2*np.pi,num=nSamp,endpoint=False)
+        rad=sampSize
         pos[0,:]=rad*np.cos(theta)
         pos[1,:]=rad*np.sin(theta)
     else:
@@ -87,17 +87,17 @@ def thetaIntegrand(theta,fiberPos,image,fibRad,tol):
     return scipy.integrate.quad(radIntegrand,0,fibRad,args=(theta,fiberPos,image),epsabs=tol,epsrel=tol)[0]
 def getFiberFlux(fibID,numFib,fibRad,fibConfig,image,tol=1.e-4):
     """Integrate image flux over fiber area, used by galsim version of getFiberFlux"""
-    fiberPos=getFiberPos(numFib,fibRad,fibConfig)[:,fibID]
+    fiberPos=getSamplePos(numFib,fibRad,fibConfig)[:,fibID]
     return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
 
 
-def getFiberFluxes(xobs,yobs,fibRad,fibConvolve,image):
+def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image):
     """Convolve image with fiber area and return fiber flux.
 
     Inputs:
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
-        fibRad - fiber radius in arcsecs
+        sampSize - fiber radius in arcsecs
         fibConvolve - if False, just sample the image at central position 
                       without convolving, else convolve
         image - galsim object
@@ -116,9 +116,9 @@ def getFiberFluxes(xobs,yobs,fibRad,fibConvolve,image):
     coordsPix=np.array([xobs,yobs])/pixScale + 0.5*imgSizePix # converted to pixels
 
     if(fibConvolve):
-        scale_radius=10.*fibRad
+        scale_radius=10.*sampSize
         beta=0.
-        fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=fibRad) # a kludgy way to get a circular tophat
+        fiber=galsim.Moffat(beta=beta,scale_radius=scale_radius,trunc=sampSize) # a kludgy way to get a circular tophat
 
         fibImage=galsim.Convolve([fiber,image])
         fibImageArr=fibImage.draw(image=imgFrame,dx=pixScale).array.copy()
@@ -589,7 +589,7 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     """Get flux-weighted fiber-averaged velocities
 
     vmapObs computes fiber sampling in two ways, depending on convOpt
-        for convOpt=galsim, need to specify atmos_fwhm,fibRad,fibConvolve
+        for convOpt=galsim, need to specify atmos_fwhm,vSampSize,fibConvolve
         for convOpt=pixel, need to specify kernel
 
     Inputs:

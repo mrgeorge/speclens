@@ -67,21 +67,24 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
     """Generate input model parameters and observables for one galaxy
 
     Inputs:
+        (model object must contain the following)
         inputPriors - list of priors for input pars, 
                       see fit.interpretPriors for format
                       default [[0,360],[0,1],150,(0,0.05),(0,0.05)]
         disk_r - galaxy size, float or ndarray (default None)
-        convOpt - None (default), "galsim", or "pixel"
+        convOpt - None, "galsim", or "pixel"
         atmos_fwhm - gaussian PSF FWHM (default None)
-        numFib - number of fibers (default 6)
-        fibRad - fiber radius in arcsecs (default 1)
-        fibConvolve - bool for whether to convolved with fiber (default False)
+        nVSamp - number of velocity samples
+        vSampSize - fiber radius or slit/ifu pixel length in arcsecs
+        vSampConvolve - bool for whether to convolved with fiber
                       (note PSF and fiber convolution controlled separately)
-        fibConfig - string used by sim.getFiberPos to describe 
-                    slit/ifu/fiber config (default "hexNoCen")
-        fibPA - fiber position angle if shape is square (default None)
+        vSampConfig - string used by sim.getSamplePos to describe 
+                      slit/ifu/fiber config
+        vSampPA - fiber position angle if shape is square (default None)
+
+    
         sigma - rms velocity error in km/s (default 30.)
-        ellErr - ndarray (gal_beta_err degrees, gal_q_err), default [10,0.1]
+        ellErr - ndarray (diskPA_err degrees, diskBA_err), default [10,0.1]
         seed - random number generator repeatability (default None)
         randomPars - if True (default), make a random instance of inputPars
                        given inputPriors, else use model.origPars
@@ -103,10 +106,10 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
     # if PA offsets are desired, set model.vSampPA first
     ellObs=sim.ellModel(model)
 
-    pos,fibShape=sim.getFiberPos(model.nVSamp,model.vSampSize,
-                                 model.vSampConfig,model.vSampPA)
+    pos,sampShape=sim.getSamplePos(model.nVSamp,model.vSampSize,
+                                  model.vSampConfig,sampPA=model.vSampPA)
     xvals,yvals=pos
-    model.vSampShape=fibShape
+    model.vSampShape=sampShape
     if(model.convOpt is not None):
         model.kernel=sim.makeConvolutionKernel(xvals,yvals,model)
         vvals=sim.vmapObs(model,xvals,yvals)

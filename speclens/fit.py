@@ -184,7 +184,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
 
 def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,seed=None):
-    """Call emcee and return sampler to fit model to fiber velocities
+    """Call emcee and return sampler to fit model to velocity and/or imaging data
 
     Inputs:
         vobs - velocity data array to be fit
@@ -204,7 +204,7 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
     # SETUP DATA
     if(vobs is not None):
         numFib=vobs.size
-        pos,fibShape=sim.getFiberPos(model.nVSamp,model.vSampSize,model.vSampConfig,fibPA=model.vSampPA)
+        pos,fibShape=sim.getSamplePos(model.nVSamp,model.vSampSize,model.vSampConfig,sampPA=model.vSampPA)
         xobs,yobs=pos
         vel=np.array(vobs).copy()
         velErr=np.repeat(sigma,numFib)
