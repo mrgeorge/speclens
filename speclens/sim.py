@@ -237,27 +237,41 @@ def convertInclination(diskBA=None, diskCA=None, inc=None):
         inc = np.arcsin(np.sqrt((1. - diskBA**2)/(1. - diskCA**2)))
         return inc
 
-def getOmega(rad,rotCurvePars,rotCurveOpt='flat'):
+def getOmega(rad,rotCurvePars,rotCurveOpt="flat"):
     """Return angular rotation rate, i.e. v(r)/r
 
     Inputs:
         rad - ndarray of radii at which to sample
         rotCurvePars - float or array of option-dependent rotation curve parameters
-        rotCurveOpt - "flat", "solid", or "nfw" (default "flat")
+        rotCurveOpt - "flat", "solid", "nfw", or "arctan" (default "flat")
     Returns:
         omega - ndarray same length as rad with rotation rates
+
+    Note: distance units are not specified here, but units for rad and
+          any scale radii in rotCurvePars should be consistent (typically arcsec)
     """
 
-    if(rotCurveOpt=='flat'): # v(r)=rotCurvePars[0]
+    if(rotCurveOpt=="flat"): 
+        # rotCurvePars = [vcirc]
+        # v(r)=rotCurvePars[0]
         return rotCurvePars[0]/rad
-    elif(rotCurveOpt=='solid'): # v(r)=rotCurvePars[0]*rad/rotCurvePars[1]
+    elif(rotCurveOpt=="solid"):
+        # rotCurvePars = [vcirc, rscale]
+        # v(r)=rotCurvePars[0]*rad/rotCurvePars[1]
         return rotCurvePars[0]/rotCurvePars[1]
-    elif(rotCurveOpt=='nfw'):
+    elif(rotCurveOpt=="nfw"):
+        # rotCurvePars = [vcirc, rscale]
         # v ~ sqrt(M(<r)/r)
         # M(<r) ~ [log(1 + r/rs) - r/(r+rs)]
         mass=np.log(1.+rad/rotCurvePars[1]) - rad/(rad+rotCurvePars[1])
         vel=np.sqrt(mass/rad)
         return rotCurvePars[0]*vel/rad
+    elif(rotCurveOpt=="arctan"):
+        # rotCurvePars = [vcirc, rscale]
+        # Courteau 1997 - v(r) = (2/pi) * vc * arctan(r/rt)
+        return (2./np.pi)*rotCurvePars[0]*np.arctan(rad/rotCurvePars[1]) / rad
+    else:
+        raise ValueError(rotCurveOpt)
 
 def makeGalVMap(model):
     """Construct galsim objects for image, velocity map, and flux-weighted velocity map.
@@ -273,7 +287,7 @@ def makeGalVMap(model):
         diskPA - position angle in degrees
         galFlux - normalization of image flux
         atmosFWHM - FWHM of gaussian PSF
-        rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
+        rotCurveOpt - option for getOmega ("flat", "solid", "nfw", or "arctan")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
@@ -321,10 +335,10 @@ def makeGalVMap(model):
     gal_beta_rad=np.deg2rad(model.diskPA)
 
     # Fill velocity map array
-    xx, yy=np.meshgrid(range(galImg.xmin-1,galImg.xmax),range(galImg.ymin-1,galImg.ymax))
-    xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
-    yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
-    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
+    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))  # pixels
+    xp=((xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad))*model.pixScale  # arcseconds
+    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*model.pixScale  # arcseconds
+    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))  # arcseconds
     vmapArr=getOmega(radNorm,model.rotCurvePars,option=model.rotCurveOpt) * sini * xp
     vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
 
@@ -370,7 +384,7 @@ def makeGalVMap2(model):
         diskCA - edge-on axis ratio
         diskPA - position angle in degrees
         galFlux - normalization of image flux
-        rotCurveOpt - option for getOmega ("flat", "solid", or "nfw")
+        rotCurveOpt - option for getOmega ("flat", "solid", "nfw", or "arctan")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
@@ -420,10 +434,10 @@ def makeGalVMap2(model):
     gal_beta_rad=np.deg2rad(model.diskPA)
 
     # Fill velocity map array
-    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))
-    xp=(xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad)
-    yp=-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad)
-    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
+    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))  # pixels
+    xp=((xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad))*model.pixScale  # arcseconds
+    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*model.pixScale  # arcseconds
+    radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))  # arcseconds
     vmapArr=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
 
     # Weight velocity map by galaxy flux
