@@ -45,6 +45,12 @@ def getFiberPos(numFib,fibRad,fibConfig,fibPA=None):
         slitX=np.linspace(-1,1,num=numFib)*0.5*fibRad*(numFib-1)
         pos[0,:]=slitX*np.cos(np.deg2rad(fibPA))
         pos[1,:]=slitX*np.sin(np.deg2rad(fibPA))
+    elif(fibConfig=="crossslit"):
+        fibShape="square"
+        slit1X=np.linspace(-1,1,num=0.5*numFib)*0.5*fibRad*(0.5*numFib-1)
+        slit2X=np.linspace(-1,1,num=0.5*numFib)*0.5*fibRad*(0.5*numFib-1)
+        pos[0,:]=np.append(slit1X*np.cos(np.deg2rad(fibPA)), slit2X*np.cos(np.deg2rad(fibPA+90.)))
+        pos[1,:]=np.append(slit1X*np.sin(np.deg2rad(fibPA)), slit2X*np.sin(np.deg2rad(fibPA+90.)))
     elif(fibConfig=="ifu"):
         fibShape="square"
         numSide=np.sqrt(numFib)
