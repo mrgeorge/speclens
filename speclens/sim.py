@@ -77,20 +77,6 @@ def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
     return (pos,fibShape)
 
 
-# These functions take a galsim object <image> and integrate over the area of a fiber (currently obsolete)
-def radIntegrand(rad,theta,fiberPos,image):
-    """Evaluate radial integrand used by galsim version of getFiberFlux"""
-    pos=galsim.PositionD(x=fiberPos[0]+rad*np.cos(theta),y=fiberPos[1]+rad*np.sin(theta))
-    return rad*image.xValue(pos)
-def thetaIntegrand(theta,fiberPos,image,fibRad,tol):
-    """Evaluate theta integrand used by galsim version of getFiberFlux"""
-    return scipy.integrate.quad(radIntegrand,0,fibRad,args=(theta,fiberPos,image),epsabs=tol,epsrel=tol)[0]
-def getFiberFlux(fibID,numFib,fibRad,fibConfig,image,tol=1.e-4):
-    """Integrate image flux over fiber area, used by galsim version of getFiberFlux"""
-    fiberPos=getSamplePos(numFib,fibRad,fibConfig)[:,fibID]
-    return scipy.integrate.quad(thetaIntegrand,0,2.*np.pi, args=(fiberPos,image,fibRad,tol), epsabs=tol, epsrel=tol)
-
-
 def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image):
     """Convolve image with fiber area and return fiber flux.
 
@@ -104,10 +90,7 @@ def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image):
     Returns:
         fiberFluxes - ndarray of values sampled at fiber centers in convolved image.
 
-    Note: getFiberFluxes is meant as an update to getFiberFlux since 
-          sampling the image after galsim's Convolve with scipy's map_coordinates
-          should be faster than the real-space integral over each fiber.
-          But, getFiberFluxes currently assumes circular fibers only, and
+    Note: getFiberFluxes currently assumes circular fibers only, and
           is being superceded by makeConvolutionKernel with convOpt=pixel.
     """
 
