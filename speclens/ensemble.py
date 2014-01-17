@@ -11,55 +11,30 @@ import galsim # for PS or NFW shear prior
 import sim
 import fit
 
-def generatePars(nGal,priors,shearOpt=None,seed=None):
+def generatePars(nGal,priors,seed=None):
     """Generate set of galaxies with shapes following a set of priors
 
     Inputs:
         nGal - number of galaxies to generate
-        priors - see fit.interpretPriors for conventions, must not be None here
-        shearOpt - distribution of shears, if not set by priors ("PS", "NFW", None)
+        priors - see fit.getPriorFuncs for conventions, must not be None here
         seed - used for repeatable random number generation (default None)
     Returns:
-        pars - ndarray (nGal x [gal_beta, gal_q, vmax, g1, g2])
+        pars - ndarray (e.g. nGal x [diskPA, diskBA, vmax, g1, g2])
     """
 
     nPars=len(priors)
     pars=np.zeros((nGal,nPars))
     np.random.seed(seed)
-    for ii in xrange(nPars):
-        prior=priors[ii]
-        # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
-        if((isinstance(prior, int)) | (isinstance(prior, float))): # fixed
-            fixVal=np.copy(prior)
-            pars[:,ii]=fixVal
-        elif(isinstance(prior, list)): # flat prior
-            priorRange=np.copy(prior)
-            pars[:,ii]=np.random.rand(nGal)*(priorRange[1]-priorRange[0]) + priorRange[0]
-        elif(isinstance(prior, tuple)): # gaussian
-            priorMean=np.copy(prior[0])
-            priorSigma=np.copy(prior[1])
-            pars[:,ii]=np.random.randn(nGal)*priorSigma + priorMean
-
-    if(shearOpt is not None):
-        # define area
-        density=150./3600 # 150/sq deg in /sq arcsec (~BOSS target density)
-        area=nGal/density # sq arcsec
-        gridLength=np.ceil(np.sqrt(area)) # arcsec
-        gridSpacing=1. # arcsec
-
-        # assign random uniform positions with origin at center
-        xpos=np.random.rand(nGal)*gridLength - 0.5*gridLength
-        ypos=np.random.rand(nGal)*gridLength - 0.5*gridLength
-        
-        if(shearOpt == "PS"):
-            ps=galsim.PowerSpectrum(lambda k: k**2)
-            ps.buildGrid(grid_spacing=gridSpacing, ngrid=gridLength)
-            g1, g2 = ps.getShear((xpos,ypos))
-            pars[:,-2]=g1
-            pars[:,-1]=g2
-
-        elif(shearOpt == "NFW"):
-            pass
+    
+    # getPriorFuncs can't handle fixed values
+    # so they need to be treated separately
+    # otherwise use the function's rvs method to generate random deviates
+    for ii,prior in priors:
+        if(prior[0] == "fixed"):
+            pars[:,ii]=np.copy(prior[1])
+        else:
+            priorFunc=fit.getPriorFuncs([prior])[0]
+            pars[:,ii]=priorFunc.rvs(nGal)
 
     return pars
     
@@ -94,7 +69,7 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
 
     # Setup galaxy properties
     if(randomPars):
-        inputPars=generatePars(1,model.inputPriors,shearOpt=None,seed=seed).squeeze()
+        inputPars=generatePars(1,model.inputPriors,seed=seed).squeeze()
         model.origPars=inputPars # overwrite the default pars array used
                                  # to initialize model
         model.updatePars(inputPars) # overwrite individual attributes
@@ -210,9 +185,9 @@ def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels
                         (dir+"statsIS_{:03d}.fits.gz".format(ii) in statsISFiles))
         if(filesExist):
             if(listInput):
-                inputPars[ii,:]=generatePars(1,inputPriors[ii],shearOpt=None,seed=ii).squeeze()[free]
+                inputPars[ii,:]=generatePars(1,inputPriors[ii],seed=ii).squeeze()[free]
             else:
-                inputPars[ii,:]=generatePars(1,inputPriors,shearOpt=None,seed=ii).squeeze()[free]
+                inputPars[ii,:]=generatePars(1,inputPriors,seed=ii).squeeze()[free]
 
             if(fileType=="chain"):
                 recI=io.readRec(dir+"chainI_{:03d}.fits.gz".format(ii))
