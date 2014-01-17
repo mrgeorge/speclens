@@ -24,7 +24,131 @@ def makeGaussPrior(mean, sigma):
 
 def makeGaussTruncPrior(mean, sigma, range):
     return lambda x: ((x-mean)/sigma)**2 + priorFlat(x, range)
+
+def getPriorFuncs(priors):
+    """Translate human-readable description of priors into functions
+
+    Inputs:
+        priors - a list of tuples [(string, arg1, arg2...), ...]
+                each tuple is for one parameter
+                string options:
+                    "norm" - gaussian, arg1=mean, arg2=sigma
+                    "truncnorm" - truncated gaussian, arg1=mean,
+                                      arg2=sigma, arg3=min,
+                                      arg4=max
+                    "uniform" - arg1=min, arg2=max
+                    "wrap" similar to uniform, but lnProb will also 
+                           wrap values within bounds. 
+                           arg1=min, arg2=max
+            Note: "fixed" values should be removed beforehand
+    Returns:
+        priorFuncs - array of functions from scipy.stats
+                     useful sub-methods include pdf(x) and logpdf(x)
+                     which evaluate the distribution at x and rvs(N)
+                     which produces N random deviates.
+    """
+
+    nPars=len(priors)
+    priorFuncs=np.repeat(None, nPars)
+    for ii,prior in enumerate(priors):
+        # note: each of the assignments below needs to *copy*
+        # aspects of prior to avoid pointer overwriting
+        if(prior is not None):
+            if(prior[0]=="norm"):
+                priorFuncs[ii]=scipy.stats.norm(loc=np.copy(prior[1]),
+                                                scale=np.copy(prior[2]))
+            elif(prior[0]=="truncnorm"):
+                pmean=np.copy(prior[1])
+                psigma=np.copy(prior[2])
+                pmin=np.copy(prior[3])
+                pmax=np.copy(prior[4])
+                priorFuncs[ii]=scipy.stats.truncnorm((pmean-pmin)/psigma,
+                        (pmean-pmax)/psigma, loc=pmean, scale=psigma)
+            elif(prior[0] in ("uniform", "wrap")):
+                pmin=np.copy(prior[1])
+                pmax=np.copy(prior[2])
+                priorFuncs[ii]=scipy.stats.uniform(loc=pmin,
+                        scale=pmax-pmin)
+            else:
+                raise ValueError(prior[0])
+        else:
+            priorFuncs[ii]=None
+    else priorFuncs=None
+
+    return priorFuncs
+
+def wrapPars(priors, pars):
+    """Handle pars that should be wrapped around a given range
+
+    Parameters can be wrapped to allow a finite range without
+    messy sampling effects near the boundaries.
+
+    To wrap a parameter, specify its prior as ("wrap",min,max)
+    The distribution is assumed uniform over the range [min,max)
+
+    Inputs:
+        priors - see getPriorFuncs for description
+        pars - ndarray of parameters
+
+    Returns:
+        pars is updated with any wraps
+    """
+    for ii,prior in enumerate(priors):
+        if(prior is not None):
+            if(prior[0]=="wrap"):
+                pmin=np.copy(prior[1])
+                pmax=np.copy(prior[2])
+                pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
+    return
+
+def removeFixedPars(model):
+    """Find pars to be fixed and removed from MCMC
+
+    Values can be fixed by setting their prior as ("fixed", value).
+    As a result, they are removed from the chain to speed up
+    evaluation.
+
+    Model object is inspected for origPriors and updated with the addition
+    of the following arrays:
+        fixed - same length as origGuess, entries are None for free
+                pars and the fixed value for fixed pars. This array can be 
+                used to to reconstruct the full parameter array when coupled 
+                with an entry from the Markov chain.
+
+        priors, guess, guessScale - copies of origPriors, origGuess,
+                origGuessScale with any fixed pars removed
+    """
     
+    # store initial guess and range for emcee
+    # these arrays will be shortened if there are fixed parameters
+    priors=np.copy(model.origPriors)
+    guess=np.copy(model.origGuess)
+    guessScale=np.copy(model.origGuessScale)
+    nPars=len(priors) # Number of pars in FULL MODEL (some may get fixed and not be sent to emcee)
+
+    # find fixed entries and record values
+    fixed=np.repeat(None, nPars)
+    delarr=np.array([])
+    for ii,prior in enumerate(priors):
+        if(prior is not None):
+            if(prior[0]=="fixed"):
+                fixed[ii]==np.copy(prior[1])
+                delarr=np.append(delarr,ii)
+
+    # remove fixed entries from list of pars to fit
+    if(len(delarr) > 0):
+        priors=np.delete(priors,delarr)
+        guess=np.delete(guess,delarr)
+        guessScale=np.delete(guessScale,delarr)
+
+    # update model object
+    model.fixed=fixed
+    model.priors=priors
+    model.guess=guess
+    model.guessScale=guessScale
+
+    return
+
 def interpretPriors(model):
     """Generate functions to evaluate priors and fix variables.
 
@@ -71,17 +195,22 @@ def interpretPriors(model):
                     fixed[ii]=fixVal
                 elif(isinstance(prior, list)):
                     priorRange=np.copy(prior)
-                    priorFuncs[ii]=makeFlatPrior(priorRange)
+                    priorFuncs[ii]=scipy.stats.uniform(loc=priorRange[0],
+                                                       scale=priorRange[1]-priorRange[0]).logpdf
                 elif(isinstance(prior, tuple)):
                     if(len(prior)==2):
                         priorMean=np.copy(prior[0])
                         priorSigma=np.copy(prior[1])
-                        priorFuncs[ii]=makeGaussPrior(priorMean,priorSigma)
+                        priorFuncs[ii]=scipy.stats.norm(loc=priorMean,
+                                                        scale=priorSigma).logpdf
                     elif(len(prior)==4):
                         priorMean=np.copy(prior[0])
                         priorSigma=np.copy(prior[1])
                         priorRange=np.copy(prior[2:])
-                        priorFuncs[ii]=makeGaussTruncPrior(priorMean,priorSigma,priorRange)
+                        priorFuncs[ii]=scipy.stats.truncnorm(
+                            (priorMean-priorRange[0])/priorSigma,
+                            (priorMean-priorRange[1])/priorSigma,
+                            loc=priorMean, scale=priorSigma).logpdf
                     else:
                         raise ValueError(prior)
                 else:
@@ -118,7 +247,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
     Inputs:
         pars - ndarray of N model parameters to be fit (N<=M)
-        model object with fixed and priorFuncs defined
+        model object with fixed array defined
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
         vobs - float or ndarray of fiber velocities
@@ -130,23 +259,18 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
         lnP - a float (this is what emcee needs)
     """
 
-    # wrap PA to fall between 0 and 360
-    if(model.fixed[0] is None):
-        pars[0]=pars[0] % 360.
-    else:
-        model.fixed[0]=model.fixed[0] % 360.
+    # wrap any pars that need wrapping, e.g. PA
+    wrapPars(model.priors, pars)
 
     # First evaluate the prior to see if this set of pars should be ignored
-    chisq_prior=0.
-    priorFuncs=interpretPriors(model) # interpretPriors does a few
-                                      # things, but here we only care
-                                      # about getting priorFuncs
+    lnp_prior=0.
+    priorFuncs=getPriorFuncs(model.priors)
     if(priorFuncs is not None):
         for ii in range(len(priorFuncs)):
             func=priorFuncs[ii]
             if(func is not None):
-                chisq_prior+=func(pars[ii])
-        if(chisq_prior == np.Inf):
+                lnp_prior+=func.logpdf(pars[ii])  # logpdf requires a modern version of scipy
+        if(lnp_prior == -np.Inf):  # we can skip likelihood evaluation
             return -np.Inf
 
     # re-insert any fixed parameters into pars array
@@ -188,7 +312,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
         chisq_like=np.sum(((modelVals-dataVals)/errorVals)**2)
 
-    return -0.5*(chisq_like+chisq_prior)
+    return -0.5*chisq_like+lnp_prior
 
 
 def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,nThreads=1,seed=None):
@@ -247,9 +371,9 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         vel+=specNoise
 
 
-    # SETUP PARS and PRIORS
-    interpretPriors(model)
-    nPars=len(model.guess)
+    # SETUP CHAIN SHAPE
+    removeFixedPars(model)
+    nPars=len(model.guess) # number of FREE pars to fit
 
     # RUN MCMC
     walkerStart=np.array([np.random.randn(nWalkers)*model.guessScale[ii]+model.guess[ii] for ii in xrange(nPars)]).T
