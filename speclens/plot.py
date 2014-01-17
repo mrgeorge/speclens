@@ -8,9 +8,15 @@ import matplotlib.patches
 import numpy as np
 import scipy.stats
 import scipy.signal
-import galsim
+
 import sim
 import fit
+
+try:
+    import galsim
+    hasGalSim=True
+except ImportError:
+    hasGalSim=False
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
@@ -18,6 +24,9 @@ plt.rc('axes',linewidth=1.5)
 
 def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",lw=2,title=None,showPlot=False):
     """Plot image given by galsim object with fiber pattern overlaid"""
+
+    if(not hasGalSim):
+        raise ValueError(hasGalSim)
 
     imgFrame=galsim.ImageF(sim.imgSizePix,sim.imgSizePix)
     img=profile.draw(image=imgFrame,dx=sim.pixScale)

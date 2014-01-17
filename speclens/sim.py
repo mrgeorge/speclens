@@ -1,14 +1,18 @@
 #! env python
 
-import galsim
 import scipy.integrate
 import scipy.signal
 import scipy.ndimage
 import numpy as np
+
 import plot
 
-pixScale=0.1
-imgSizePix=100
+try:
+    import galsim
+    hasGalSim=True
+except ImportError:
+    hasGalSim=False
+
 
 def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
     """Return fiber center positions and fiber shape given config string.
@@ -77,7 +81,7 @@ def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
     return (pos,fibShape)
 
 
-def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image):
+def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image,imgSizePix,pixScale):
     """Convolve image with fiber area and return fiber flux.
 
     Inputs:
@@ -298,6 +302,9 @@ def makeGalVMap(model):
 
     Note: See also makeGalVMap2, which uses pixel arrays instead of galsim objects
     """
+
+    if(not hasGalSim):
+        raise ValueError(hasGalSim)
     
     # Define the galaxy velocity map
     if(0 < model.bulgeFraction < 1):
@@ -607,8 +614,8 @@ def vmapObs(model,xobs,yobs,showPlot=False):
             plot.showImage(fluxVMap,xobs,yobs,model.vSampSize,showPlot=True)
 
         # Get the flux in each fiber
-        galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal)
-        vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap)
+        galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal,model.nPix,model.pixScale)
+        vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap,model.nPix,model.pixScale)
 
     elif(model.convOpt=="pixel"):
         vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model)
