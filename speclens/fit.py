@@ -8,22 +8,6 @@ import sim
 ####
 # Priors
 ####
-# These generate functions used in lnProbVMapModel to compute chisq_prior
-
-def makeFlatPrior(range):
-    return lambda x: priorFlat(x, range)
-
-def priorFlat(arg, range):
-    if((arg >= range[0]) & (arg < range[1])):
-        return 0
-    else:
-        return np.Inf
-
-def makeGaussPrior(mean, sigma):
-    return lambda x: ((x-mean)/sigma)**2
-
-def makeGaussTruncPrior(mean, sigma, range):
-    return lambda x: ((x-mean)/sigma)**2 + priorFlat(x, range)
 
 def getPriorFuncs(priors):
     """Translate human-readable description of priors into functions
@@ -149,89 +133,6 @@ def removeFixedPars(model):
 
     return
 
-def interpretPriors(model):
-    """Generate functions to evaluate priors and fix variables.
-
-    Inputs:
-        (model object must contain the following:)
-        priors - a list or tuple with an entry for each of M parameters 
-          in the full model. Each parameter can have a prior set by one of
-          the following formats:
-            None - leave this variable completely free
-            float - fix the variable to this value
-            list[a,b] - flat prior between a and b
-            tuple(a,b) - gaussian prior with mean a and stddev b
-            tuple(a,b,c,d) - gaussian prior with mean a and stddev b, truncated at c and d
-        origGuess - ndarray of length M with initial guess for each parameter
-        origGuessScale - ndarray of length M with approximate guess range for each parameter
-    
-    Returns:
-        priorFuncs - ndarray of functions of length N (# of free parameters to fit)
-            (not stored as model attribute since these aren't pickleable)
-        model object is updated with the following arrays:
-            fixed - ndarray of length M; None for free pars, float for fixed pars
-            guess - ndarray of length N with initial guesses
-            guessScale - ndarray of length N with scale for range of initial guesses
-            (Note: guess and guessScale may be smaller than origGuess and origGuessScale
-                   if N<M, i.e. if there are fixed parameters.)
-    """
-
-    # Define initial guess and range for emcee
-    # these arrays will be shortened if there are fixed parameters
-    guess=np.copy(model.origGuess)
-    guessScale=np.copy(model.origGuessScale)
-    nPars=len(model.priors) # Number of pars in FULL MODEL (some may get fixed and not be sent to emcee)
-
-    fixed=np.repeat(None, nPars)
-    priorFuncs=np.repeat(None, nPars)
-    if(model.priors is not None):
-        for ii in xrange(nPars):
-            prior=model.priors[ii]
-            # note: each of the assignments below needs to *copy* aspects of prior to avoid pointer overwriting
-            if(prior is not None):
-                if((isinstance(prior, int)) | (isinstance(prior, float))):
-                # entry will be removed from list of pars and guess but value is still sent to evauluate function
-                    fixVal=np.copy(prior)
-                    fixed[ii]=fixVal
-                elif(isinstance(prior, list)):
-                    priorRange=np.copy(prior)
-                    priorFuncs[ii]=scipy.stats.uniform(loc=priorRange[0],
-                                                       scale=priorRange[1]-priorRange[0]).logpdf
-                elif(isinstance(prior, tuple)):
-                    if(len(prior)==2):
-                        priorMean=np.copy(prior[0])
-                        priorSigma=np.copy(prior[1])
-                        priorFuncs[ii]=scipy.stats.norm(loc=priorMean,
-                                                        scale=priorSigma).logpdf
-                    elif(len(prior)==4):
-                        priorMean=np.copy(prior[0])
-                        priorSigma=np.copy(prior[1])
-                        priorRange=np.copy(prior[2:])
-                        priorFuncs[ii]=scipy.stats.truncnorm(
-                            (priorMean-priorRange[0])/priorSigma,
-                            (priorMean-priorRange[1])/priorSigma,
-                            loc=priorMean, scale=priorSigma).logpdf
-                    else:
-                        raise ValueError(prior)
-                else:
-                    raise ValueError(ii,prior,type(prior))
-
-    # remove fixed entries from list of pars to fit
-    delarr=np.array([])
-    for ii in xrange(nPars):
-        if(fixed[ii] is not None):
-            delarr=np.append(delarr,ii)
-    if(len(delarr) > 0):
-        guess=np.delete(guess,delarr)
-        guessScale=np.delete(guessScale,delarr)
-        priorFuncs=np.delete(priorFuncs,delarr)
-
-    model.guess=guess
-    model.guessScale=guessScale
-    model.fixed=fixed
-
-    return priorFuncs
-
 
 ####
 # Evaluate Likelihood
@@ -312,7 +213,7 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
 
         chisq_like=np.sum(((modelVals-dataVals)/errorVals)**2)
 
-    return -0.5*chisq_like+lnp_prior
+    return -0.5*chisq_like + lnp_prior
 
 
 def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,nThreads=1,seed=None):
