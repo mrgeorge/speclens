@@ -609,9 +609,15 @@ def vmapObs(model,xobs,yobs,showPlot=False):
         vmap,fluxVMap,gal=makeGalVMap(model)
 
         if(showPlot):
-            plot.showImage(gal,xobs,yobs,model.vSampSize,showPlot=True)
-            plot.showImage(vmap,xobs,yobs,model.vSampSize,showPlot=True)
-            plot.showImage(fluxVMap,xobs,yobs,model.vSampSize,showPlot=True)
+            if(not hasGalSim):
+                raise ValueError(hasGalSim)
+            vmapArr=plot.drawGSObject(vmap,model)
+            fluxVMapArr=plot.drawGSObject(vmap,model)
+            imgArr=plot.drawGSObject(vmap,model)
+
+            plot.showImage(imgArr,model,xobs,yobs,showPlot=True)
+            plot.showImage(vmapArr,model,xobs,yobs,showPlot=True)
+            plot.showImage(fluxVMapArr,model,xobs,yobs,showPlot=True)
 
         # Get the flux in each fiber
         galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal,model.nPix,model.pixScale)
@@ -620,8 +626,10 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     elif(model.convOpt=="pixel"):
         vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model)
         if(showPlot):
-            plot.showArr(imgArr)
-            plot.showArr(fluxVMapArr)
+            plot.showImage(imgArr,model,xobs,yobs,showPlot=True,title="Full image")
+            plot.showImage(thinImgArr,model,xobs,yobs,showPlot=True,title="Thin disk")
+            plot.showImage(vmapArr,model,xobs,yobs,showPlot=True,title="Velocity map")
+            plot.showImage(fluxVMapArr,model,xobs,yobs,showPlot=True,title="Flux-weighted velocity map")
         vmapFibFlux=np.array([np.sum(model.kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
         galFibFlux=np.array([np.sum(model.kernel[ii]*thinImgArr) for ii in range(model.nVSamp)])
 
