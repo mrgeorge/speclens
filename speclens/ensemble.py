@@ -6,8 +6,6 @@ import numpy as np
 import os
 import glob
 
-import galsim # for PS or NFW shear prior
-
 import sim
 import fit
 
