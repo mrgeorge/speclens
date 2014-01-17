@@ -9,7 +9,6 @@ import numpy as np
 import scipy.stats
 import scipy.signal
 
-import sim
 import fit
 
 try:
@@ -18,42 +17,64 @@ try:
 except ImportError:
     hasGalSim=False
 
+
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
 plt.rc('axes',linewidth=1.5)
 
-def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=None,colorbar=True,colorbarLabel=r"v$_{LOS}$ (km/s)",cmap=matplotlib.cm.jet,plotScale="linear",trim=0,xlabel="x (arcsec)",ylabel="y (arcsec)",ellipse=None,lines=None,lcolors="white",lstyles="--",lw=2,title=None,showPlot=False):
-    """Plot image given by galsim object with fiber pattern overlaid"""
+def drawGSObject(profile, model):
+    """Extract 2d array from galsim object"""
 
     if(not hasGalSim):
         raise ValueError(hasGalSim)
 
-    imgFrame=galsim.ImageF(sim.imgSizePix,sim.imgSizePix)
-    img=profile.draw(image=imgFrame,dx=sim.pixScale)
-    halfWidth=0.5*sim.imgSizePix*sim.pixScale # arcsec
-    #    img.setCenter(0,0)
+    imgFrame=galsim.ImageF(model.nPix,model.nPix)
+    img=profile.draw(image=imgFrame,dx=model.pixScale)
 
+    return img.array
+
+def showImage(arr, model, xsamp, ysamp, filename=None, colorbar=True,
+              colorbarLabel=r"v$_{LOS}$ (km/s)",
+              cmap=matplotlib.cm.jet, plotScale="linear", trim=0,
+              xlabel="x (arcsec)", ylabel="y (arcsec)", ellipse=None,
+              lines=None, lcolors="white", lstyles="--", lw=2,
+              title=None, showPlot=False):
+    """Plot 2d image with optional overlays
+
+    Inputs:
+        arr - 2d array with pixel values (image, vmap, etc)
+        model - object with nPix,pixScale,vSampShape,vSampeSize,vSampPA
+    Optional inputs:
+        xsamp, ysamp - positions of velocity sampling (can be None)
+                       If specified, plot sampling config (fibers, slits, etc)
+
+        (various plot aesthetics and shape arguments)
+    Returns:
+        plot is optionally displayed and optionally saved
+    """
+
+    halfWidth=0.5*model.nPix*model.pixScale # arcsec
+    
     if(plotScale=="linear"):
-        plotArr=img.array
+        plotArr=arr
     elif(plotScale=="log"):
-        plotArr=np.log(img.array)
+        plotArr=np.log(arr)
 
     plt.imshow(plotArr,origin='lower',extent=(-halfWidth,halfWidth,-halfWidth,halfWidth),interpolation='nearest',cmap=cmap)
 
-    if(xfib is not None):
-        numFib=xfib.size
-        for pos in zip(xfib,yfib):
-            if(fibShape=="circle"):
-                circ=plt.Circle((pos[0],pos[1]),radius=fibRad,fill=False,color='white',lw=lw)
+    if(xsamp is not None):
+        for pos in zip(xsamp,ysamp):
+            if(model.vSampShape=="circle"):
+                circ=plt.Circle((pos[0],pos[1]),radius=model.vSampSize,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(circ)
-            elif(fibShape=="square"):
-                PArad=np.deg2rad(fibPA)
+            elif(model.vSampShape=="square"):
+                PArad=np.deg2rad(model.vSampPA)
                 corners=np.zeros((4,2))
                 xx=np.array([-1,1,1,-1])
                 yy=np.array([-1,-1,1,1])
-                corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*fibRad+pos[0]
-                corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*fibRad+pos[1]
+                corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*model.vSampSize+pos[0]
+                corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*model.vSampSize+pos[1]
                 sq=plt.Polygon(corners,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(sq)
@@ -93,15 +114,6 @@ def showImage(profile,xfib,yfib,fibRad,fibShape="circle",fibPA=None,filename=Non
         plt.savefig(filename,bbox_inches=matplotlib.transforms.Bbox(np.array(((0,-.4),(8.5,6))))) # annoying hardcode fudge to keep labels inside plot
     if(showPlot):
         plt.show()
-
-
-def showArr(arr):
-    """Pixel equivalent of showImage (with fewer features)"""
-    
-    halfWidth=0.5*sim.imgSizePix*sim.pixScale # arcsec
-    plt.clf()
-    plt.imshow(arr,origin='lower',extent=(-halfWidth,halfWidth,-halfWidth,halfWidth),interpolation='nearest',cmap=matplotlib.cm.jet)
-    plt.show()
 
 
 def contourPlot(xvals,yvals,smooth=0,percentiles=[0.68,0.95,0.99],colors=["red","green","blue"],xlabel=None,ylabel=None,xlim=None,ylim=None,filename=None,showPlot=False):
