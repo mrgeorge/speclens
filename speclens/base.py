@@ -98,11 +98,16 @@ class Model(object):
                 g2 - shear 2 (abs<0.5)
             """
             self.origPars=[self.diskPA, self.cosi, self.vCirc, self.g1, self.g2]
-            self.labels=np.array(["PA","cos(i)","vmax","g1","g2"])
-            self.origGuess=np.array([10.,0.5,200.,0.,0.])
-            self.origGuessScale=np.array([30.,0.2,50.,0.02,0.02])
-            self.priors=[None,[0.01,0.99],(200.,20.,0.,500.),[-0.5,0.5],[-0.5,0.5]]
-            self.inputPriors=[[0.01,359.99],[0.01,0.99],200.,(0.,0.05),(0.,0.05)]
+            self.labels=np.array(["PA","cos(i)","log10(vmax)","g1","g2"])
+            self.origGuess=np.array([10.,0.5,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([30.,0.2,0.06,0.02,0.02])
+            self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,360.),
+                             ("uniform",0.01,0.99), ("fixed",np.log10(200.)),
+                             ("norm",0.,0.05), ("norm",0.,0.05)]
 
         elif(name=="B"):
             self.description="""Free disk thickness, flat rotation curve
@@ -114,12 +119,20 @@ class Model(object):
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.origPars=[self.diskPA, self.cosi, self.diskCA, np.log10(self.vCirc), self.g1, self.g2]
+            self.origPars=[self.diskPA, self.cosi, self.diskCA,
+                           np.log10(self.vCirc), self.g1, self.g2]
             self.labels=np.array(["PA","cos(i)","c/a","log10(vmax)","g1","g2"])
             self.origGuess=np.array([10.,0.5,0.2,np.log10(200.),0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.1,0.06,0.02,0.02])
-            self.priors=[None,[0.01,0.99],(0.2,0.05,0.,1.),(np.log10(200.),0.06),[-0.5,0.5],[-0.5,0.5]]
-            self.inputPriors=[[0.01,359.99],[0.01,0.99],0.2,np.log10(200.),(0.,0.05),(0.,0.05)]
+            self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
+                             ("truncnorm",0.2,0.05,0.,1.),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,360.),
+                             ("uniform",0.01,0.99), ("fixed",0.2),
+                             ("fixed",np.log10(200.)),
+                             ("norm",0.,0.05), ("norm",0.,0.05)]
 
         else:
             raise ValueError(name)
@@ -132,8 +145,9 @@ class Model(object):
         array and reassigns the stored values in the model object.
         """
         if(self.name=="A"):
-            self.diskPA, self.cosi, self.vCirc, self.g1, self.g2 = pars
+            self.diskPA, self.cosi, log10vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
+            self.vCirc = 10.**log10vCirc
         elif(self.name=="B"):
             self.diskPA, self.cosi, self.diskCA, log10vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
