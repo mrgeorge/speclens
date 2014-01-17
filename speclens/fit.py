@@ -57,7 +57,8 @@ def getPriorFuncs(priors):
                 raise ValueError(prior[0])
         else:
             priorFuncs[ii]=None
-    else priorFuncs=None
+    else:
+        priorFuncs=None
 
     return priorFuncs
 
