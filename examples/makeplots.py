@@ -36,7 +36,7 @@ def shearVMapPlot(plotDir, figExt="pdf", showPlot=False):
     trim=2.5
 
     # Start with basic model
-    model=speclens.Model("B",galName="default")
+    model=speclens.Model("A",galName="default")
     model.diskCA=0.
     model.rotCurveOpt="flat"
     model.rotCurvePars=[model.vCirc]
@@ -112,17 +112,17 @@ def shearVMapPlot(plotDir, figExt="pdf", showPlot=False):
     return
 
 def samplingPlot(plotDir, figExt="pdf", showPlot=False):
-    """Create plots of fibers overlaid on image and vmap.
+    """Plot sampling configuration overlaid on image and fvmap
 
-    Show 2 arcsec diameter fibers in hex patter overlaid
-    on galaxy image and flux-weighted velocity map to 
-    illustrate spatial sampling of the velocity field
-    including the effects of seeing.
+    Illustrate spatial sampling of the velocity field
+    including the effects of seeing. Uses default sampling
+    configuration from Model class, can be changed for
+    fibers/slits/ifu etc.
     """
 
     trim=1.
 
-    model=speclens.Model("B")
+    model=speclens.Model("A")
     model.rotCurveOpt="flat"
     model.rotCurvePars=np.array([model.vCirc])
 
@@ -158,26 +158,30 @@ def vThetaPlot(plotDir, figExt="pdf", showPlot=False):
 
     plt.clf()
     
+    # Define galaxy model    
+    model=speclens.Model("A")
+    model.vSampConfig="hexNoCen"
+    model.nVSamp=6
+    model.vSampSize=1.
+    model.atmosFWHM=None
+    model.vSampConvolve=False
+
+    # Get velocity sampling positions
+    pos,sampShape=speclens.sim.getFiberPos(model.nVSamp,model.vSampSize,model.vSampConfig)
     sigma=30. # velocity unc in km/s
+    xpos,ypos=pos
+    model.vSampShape=sampShape
     
-    gal_beta=300.
-    gal_q=0.5
-    vmax=200.
-    g1=0.
-    g2=0.
-    pars = np.array([gal_beta, gal_q, vmax, g1, g2])
-    numFib=7
-    fibRad=1.
-    fibConfig="hex"
-    pos,fibShape=speclens.sim.getFiberPos(numFib,fibRad,fibConfig)
-    xfib,yfib=pos
-    
+    # Evaluate model as smooth function of azimuthal angle
     theta=np.linspace(0,2.*np.pi,num=200)
     xvals=2.*fibRad*np.cos(theta)
     yvals=2.*fibRad*np.sin(theta)
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="blue",linestyle='-',lw=3,label="Fiducial: PA={}, b/a={}".format(pars[0],pars[1])+r", v$_{max}$"+"={}, g1={}, g2={}".format(pars[2],pars[3],pars[4]))
-    
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+
+    plt.plot(np.rad2deg(theta), vvals, color="blue", linestyle='-', lw=3,
+             label="Fiducial: PA={}, b/a={}".format(model.diskPA,model.diskBA)+
+             r", v$_{max}$"+"={}, g1={}, g2={}".format(model.vCirc,model.g1,model.g2))
+# CONTINUE EDITING HERE!
     thetasamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
     xsamp=2.*fibRad*np.cos(thetasamp)
     ysamp=2.*fibRad*np.sin(thetasamp)
