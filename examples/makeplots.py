@@ -119,35 +119,31 @@ def samplingPlot(plotDir, figExt="pdf", showPlot=False):
     illustrate spatial sampling of the velocity field
     including the effects of seeing.
     """
-        
-    bulge_n=4.
-    bulge_r=1.
-    disk_n=1.
-    disk_r=2.
-    bulge_frac=0.
-    gal_q=0.75
-    gal_beta=0.1
-    gal_flux=1.
-    atmos_fwhm=1.
-    rotCurveOpt='flat'
-    vmax=100.
-    rotCurvePars=np.array([vmax])
-    g1=0.
-    g2=0.
-    
-    vmap,fluxVMap,gal = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
+
     trim=1.
 
+    model=speclens.Model("B")
+    model.rotCurveOpt="flat"
+    model.rotCurvePars=np.array([model.vCirc])
+
+    vmap,fluxVMap,thinImg,img = speclens.sim.makeGalVMap2(model)
+
+    pos,sampShape=speclens.sim.getSamplePos(model.nVSamp,
+        model.vSampSize, model.vSampConfig, sampPA=model.vSampPA)
+
+    xpos,ypos=pos
+    model.vSampShape=sampShape
+
     plt.clf()
-    numFib=7
-    fibRad=1.
-    fibPA=None
-    fibConfig="hex"
-    pos,fibShape=speclens.sim.getFiberPos(numFib,fibRad,fibConfig)
-    xfib,yfib=pos
-    speclens.plot.showImage(gal,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,cmap=matplotlib.cm.gray,colorbar=False,filename="{}/fig2a.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.showImage(img, model, xpos, ypos,
+        filename="{}/fig2a".format(plotDir,figExt), trim=trim,
+        colorbar=True, cmap=matplotlib.cm.gray, colorbarLabel=None,
+        showPlot=showPlot)
     plt.clf()
-    speclens.plot.showImage(fluxVMap,xfib,yfib,fibRad,fibShape=fibShape,fibPA=fibPA,trim=trim,colorbar=False,filename="{}/fig2b.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.showImage(fluxVMap, model, xpos, ypos,
+        filename="{}/fig2b".format(plotDir,figExt), trim=trim,
+        colorbar=True, cmap=matplotlib.cm.jet, colorbarLabel=None,
+        showPlot=showPlot)
 
     print "Finished Fig 2"
     return
