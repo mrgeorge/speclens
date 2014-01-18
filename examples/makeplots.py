@@ -15,6 +15,10 @@ except ImportError: # add parent dir to python search path
     
 # This is a driver for functions in sim.py to create some figures for a proposal
 
+def getShapes(model):
+    ell=speclens.sim.defineEllipse(model)
+    lines=speclens.sim.getEllipseAxes(ell)
+    return (ell,lines)
 
 def shearVMapPlot(plotDir, figExt="pdf", showPlot=False):
     """Create plots illustrating shear effect on velocity map.
@@ -28,54 +32,81 @@ def shearVMapPlot(plotDir, figExt="pdf", showPlot=False):
         d) velocity map with shear at 45 deg to show misalignment
     """
 
-    bulge_n=4.
-    bulge_r=1.
-    disk_n=1.
-    disk_r=2.
-    bulge_frac=0.
-    gal_q=0.75
-    gal_beta=0.1
-    gal_flux=1.
-    atmos_fwhm=1.
-    rotCurveOpt='flat'
-    vmax=100.
-    rotCurvePars=np.array([vmax])
-    g1=0.
-    g2=0.
-    
-    ell=[disk_r,gal_q,gal_beta]
-    lines=speclens.sim.getEllipseAxes(ell)
     lw=5
-    
-    vmap,fluxVMap,gal = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     trim=2.5
-    plt.clf()
-    speclens.plot.showImage(vmap,None,None,None,trim=trim,colorbar=True,ellipse=ell,lines=lines,lw=lw,filename="{}/fig1a.{}".format(plotDir,figExt),title=r"q$_{\rm int}=0.75$, $\gamma_+=0, \gamma_{\times}=0$",showPlot=showPlot)
+
+    # Start with basic model
+    model=speclens.Model("B",galName="default")
+    model.diskCA=0.
+    model.rotCurveOpt="flat"
+    model.rotCurvePars=[model.vCirc]
+    model.cosi=0.75
+    model.diskBA=speclens.sim.convertInclination(inc=np.arccos(model.cosi),diskCA=model.diskCA)
     
-    g1=0.2
-    g2=0.
-    ellSheared=speclens.sim.shearEllipse(ell,g1,g2)
-    linesSheared=speclens.sim.shearLines(lines,g1,g2)
+    ell,lines=getShapes(model)
+    vmap,fluxVMap,thinImg,img = speclens.sim.makeGalVMap2(model)
+
+    plt.clf()
+    speclens.plot.showImage(vmap, model, None, None,
+        filename="{}/fig1a.{}".format(plotDir,figExt), trim=trim,
+        ellipse=ell, lines=lines, lw=lw, 
+        title=r"cos$(i)=0.75$, $\gamma_+=0, \gamma_{\times}=0$",
+        showPlot=showPlot)
+
+    # Now change the inclination
+    model.cosi=0.5
+    model.diskBA=speclens.sim.convertInclination(inc=np.arccos(model.cosi),diskCA=model.diskCA)
+
+    ellInc,linesInc=getShapes(model)
+    vmapInc,fluxVMapInc,thinImgInc,imgInc = speclens.sim.makeGalVMap2(model)
+
+    plt.clf()
+    speclens.plot.showImage(vmapInc, model, None, None,
+        filename="{}/fig1b.{}".format(plotDir,figExt), trim=trim,
+        ellipse=ellInc, lines=linesInc, lw=lw, 
+        title=r"cos$(i)=0.5$, $\gamma_+=0, \gamma_{\times}=0$",
+        showPlot=showPlot)
+    
+    # Now undo inclination and apply a shear that mimics it
+    model.cosi=0.75
+    model.diskBA=speclens.sim.convertInclination(inc=np.arccos(model.cosi),diskCA=model.diskCA)
+    model.g1=0.2
+
+    ellG1,linesG1=getShapes(model) # note these are the unsheared shapes
+    ellSheared=speclens.sim.shearEllipse(ellG1,model.g1,model.g2)
+    linesSheared=speclens.sim.shearLines(linesG1,model.g1,model.g2)
+    linesObs=speclens.sim.getEllipseAxes(ellSheared)
+
+    vmapG1,fluxVMapG1,thinImgG1,imgG1 = speclens.sim.makeGalVMap2(model)
+
+    plt.clf()
+    speclens.plot.showImage(vmapG1, model, None, None,
+        filename="{}/fig1c.{}".format(plotDir,figExt), trim=trim,
+        ellipse=ellSheared, lines=linesObs, lw=lw, 
+        title=r"cos$(i)=0.75$, $\gamma_+=0.2, \gamma_{\times}=0$",
+        showPlot=showPlot)
+    
+
+    # Finally show the cross shear
+    model.g1=0.
+    model.g2=0.2
+    
+    ellG2,linesG2=getShapes(model) # note these are the unsheared shapes
+    ellSheared=speclens.sim.shearEllipse(ellG2,model.g1,model.g2)
+    linesSheared=speclens.sim.shearLines(linesG2,model.g1,model.g2)
     linesObs=speclens.sim.getEllipseAxes(ellSheared)
     
-    vmapInc,fluxVMapInc,gal = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,ellSheared[0],bulge_frac,ellSheared[1],ellSheared[2],gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,0.,0.)
-    plt.clf()
-    speclens.plot.showImage(vmapInc,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,lw=lw,filename="{}/fig1b.{}".format(plotDir,figExt),title=r"q$_{\rm int}=0.5$",showPlot=showPlot)
+    vmapG2,fluxVMapG2,thinImgG2,imgG2 = speclens.sim.makeGalVMap2(model)
 
-    vmapSheared,fluxVMapSheared,galSheared = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
     plt.clf()
-    speclens.plot.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=linesSheared,lw=lw,filename="{}/fig1c.{}".format(plotDir,figExt),title=r"$\gamma_+=0.2$",showPlot=showPlot)
     
-
-    g1=0.0
-    g2=0.2
-    ellSheared=speclens.sim.shearEllipse(ell,g1,g2)
-    linesSheared=speclens.sim.shearLines(lines,g1,g2)
-    linesObs=speclens.sim.getEllipseAxes(ellSheared)
-    
-    vmapSheared,fluxVMapSheared,galSheared = speclens.sim.makeGalVMap(bulge_n,bulge_r,disk_n,disk_r,bulge_frac,gal_q,gal_beta,gal_flux,atmos_fwhm,rotCurveOpt,rotCurvePars,g1,g2)
-    plt.clf()
-    speclens.plot.showImage(vmapSheared,None,None,None,trim=trim,ellipse=ellSheared,lines=np.array([linesSheared,linesObs]).reshape(4,4),lcolors=['w','w',"gray","gray"],lstyles=["--","--","-","-"],lw=lw,filename="{}/fig1d.{}".format(plotDir,figExt),title=r"$\gamma_{\times}=0.2$",showPlot=showPlot)
+    speclens.plot.showImage(vmapG2, model, None, None,
+        filename="{}/fig1d.{}".format(plotDir,figExt), trim=trim,
+        ellipse=ellSheared,
+        lines=np.array([linesSheared,linesObs]).reshape(4,4),
+        lcolors=['w','w',"gray","gray"], lstyles=["--","--","-","-"],
+        lw=lw, title=r"cos$(i)=0.75$, $\gamma_+=0, \gamma_{\times}=0.2$",
+        showPlot=showPlot)
 
     print "Finished Fig 1"
     return
