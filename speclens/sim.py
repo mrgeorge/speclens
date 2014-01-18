@@ -117,6 +117,8 @@ def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image,imgSizePix,pixScale):
 def shearEllipse(ellipse,g1,g2):
     """Shear ellipse parameters following Supri & Harari 1999.
 
+    Note: galaxy size (disk_r) is not changed
+    
     Inputs:
         ellipse - (disk_r, gal_q, gal_beta) unsheared ellipse
         g1 - shear 1
@@ -134,7 +136,9 @@ def shearEllipse(ellipse,g1,g2):
     assert((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2 >= 0)
     epsilon_prime=np.sqrt((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2) / (1.+2.*epsilon*gamma*np.cos(2.*(phi-psi)))
 
-    disk_r_prime=disk_r*(1+gamma)
+    #    disk_r_prime=disk_r*(1+gamma)
+    disk_r_prime=disk_r # don't change size of galaxy
+
     #    assert(epsilon_prime < 1.1)
     if(epsilon_prime>1):
         epsilon_prime=1.
@@ -199,6 +203,9 @@ def shearLines(lines,g1,g2):
             lines_prime[ii]=np.array([x1p,x2p,y1p,y2p])
 
     return lines_prime
+
+def defineEllipse(model):
+    return [model.diskRadius, model.diskBA, model.diskPA]
 
 def getEllipseAxes(ellipse):
     """Return endpoints of major and minor axis of an ellipse
