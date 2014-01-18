@@ -179,9 +179,9 @@ class Model(object):
             self.atmosFWHM=1.
             self.pixScale=0.1  # arcseconds per pixel
             self.nPix=100
-            self.vSampConfig="hexNoCen"
-            self.vSampSize=1.  # arcseconds (radius for fibers, side length for pixels)
-            self.nVSamp=6
+            self.vSampConfig="crossslit"
+            self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
+            self.nVSamp=20.
             self.vSampPA=self.diskPA
             self.vSampConvolve=True
             self.convOpt="pixel"
