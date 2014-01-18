@@ -81,14 +81,14 @@ class Model(object):
     which ones will be fit or fixed.
     """
 
-    def __init__(self, name):
-        self.name=name
-        self.setDefaultVals()
+    def __init__(self, modelName, galName="default"):
+        self.modelName=modelName
+        self.setupAttr(galName)
 
         # Define priors and guess for each type of model
         # Note: priors are those used for fitting, 
         #       inputPriors are the distributions for generating ensembles.
-        if(name=="A"):
+        if(modelName=="A"):
             self.description="""Fixed disk thickness, flat rotation curve
 
                 diskPA - disk position angle in degrees [0,360)
@@ -109,7 +109,7 @@ class Model(object):
                              ("uniform",0.01,0.99), ("fixed",np.log10(200.)),
                              ("norm",0.,0.05), ("norm",0.,0.05)]
 
-        elif(name=="B"):
+        elif(modelName=="B"):
             self.description="""Free disk thickness, flat rotation curve
 
                 diskPA - disk position angle in degrees [0,360)
@@ -135,7 +135,7 @@ class Model(object):
                              ("norm",0.,0.05), ("norm",0.,0.05)]
 
         else:
-            raise ValueError(name)
+            raise ValueError(modelName)
 
     def updatePars(self, pars):
         """Take a set of model pars and update stored values
@@ -144,48 +144,46 @@ class Model(object):
         functions require a model object, this function takes a given pars
         array and reassigns the stored values in the model object.
         """
-        if(self.name=="A"):
+        if(self.modelName=="A"):
             self.diskPA, self.cosi, log10vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
             self.vCirc = 10.**log10vCirc
-        elif(self.name=="B"):
+        elif(self.modelName=="B"):
             self.diskPA, self.cosi, self.diskCA, log10vCirc, self.g1, self.g2 = pars
             self.diskBA = sim.convertInclination(diskCA=self.diskCA, inc=np.arccos(self.cosi))
             self.vCirc = 10.**log10vCirc
         else:
-            raise ValueError(self.name)
+            raise ValueError(self.modelName)
 
-    def setDefaultVals(self):
-        """
-        convOpt - how to compute images and convolutions ("galsim" or "pixel")
-        atmos_fwhm - FWHM of gaussian PSF (default None)
-        fibRad - fiber radius in arcsecs (default None)
-        fibConvolve - if False (default), just sample the image at central position 
-                      without convolving, else convolve
-        """
-        self.diskRadius=1.
-        self.diskVRadius=2.2
-        self.diskCA=0.2
-        self.diskNu=0.5
-        self.bulgeFraction=0.
-        self.bulgeRadius=1.
-        self.bulgeNu=-0.6
-        self.galFlux=1.
-        self.rotCurveOpt="flat"
-        self.rotCurvePars=[200.]
-        self.vCirc=self.rotCurvePars[0]
-        self.redshift=0.5
-        self.diskPA=0.
-        self.cosi=np.cos(np.deg2rad(30.))
-        self.diskBA=sim.convertInclination(diskCA=self.diskCA,inc=np.arccos(self.cosi))
-        self.g1=0.
-        self.g2=0.
-        self.atmosFWHM=1.
-        self.pixScale=0.1  # arcseconds per pixel
-        self.nPix=100
-        self.vSampConfig="hexNoCen"
-        self.vSampSize=1.  # arcseconds (radius for fibers, side length for pixels)
-        self.nVSamp=6
-        self.vSampPA=self.diskPA
-        self.vSampConvolve=True
-        self.convOpt="pixel"
+    def setupAttr(self, galName="default"):
+        """Define Model attributes"""
+
+        if(galName == "default"):
+            self.diskRadius=1.
+            self.diskVRadius=2.2
+            self.diskCA=0.2
+            self.diskNu=0.5
+            self.bulgeFraction=0.
+            self.bulgeRadius=1.
+            self.bulgeNu=-0.6
+            self.galFlux=1.
+            self.rotCurveOpt="arctan"
+            self.vCirc=200.
+            self.rotCurvePars=[self.vCirc,self.diskVRadius]
+            self.redshift=0.5
+            self.diskPA=0.
+            self.cosi=np.cos(np.deg2rad(30.))
+            self.diskBA=sim.convertInclination(diskCA=self.diskCA,inc=np.arccos(self.cosi))
+            self.g1=0.
+            self.g2=0.
+            self.atmosFWHM=1.
+            self.pixScale=0.1  # arcseconds per pixel
+            self.nPix=100
+            self.vSampConfig="hexNoCen"
+            self.vSampSize=1.  # arcseconds (radius for fibers, side length for pixels)
+            self.nVSamp=6
+            self.vSampPA=self.diskPA
+            self.vSampConvolve=True
+            self.convOpt="pixel"
+        else:
+            raise ValueError(galName)
