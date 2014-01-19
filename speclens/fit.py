@@ -39,26 +39,25 @@ def getPriorFuncs(priors):
         # aspects of prior to avoid pointer overwriting
         if(prior is not None):
             if(prior[0]=="norm"):
-                priorFuncs[ii]=scipy.stats.norm(loc=np.copy(prior[1]),
-                                                scale=np.copy(prior[2]))
+                priorFuncs[ii]=scipy.stats.norm(
+                        loc=np.float64(np.copy(prior[1])),
+                        scale=np.float64(np.copy(prior[2])))
             elif(prior[0]=="truncnorm"):
-                pmean=np.copy(prior[1])
-                psigma=np.copy(prior[2])
-                pmin=np.copy(prior[3])
-                pmax=np.copy(prior[4])
+                pmean=np.float64(np.copy(prior[1]))
+                psigma=np.float64(np.copy(prior[2]))
+                pmin=np.float64(np.copy(prior[3]))
+                pmax=np.float64(np.copy(prior[4]))
                 priorFuncs[ii]=scipy.stats.truncnorm((pmean-pmin)/psigma,
                         (pmean-pmax)/psigma, loc=pmean, scale=psigma)
             elif(prior[0] in ("uniform", "wrap")):
-                pmin=np.copy(prior[1])
-                pmax=np.copy(prior[2])
+                pmin=np.float64(np.copy(prior[1]))
+                pmax=np.float64(np.copy(prior[2]))
                 priorFuncs[ii]=scipy.stats.uniform(loc=pmin,
                         scale=pmax-pmin)
             else:
                 raise ValueError(prior[0])
         else:
             priorFuncs[ii]=None
-    else:
-        priorFuncs=None
 
     return priorFuncs
 
@@ -81,8 +80,8 @@ def wrapPars(priors, pars):
     for ii,prior in enumerate(priors):
         if(prior is not None):
             if(prior[0]=="wrap"):
-                pmin=np.copy(prior[1])
-                pmax=np.copy(prior[2])
+                pmin=np.float64(np.copy(prior[1]))
+                pmax=np.float64(np.copy(prior[2]))
                 pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
     return
 
