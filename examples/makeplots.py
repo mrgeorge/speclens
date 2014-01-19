@@ -161,54 +161,72 @@ def vThetaPlot(plotDir, figExt="pdf", showPlot=False):
     # Define galaxy model    
     model=speclens.Model("A")
     model.vSampConfig="hexNoCen"
+    model.rotCurveOpt="flat"
+    model.rotCurvePars=[model.vCirc]
+    model.cosi=0.8
     model.nVSamp=6
     model.vSampSize=1.
     model.atmosFWHM=None
     model.vSampConvolve=False
 
     # Get velocity sampling positions
-    pos,sampShape=speclens.sim.getFiberPos(model.nVSamp,model.vSampSize,model.vSampConfig)
+    pos,sampShape=speclens.sim.getSamplePos(model.nVSamp,model.vSampSize,model.vSampConfig)
     sigma=30. # velocity unc in km/s
     xpos,ypos=pos
     model.vSampShape=sampShape
     
     # Evaluate model as smooth function of azimuthal angle
     theta=np.linspace(0,2.*np.pi,num=200)
-    xvals=2.*fibRad*np.cos(theta)
-    yvals=2.*fibRad*np.sin(theta)
+    xvals=2.*model.vSampSize*np.cos(theta)
+    yvals=2.*model.vSampSize*np.sin(theta)
     vvals=speclens.sim.vmapModel(model, xvals, yvals)
 
-    plt.plot(np.rad2deg(theta), vvals, color="blue", linestyle='-', lw=3,
-             label="Fiducial: PA={}, b/a={}".format(model.diskPA,model.diskBA)+
-             r", v$_{max}$"+"={}, g1={}, g2={}".format(model.vCirc,model.g1,model.g2))
-# CONTINUE EDITING HERE!
+    plt.plot(np.rad2deg(theta), vvals, color="blue", linestyle='-',
+             lw=3, label="Fiducial: PA={}, cos(i)={:0.2}".format(
+                model.diskPA, model.cosi) + 
+             r", v$_{max}$"+"={}, g1={}, g2={}".format(
+                 model.vCirc, model.g1, model.g2))
+
     thetasamp=np.linspace(0,2.*np.pi,num=6,endpoint=False)
-    xsamp=2.*fibRad*np.cos(thetasamp)
-    ysamp=2.*fibRad*np.sin(thetasamp)
-    vsamp=speclens.sim.vmapModel(pars, xsamp, ysamp)
+    xsamp=2.*model.vSampSize*np.cos(thetasamp)
+    ysamp=2.*model.vSampSize*np.sin(thetasamp)
+    vsamp=speclens.sim.vmapModel(model, xsamp, ysamp)
     verr=np.repeat(sigma,xsamp.size)
     
-    plt.errorbar(np.rad2deg(thetasamp),vsamp,yerr=verr,fmt=None,lw=2,ecolor='black',elinewidth=5,capsize=7)
+    plt.errorbar(np.rad2deg(thetasamp), vsamp, yerr=verr, fmt=None,
+        lw=2, ecolor='black', elinewidth=5, capsize=7)
     
-    pars = np.array([gal_beta, gal_q+0.2, vmax, g1, g2])
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="green",linestyle="--",lw=2,label="b/a={}".format(pars[1]))
+    model.cosi+=0.2
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+    plt.plot(np.rad2deg(theta), vvals, color="green", linestyle="--",
+        lw=2, label="cos(i)={:0.2}".format(model.cosi))
     
-    pars = np.array([gal_beta+20, gal_q, vmax, g1, g2])
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="orange",linestyle="-.",lw=2,label="PA={}".format(pars[0]))
+    model.cosi-=0.2
+    model.diskPA+=20.
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+    plt.plot(np.rad2deg(theta), vvals, color="orange", linestyle="-.",
+        lw=2, label="PA={}".format(model.diskPA))
     
-    pars = np.array([gal_beta, gal_q, vmax+50, g1, g2])
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="red",linestyle=":",lw=2,label=r"v$_{max}$"+"={}".format(pars[2]))
+    model.diskPA-=20.
+    model.vCirc+=50.
+    model.rotCurvPars=[model.vCirc]
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+    plt.plot(np.rad2deg(theta), vvals, color="red", linestyle=":",
+        lw=2, label=r"v$_{max}$"+"={}".format(model.vCirc))
     
-    pars = np.array([gal_beta, gal_q, vmax, g1+0.1, g2])
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="yellow",linestyle="-",lw=2,label="g1"+"={}".format(pars[3]))
+    model.vCirc-=50.
+    model.rotCurvPars=[model.vCirc]
+    model.g1+=0.1
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+    plt.plot(np.rad2deg(theta), vvals, color="yellow", linestyle="-",
+        lw=2, label="g1"+"={}".format(model.g1))
     
-    pars = np.array([gal_beta, gal_q, vmax+50, g1, g2+0.1])
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    plt.plot(np.rad2deg(theta),vvals,color="magenta",linestyle="--",lw=2,label="g2"+"={}".format(pars[4]))
+    model.g1-=0.1
+    model.g2+=0.1
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+
+    plt.plot(np.rad2deg(theta), vvals, color="magenta",
+        linestyle="--", lw=2, label="g2"+"={}".format(model.g2))
     
     plt.legend(loc="upper right",prop={'size':14},frameon=False)
     
