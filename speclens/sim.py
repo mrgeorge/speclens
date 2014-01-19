@@ -676,7 +676,6 @@ def vmapModel(model, xobs, yobs):
         sini=np.sin(inc)
         tani=np.tan(inc)
 
-        rotCurvePars=np.array([vmax])
         nSamp=xobs.size
         vmodel=np.zeros(nSamp)
         radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
