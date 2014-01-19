@@ -247,40 +247,55 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     """Plot parameter constraints given a measurement with errors
 
     Take the imaging and velocity observables for a single sheared
-    galaxy and fit a 5 parameter model using MCMC to maximize the
+    galaxy and fit a 6 parameter model using MCMC to maximize the
     fit likelihood. Plot joint posterior constraints.
     """
 
-    pars = np.array([105, 0.5, 200, 0, 0.15])
-    labels=np.array(["PA","b/a","vmax","g1","g2"])
-    sigma=30.
-    numFib=6
-    fibRad=1
-    fibPA=0.
-    fibConfig="hexNoCen"
-    pos,fibShape=speclens.sim.getFiberPos(numFib,fibRad,fibConfig,fibPA=fibPA)
+    model=speclens.Model("A")
+
+    # first try w/o PSF and fiber convolution
+    model.atmosFWHM=None
+    model.vSampConvolve=False
+    model.convOpt=None
+
+    pos,sampShape=speclens.sim.getSamplePos(model.nVSamp,
+        model.vSampSize, model.vSampConfig, sampPA=model.vSampPA)
     xvals,yvals=pos
-    vvals=speclens.sim.vmapModel(pars, xvals, yvals)
-    ellObs=speclens.sim.ellModel(pars)
+    model.vSampShape=sampShape
+
+    vvals=speclens.sim.vmapModel(model, xvals, yvals)
+    sigma=10.
+    ellObs=speclens.sim.ellModel(model)
     ellErr=np.array([10.,0.1])
-    priors=[None,[0.1,1],(pars[2],10),[-0.5,0.5],[-0.5,0.5]]
 
     # compare imaging vs spectro vs combined
-    chains,lnprobs=speclens.fit.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,fibConfig=fibConfig,fibPA=fibPA,addNoise=False,nSteps=250)
+    chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
+        model, addNoise=True)
     smooth=3
     plt.clf()
-    speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=pars,showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4a.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
+        inputPars=model.origPars, showMax=True, showPeakKDE=True,
+        show68=True, smooth=smooth, percentiles=[0.68,0.95],
+        labels=model.labels,
+        filename="{}/fig4a.{}".format(plotDir,figExt),
+        showPlot=showPlot)
 
     # now try with PSF and fiber convolution
-    atmos_fwhm=1.5
-    disk_r=1.
-    fibConvolve=True
-    convOpt="pixel"
+    model.atmosFWHM=1.
+    model.vSampConvolve=True
+    model.convOpt="pixel"
 
-    chains,lnprobs=speclens.fit.fitObs(vvals,sigma,ellObs,ellErr,priors,fibRad=fibRad,disk_r=disk_r,atmos_fwhm=atmos_fwhm,fibConvolve=fibConvolve,addNoise=True,convOpt=convOpt)
+    vvals=speclens.sim.vmapObs(model, xvals, yvals)
+
+    chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
+        model, addNoise=True)
     smooth=3
     plt.clf()
-    speclens.plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=pars,showMax=True,showPeakKDE=True,show68=True,smooth=smooth,percentiles=[0.68,0.95],labels=labels,filename="{}/fig4b.{}".format(plotDir,figExt),showPlot=showPlot)
+    speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
+        inputPars=model.origPars, showMax=True, showPeakKDE=True,
+        show68=True, smooth=smooth, percentiles=[0.68,0.95],
+        labels=model.labels, filename="{}/fig4b.{}".format(plotDir,
+        figExt), showPlot=showPlot)
 
     print "Finished Fig 4"
     return
