@@ -113,6 +113,33 @@ def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image,imgSizePix,pixScale):
         fibImageArr=image.draw(image=imgFrame,dx=pixScale).array.copy()
 
     return scipy.ndimage.map_coordinates(fibImageArr.T,coordsPix)
+
+def convertShear(g1,g2,diskPA):
+    """Convert shear coordinates
+
+    Inputs:
+        g1, g2 - shear in Cartesian coordinates
+        diskPA - unlensed PA in degrees
+    Returns:
+        gPlus, gCross - shear in unlensed coordinates (x-axis is major)
+    """
+    phi=0.5*np.arctan2(g2,g1)
+    gamma=np.sqrt(g1**2 + g2**2)
+    gPlus=gamma * np.cos(2*(phi-np.deg2rad(diskPA)))
+    gCross=gamma * np.sin(2*(phi-np.deg2rad(diskPA)))
+
+    return (gPlus, gCross)
+
+def shearEllipse2(ellipse,g1,g2):
+    """Shear ellipse parameters following Huff++
+    """
+
+    diskRadius, diskBA, diskPA = ellipse
+    gPlus, gCross = convertShear(g1,g2,diskPA)
+    diskBASheared = diskBA * (1. + 2.*gPlus)
+    diskPASheared = diskPA + (1. + diskBA**2)/(1. - diskBA**2) * gCross
+
+    return (diskRadius, diskBASheared, diskPASheared)
     
 def shearEllipse(ellipse,g1,g2):
     """Shear ellipse parameters following Supri & Harari 1999.
@@ -132,15 +159,24 @@ def shearEllipse(ellipse,g1,g2):
     psi=np.deg2rad(gal_beta)
     phi=0.5*np.arctan2(g2,g1)
 
-    dpsi=0.5*np.arctan2(2*(gamma/epsilon)*np.sin(2.*(phi-psi)), 1.+2*(gamma/epsilon)*np.cos(2*(phi-psi)))
-    assert((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2 >= 0)
-    epsilon_prime=np.sqrt((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 + 4*(gamma*np.sin(2*(phi-psi)))**2) / (1.+2.*epsilon*gamma*np.cos(2.*(phi-psi)))
+    dpsi=0.5*np.arctan2(2*(gamma/epsilon)*np.sin(2.*(phi-psi)),
+        1.+2*(gamma/epsilon)*np.cos(2*(phi-psi)))
+
+    assert((epsilon + 2.*gamma*np.cos(2.*(phi-psi)))**2 +
+           4*(gamma*np.sin(2*(phi-psi)))**2 >= 0)
+
+    epsilon_prime=(np.sqrt((epsilon +
+        2.*gamma*np.cos(2.*(phi-psi)))**2 +
+        4*(gamma*np.sin(2*(phi-psi)))**2) /
+        (1.+2.*epsilon*gamma*np.cos(2.*(phi-psi))))
 
     #    disk_r_prime=disk_r*(1+gamma)
     disk_r_prime=disk_r # don't change size of galaxy
 
     #    assert(epsilon_prime < 1.1)
     if(epsilon_prime>1):
+        dr2,ba2,pa2=shearEllipse2(ellipse,g1,g2)
+        print "shearEllipse:",np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime)),ba2,np.rad2deg(psi+dpsi),pa2
         epsilon_prime=1.
     assert(epsilon_prime <= 1.)
     gal_q_prime=np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime))
