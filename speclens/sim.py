@@ -130,6 +130,48 @@ def convertShear(g1,g2,diskPA):
 
     return (gPlus, gCross)
 
+def shearEllipse3(ellipse,g1,g2):
+    """Shear ellipse parameters following Wikipedia"""
+    diskRadius, diskBA, diskPA = ellipse
+
+    # get intrinsic properties
+    phiInt = np.deg2rad(diskPA)
+    qInt = diskBA
+    epsilonInt = (1.-qInt) / (1.+qInt)
+
+    # get shear in polar coords
+    phiShear = 0.5 * np.arctan2(g2, g1)
+    gammaShear = np.sqrt(g1**2 + g2**2)
+
+    # compute observed ellipticity
+    # http://en.wikipedia.org/wiki/Gravitational_lensing_formalism
+    # epsilonObserved = (epsilonInt + g) / (1 + gConj * epsilonInt)
+    # where gamma -> g since we ignore magnification
+
+    # writing out complex term (epsilonInt + g) gives aa+bb*i
+    aa = epsilonInt * np.cos(2.*phiInt) + gammaShear * np.cos(2.*phiShear)
+    bb = epsilonInt * np.sin(2.*phiInt) + gammaShear * np.sin(2.*phiShear)
+
+    # complex term (1 + gConj * epsilonInt) gives cc+dd*i
+    cc = 1. + gammaShear * epsilonInt * np.cos(2. * (phiInt - phiShear))
+    dd = gammaShear * epsilonInt * np.sin(2. * (phiInt - phiShear))
+
+    # complex division (aa + bb*i)/(cc + dd*i)
+    #  = (aa*cc + bb*dd)/(cc**2 + dd**2) + i*(bb*cc - aa*dd)/(cc**2 + dd**2)
+    #  = Re(epsilonObs) + i*Im(epsilonObs)
+    #  = rr + i*ii
+    rr = (aa*cc + bb*dd) / (cc**2 + dd**2)
+    ii = (bb*cc - aa*dd) / (cc**2 + dd**2)
+
+    # convert complex epsilonObs to observed axis ratio and PA
+    phiObs = 0.5 * np.arctan2(ii, rr)
+    epsilonObs = np.sqrt(rr**2 + ii**2) # magnitude
+
+    diskBASheared = (1. - epsilonObs) / (1. + epsilonObs)
+    diskPASheared = np.rad2deg(phiObs)
+
+    return (diskRadius, diskBASheared, diskPASheared)
+    
 def shearEllipse2(ellipse,g1,g2):
     """Shear ellipse parameters following Huff++
     """
@@ -142,7 +184,7 @@ def shearEllipse2(ellipse,g1,g2):
     return (diskRadius, diskBASheared, diskPASheared)
     
 def shearEllipse(ellipse,g1,g2):
-    """Shear ellipse parameters following Supri & Harari 1999.
+    """Shear ellipse parameters following Surpi & Harari 1999.
 
     Note: galaxy size (disk_r) is not changed
     
@@ -174,9 +216,11 @@ def shearEllipse(ellipse,g1,g2):
     disk_r_prime=disk_r # don't change size of galaxy
 
     #    assert(epsilon_prime < 1.1)
+    dr2,ba2,pa2=shearEllipse2(ellipse,g1,g2)
+    dr3,ba3,pa3=shearEllipse3(ellipse,g1,g2)
+    if(np.abs(g2) > 0.1):
+        print "shearEllipse:",ellipse,g1,g2,np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime)),ba3,np.rad2deg(psi+dpsi),pa3
     if(epsilon_prime>1):
-        dr2,ba2,pa2=shearEllipse2(ellipse,g1,g2)
-        print "shearEllipse:",np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime)),ba2,np.rad2deg(psi+dpsi),pa2
         epsilon_prime=1.
     assert(epsilon_prime <= 1.)
     gal_q_prime=np.sqrt((1.-epsilon_prime)/(1.+epsilon_prime))
@@ -733,7 +777,7 @@ def ellModel(model):
     """
 
     ellipse=(model.diskRadius,model.diskBA,model.diskPA) # unsheared ellipse
-    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,model.g1,model.g2)
+    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse3(ellipse,model.g1,model.g2)
     ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
 
     return ellmodel
