@@ -47,8 +47,8 @@ def getPriorFuncs(priors):
                 psigma=np.float64(np.copy(prior[2]))
                 pmin=np.float64(np.copy(prior[3]))
                 pmax=np.float64(np.copy(prior[4]))
-                priorFuncs[ii]=scipy.stats.truncnorm((pmean-pmin)/psigma,
-                        (pmean-pmax)/psigma, loc=pmean, scale=psigma)
+                priorFuncs[ii]=scipy.stats.truncnorm((pmin-pmean)/psigma,
+                        (pmax-pmean)/psigma, loc=pmean, scale=psigma)
             elif(prior[0] in ("uniform", "wrap")):
                 pmin=np.float64(np.copy(prior[1]))
                 pmax=np.float64(np.copy(prior[2]))
@@ -260,17 +260,18 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         ellObs=None
         ellErr=None
 
-    if(addNoise): # useful when simulating many realizations to project parameter constraints
+    if(addNoise): # useful when simulating many realizations to
+                  # project parameter constraints
         np.random.seed(seed)
-        # NOTE: imObs will always be 2 number, but len(vobs) may vary with fiber configuration
-        #       To preserve random seed, generate imObs noise first
-    if(imObs is not None):
-        imNoise=np.random.randn(ellObs.size)*ellErr
-        ellObs+=imNoise
-    if(vobs is not None):
-        specNoise=np.random.randn(numFib)*sigma
-        vel+=specNoise
-
+        # NOTE: imObs will always be 2 number, but len(vobs) may vary
+        # with fiber configuration. To preserve random seed, generate
+        # imObs noise first
+        if(imObs is not None):
+            imNoise=np.random.randn(ellObs.size)*ellErr
+            ellObs+=imNoise
+        if(vobs is not None):
+            specNoise=np.random.randn(numFib)*sigma
+            vel+=specNoise
 
     # SETUP CHAIN SHAPE
     removeFixedPars(model)
