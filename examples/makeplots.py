@@ -251,26 +251,24 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     fit likelihood. Plot joint posterior constraints.
     """
 
+    nThreads=8
+    
     model=speclens.Model("A")
+
+    sigma=10.
+    ellErr=np.array([10.,0.1])
 
     # first try w/o PSF and fiber convolution
     model.atmosFWHM=None
     model.vSampConvolve=False
     model.convOpt=None
 
-    pos,sampShape=speclens.sim.getSamplePos(model.nVSamp,
-        model.vSampSize, model.vSampConfig, sampPA=model.vSampPA)
-    xvals,yvals=pos
-    model.vSampShape=sampShape
-
-    vvals=speclens.sim.vmapModel(model, xvals, yvals)
-    sigma=10.
-    ellObs=speclens.sim.ellModel(model)
-    ellErr=np.array([10.,0.1])
-
+    xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
+        model, sigma=sigma, ellErr=ellErr, randomPars=False)
+    
     # compare imaging vs spectro vs combined
     chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
-        model, addNoise=True)
+        model, addNoise=True, nThreads=nThreads)
     smooth=3
     plt.clf()
     speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
@@ -285,10 +283,11 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     model.vSampConvolve=True
     model.convOpt="pixel"
 
-    vvals=speclens.sim.vmapObs(model, xvals, yvals)
+    xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
+        model, sigma=sigma, ellErr=ellErr, randomPars=False)
 
     chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
-        model, addNoise=True)
+        model, addNoise=True, nThreads=nThreads)
     smooth=3
     plt.clf()
     speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
