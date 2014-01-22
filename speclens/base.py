@@ -97,8 +97,8 @@ class Model(object):
                 g1 - shear 1 (abs<0.5)
                 g2 - shear 2 (abs<0.5)
             """
-            self.origPars=[self.diskPA, self.cosi, self.vCirc, self.g1, self.g2]
-            self.labels=np.array(["PA","cos(i)","log10(vmax)","g1","g2"])
+            self.origPars=[self.diskPA, self.cosi, np.log10(self.vCirc), self.g1, self.g2]
+            self.labels=np.array(["PA","cos(i)","lg10(vc)","g1","g2"])
             self.origGuess=np.array([10.,0.5,np.log10(200.),0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.06,0.02,0.02])
             self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
@@ -121,7 +121,7 @@ class Model(object):
             """
             self.origPars=[self.diskPA, self.cosi, self.diskCA,
                            np.log10(self.vCirc), self.g1, self.g2]
-            self.labels=np.array(["PA","cos(i)","c/a","log10(vmax)","g1","g2"])
+            self.labels=np.array(["PA","cos(i)","c/a","lg10(vc)","g1","g2"])
             self.origGuess=np.array([10.,0.5,0.2,np.log10(200.),0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.1,0.06,0.02,0.02])
             self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
@@ -181,7 +181,7 @@ class Model(object):
             self.nPix=100
             self.vSampConfig="crossslit"
             self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
-            self.nVSamp=20.
+            self.nVSamp=20
             self.vSampPA=self.diskPA
             self.vSampConvolve=True
             self.convOpt="pixel"
