@@ -91,7 +91,7 @@ class Model(object):
         if(modelName=="A"):
             self.description="""Fixed disk thickness, flat rotation curve
 
-                diskPA - disk position angle in degrees [0,360)
+                diskPA - disk position angle in degrees [0,180)
                 cosi - cosine of the disk inclination (0=edge on, 1=face on)
                 vmax - circular velocity (>0)
                 g1 - shear 1 (abs<0.5)
@@ -101,18 +101,18 @@ class Model(object):
             self.labels=np.array(["PA","cos(i)","lg10(vc)","g1","g2"])
             self.origGuess=np.array([10.,0.5,np.log10(200.),0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.06,0.02,0.02])
-            self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
+            self.origPriors=[("wrap",0.,180.), ("uniform",0.01,0.99),
                              ("norm",np.log10(200.),0.06),
                              ("uniform",-0.5,0.5),
                              ("uniform",-0.5,0.5)]
-            self.inputPriors=[("uniform",0.0,360.),
+            self.inputPriors=[("uniform",0.0,180.),
                              ("uniform",0.01,0.99), ("fixed",np.log10(200.)),
                              ("norm",0.,0.05), ("norm",0.,0.05)]
 
         elif(modelName=="B"):
             self.description="""Free disk thickness, flat rotation curve
 
-                diskPA - disk position angle in degrees [0,360)
+                diskPA - disk position angle in degrees [0,180)
                 cosi - cosine of the disk inclination (0=edge on, 1=face on)
                 diskCA - edge on disk thickness ratio (0=thin,1=sphere)
                 log10(vmax) - circular velocity
@@ -124,12 +124,12 @@ class Model(object):
             self.labels=np.array(["PA","cos(i)","c/a","lg10(vc)","g1","g2"])
             self.origGuess=np.array([10.,0.5,0.2,np.log10(200.),0.,0.])
             self.origGuessScale=np.array([30.,0.2,0.1,0.06,0.02,0.02])
-            self.origPriors=[("wrap",0.,360.), ("uniform",0.01,0.99),
+            self.origPriors=[("wrap",0.,180.), ("uniform",0.01,0.99),
                              ("truncnorm",0.2,0.05,0.,1.),
                              ("norm",np.log10(200.),0.06),
                              ("uniform",-0.5,0.5),
                              ("uniform",-0.5,0.5)]
-            self.inputPriors=[("uniform",0.0,360.),
+            self.inputPriors=[("uniform",0.0,180.),
                              ("uniform",0.01,0.99), ("fixed",0.2),
                              ("fixed",np.log10(200.)),
                              ("norm",0.,0.05), ("norm",0.,0.05)]
