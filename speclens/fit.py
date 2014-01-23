@@ -82,7 +82,10 @@ def wrapPars(priors, pars):
             if(prior[0]=="wrap"):
                 pmin=np.float64(np.copy(prior[1]))
                 pmax=np.float64(np.copy(prior[2]))
-                pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
+                try:  # assume pars is a chain (nsteps x npars)
+                    pars[:,ii]=(pars[:,ii]-pmin) % (pmax-pmin) + pmin
+                except IndexError:  # allow if pars is a single entry
+                    pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
     return
 
 def removeFixedPars(model):
@@ -227,7 +230,7 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         model object with priors
         addNoise - bool for whether to fit noisy or noise-free observations
         nWalkers, nBurn, nSteps, nThreads - see emcee documentation
-        seed - optional for random number repeatability
+        seed - optional int for random number repeatability
     
     Returns:
         sampler - emcee object with posterior chains
@@ -287,6 +290,16 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
     print "emcee running"
     sampler.run_mcmc(pos, nSteps)
 
+    # wrap chain entries this handles cases where emcee guesses a
+    # value outside of the wrap range. The lnP returned may be good,
+    # but we want to store the wrapped values, e.g. for plotting
+    wrapPars(model.priors, sampler.flatchain)
+
+    # we probably only care about flatchain, but let's reset sampler's
+    # chain attr too. To do this, need to set _chain since chain can't
+    # be set directly
+    sampler._chain=sampler.flatchain.reshape((nWalkers,nSteps,nPars))
+    
     return sampler
 
 def fitObs(specObs,specErr,imObs,imErr,model,**kwargs):
