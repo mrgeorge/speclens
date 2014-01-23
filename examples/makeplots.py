@@ -243,12 +243,12 @@ def vThetaPlot(plotDir, figExt="pdf", showPlot=False):
     print "Finished Fig 3"
     return
 
-def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
-    """Plot parameter constraints given a measurement with errors
+def modelConstraintPlot(dataDir, plotDir, figExt="pdf", showPlot=False):
+    """Get parameter constraints given a measurement with errors
 
     Take the imaging and velocity observables for a single sheared
-    galaxy and fit a 6 parameter model using MCMC to maximize the
-    fit likelihood. Plot joint posterior constraints.
+    galaxy and fit a parametric model using MCMC to maximize the
+    fit likelihood. Plot joint posterior constraints and store chain.
     """
 
     nThreads=8
@@ -259,26 +259,23 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     ellErr=np.array([10.,0.1])
 
     # first try w/o PSF and fiber convolution
+    galID=0
     model.atmosFWHM=None
     model.vSampConvolve=False
     model.convOpt=None
 
     xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
         model, sigma=sigma, ellErr=ellErr, randomPars=False)
-    
+
     # compare imaging vs spectro vs combined
-    chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
-        model, addNoise=True, nThreads=nThreads)
-    smooth=3
-    plt.clf()
-    speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
-        inputPars=model.origPars, showMax=True, showPeakKDE=True,
-        show68=True, smooth=smooth, percentiles=[0.68,0.95],
-        labels=model.labels,
-        filename="{}/fig4a.{}".format(plotDir,figExt),
-        showPlot=showPlot)
+    # store chains and make contour plot
+    speclens.ensemble.runGal(dataDir, plotDir, galID, inputPars, vvals,
+        sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
+        nThreads=nThreads, seed=0)
+
 
     # now try with PSF and fiber convolution
+    galID=1
     model.atmosFWHM=1.
     model.vSampConvolve=True
     model.convOpt="pixel"
@@ -286,17 +283,11 @@ def modelConstraintPlot(plotDir, figExt="pdf", showPlot=False):
     xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
         model, sigma=sigma, ellErr=ellErr, randomPars=False)
 
-    chains,lnprobs=speclens.fit.fitObs(vvals, sigma, ellObs, ellErr,
-        model, addNoise=True, nThreads=nThreads)
-    smooth=3
-    plt.clf()
-    speclens.plot.contourPlotAll(chains, lnprobs=lnprobs,
-        inputPars=model.origPars, showMax=True, showPeakKDE=True,
-        show68=True, smooth=smooth, percentiles=[0.68,0.95],
-        labels=model.labels, filename="{}/fig4b.{}".format(plotDir,
-        figExt), showPlot=showPlot)
+    speclens.ensemble.runGal(dataDir, plotDir, galID, inputPars, vvals,
+        sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
+        nThreads=nThreads, seed=0)
 
-    print "Finished Fig 4"
+    print "Finished Fig 4 - gal 0 and 1"
     return
 
     
@@ -331,4 +322,4 @@ if __name__ == "__main__":
     
     # Fig 4
     # parameter constraints from a number of noise realizations
-    modelConstraintPlot(plotDir, figExt=figExt, showPlot=showPlot)
+    modelConstraintPlot(dataDir, plotDir, figExt=figExt, showPlot=showPlot)
