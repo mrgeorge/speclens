@@ -32,7 +32,6 @@ class Datacube(object):
     
     Set additional parameters necessary for constructing the spectrum,
     but don't actually build until needed.
-    
     """
 
     def __init__(self, model, linelist):
@@ -55,7 +54,7 @@ class Datacube(object):
         
         #Parameters describing the galaxy spectrum.
         self.baseModel = Model
-        self.z = z #galaxy Redshift
+        self.z = z # galaxy redshift
         self.ContinuumReferenceWavelength = 5000. # Wavelength at which to normalize the continuum, in Angstroms
         self.ContinuumReferenceNorm = 1e-18 # Value of continuum at reference wavelength, in erg/s/cm^2
         
@@ -76,7 +75,7 @@ class Datacube(object):
         
  
  
-    def makePsfConvImage(self):
+    def _makePsfConvKernel(self):
         # Draw the galaxy surface-brightness profile.
         image = sim.makeImageBessel(self.galaxyModel)
         #Make a seeing disk.
@@ -84,10 +83,9 @@ class Datacube(object):
         kk2 = (kx*kx + ky*ky)/(self.SeeingScale)**2
         Pk = np.exp(-(kk2)**(5./6.)) #Kolmogorov power spectrum.
         Pr = np.real(np.fft.fft2(Pk))
-        Pr = np.fft.fftshift(Pr)
+        psf = np.fft.fftshift(Pr)
         # Convolve this model profile with a sensible seeing disk.
-        image_smeared = fftconvolve(image,Pr,mode='same')
-        return image_smeared
+        return psf
 
     
     def makeDataCube(self):
@@ -99,14 +97,28 @@ class Datacube(object):
         self._loadThroughput()
         self._loadSky()
         self._loadGalaxySpectrum()
+        # Loop  over the  spatial  grid;  in each  pixel,  look up  the
+        # velocity,  and  interpolate  the  galaxy  spectrum  onto  the
+        # redshift wavelength scale.
+        c = 300000. # Speed of light, km/s
+        dataCube = np.zeros(self.Npix,self.Npix,self.nSpectralPixels)
+        thisSky = np.interp(self.lambdaObs,self.lambdaSky,self.skyFluxTemplate)
+        thisTransparency = np.interp(self.lambdaObs,self.lambdaTransparency,self.transparencyTemplate)
+        for i in arange(self.Npix):
+            for j in arange(self.Npix):
+                z_velocity = vmap[i,j] / c 
+                lambdaRest = lambdaObs * (1 + self.z) * (1 + z_velocity)
+                dataCube[i,j,:] = np.interp(lambdaRest,self.lambdaGalaxy,self.GalaxyFlux) * \ 
+                  thisTransparency + thisSky
+        self.dataCube = dataCube
+
+        # Finally, step through the datacube and convolve each spectral slice with the psf.
+        psf = self._makePsfConvKernel()
+        for i in arange(self.nSpectralPixels):
+            dataCube[:,:,i] = fftconvolve(dataCube[:,:,i],psf,mode="same")
+
+        return dataCube
         
-
-
-        galaxySpec = (self._loadGalaxySpectrum() * transparency + skyspec) * throughput
-        dataCubeSky = np.einsum('...ij','...k',image_smeared,skyspec)
-        dataCube = np.einsum('..ij','...k',image_smeared,galaxySpec)
-        return dataCube, dataCubeSky
-    
 
         
     def _loadSky(self):
