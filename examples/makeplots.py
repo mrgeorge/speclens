@@ -243,7 +243,7 @@ def vThetaPlot(plotDir, figExt="pdf", showPlot=False):
     print "Finished Fig 3"
     return
 
-def modelConstraintPlot(dataDir, plotDir, figExt="pdf", showPlot=False):
+def modelConstraintPlot(chainDir, plotDir, figExt="pdf", showPlot=False):
     """Get parameter constraints given a measurement with errors
 
     Take the imaging and velocity observables for a single sheared
@@ -269,7 +269,7 @@ def modelConstraintPlot(dataDir, plotDir, figExt="pdf", showPlot=False):
 
     # compare imaging vs spectro vs combined
     # store chains and make contour plot
-    speclens.ensemble.runGal(dataDir, plotDir, galID, inputPars, vvals,
+    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars, vvals,
         sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
         nThreads=nThreads, seed=0)
 
@@ -283,7 +283,7 @@ def modelConstraintPlot(dataDir, plotDir, figExt="pdf", showPlot=False):
     xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
         model, sigma=sigma, ellErr=ellErr, randomPars=False)
 
-    speclens.ensemble.runGal(dataDir, plotDir, galID, inputPars, vvals,
+    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars, vvals,
         sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
         nThreads=nThreads, seed=0)
 
@@ -298,11 +298,11 @@ if __name__ == "__main__":
     if not os.path.isdir(speclensDir):
         raise NameError(speclensDir)
     plotDir=speclensDir+"/plots"
-    dataDir=speclensDir+"/data"
+    chainDir=speclensDir+"/chains"
     if not os.path.isdir(plotDir):
         os.mkdir(plotDir)
-    if not os.path.isdir(dataDir):
-        os.mkdir(dataDir)
+    if not os.path.isdir(chainDir):
+        os.mkdir(chainDir)
 
     figExt="pdf" # pdf or png
     showPlot=False
@@ -322,4 +322,4 @@ if __name__ == "__main__":
     
     # Fig 4
     # parameter constraints from a number of noise realizations
-    modelConstraintPlot(dataDir, plotDir, figExt=figExt, showPlot=showPlot)
+    modelConstraintPlot(chainDir, plotDir, figExt=figExt, showPlot=showPlot)
