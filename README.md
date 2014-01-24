@@ -16,15 +16,16 @@ speclens currently uses the following packages:
 
 * python, and common libaries like numpy, matplotlib, scipy
 
-* [GalSim](https://github.com/GalSim-developers/GalSim) The GalSim
-  package for galaxy images, PSFs, shear. There have been some issues
-  attempting to integrate with this code due to real-space convolution
-  bugs with velocity maps that have total flux=0. Current trend has
-  been to reduce/eliminate dependency on GalSim, but re-integration
-  may eventually be desired.
-
 * [emcee](http://dan.iel.fm/emcee/) Dan Foreman-Mackey's parallel
   sampler for fast MCMC
+
+Optional:
+
+* [GalSim](https://github.com/GalSim-developers/GalSim) The GalSim
+  package for galaxy images, PSFs, shear. Currently GalSim is used as
+  an optional path to generating, convolving, and shearing galaxy
+  images. It will be used for testing against the mainline approach
+  of pixel arrays.
 
 The following packages are imported by some scripts in scratch/ but
 aren't essential for the main functions:
