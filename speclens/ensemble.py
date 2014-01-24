@@ -91,13 +91,13 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def runGal(dataDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figExt="pdf",**kwargs):
+def runGal(chainDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figExt="pdf",**kwargs):
     """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
 
     This is what create_qsub_galArr calls to run each galaxy
 
     Inputs:
-        dataDir - directory to write output files
+        chainDir - directory to write output files
         plotDir - directory to write output plots
         galID - label to name each galaxy file separately
         inputPars - ndarray of nGal sets of model parameters
@@ -111,13 +111,13 @@ def runGal(dataDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figEx
         figExt - plot file format (default "pdf", or "png")
         **kwargs - args passed on to fit.fitObs
     Returns:
-        nothing, chains and plots written to dataDir, plotDir
+        nothing, chains and plots written to chainDir, plotDir
     """
 
     chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,model,**kwargs)
-    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),dataDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),dataDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),dataDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),chainDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),chainDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
+    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),chainDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
     plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=model.labels,showPlot=False,filename=plotDir+"/gal_{:03d}.{}".format(galID,figExt))
 
 
