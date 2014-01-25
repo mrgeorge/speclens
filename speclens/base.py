@@ -74,6 +74,118 @@ class Observation(object):
     def addNoise(self, sigma):
         pass
 
+class TestObservable(object):
+    """Collection of data and self-description for lnP calculation
+
+    Though a Model object may produce simulated Observable data, this
+    object contains only the information that is in principle
+    available from a telescope, e.g. datacube (flux vs x,y,lambda),
+    derived velocity samples, image properties like measured PA, noise
+    properties, and detector characteristics like pixel scale, etc. It
+    does not contain model parameters such as intrinsic PA or shear.
+
+    The likelihood calculation for model fitting is done in Observable
+    space. This object also contains a description of what type of
+    observable is used in the fit (e.g. imaging only, spectroscopy
+    only, datacube vs derived velocities) and any special treatment
+    needed (e.g. phase wrapping for measured PA).
+    """
+
+    def __init__(self, ID, inputFile=None, dataType=None):
+        self.ID = ID
+        self.dataType=dataType
+        self._setupAttr(inputFile=inputFile, dataType=dataType)
+        self._defineDataVector(dataType)
+
+    def _setupAttr(self, inputFile=None, dataType=None):
+        if(self.ID == "default"):
+
+            # parameters describing detector
+            self.pixScale=0.1  # arcseconds per pixel
+            self.nPix=100
+            self.vSampConfig="crossslit"
+            self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
+            self.nVSamp=20
+            self.vSampPA=self.diskPA
+            pos,self.vSampShape = sim.getSamplePos(self.nVSamp,
+                self.vSampSize, self.vSampConfig, sampPA=self.vSampPA)
+            self.xObs, self.yObs = pos
+            self.xObsErr=0.
+            self.yObsErr=0.
+
+            # parameters derived from raw data, with errors
+            #   (typically fixed in the model)
+            self.redshift=0.5
+            self.diskRadius=1.
+            self.diskRadiusErr=0.
+            self.diskNu=0.5
+            self.diskNuErr=0.
+            self.bulgeFraction=0.
+            self.bulgeFractionErr=0.
+            self.bulgeRadius=1.
+            self.bulgeRadiusErr=0.
+            self.bulgeNu=-0.6
+            self.bulgeNuErr=0
+            self.galFlux=1.
+            self.galFluxErr=0.
+            self.atmosFWHM=1.
+            self.atmosFWHMErr=0.
+
+            # parameters derived from raw data, with errors
+            #   (typically free in the model)
+            self.diskPA=0.
+            self.diskPAErr=10.
+            self.diskBA=0.5
+            self.diskBAErr=0.1
+            self.vObs=None
+            self.vObsErr=None
+
+            # raw data, with errors
+            self.image=None
+            self.imageErr=None
+            self.datacubeErr=None
+            
+        else:
+            self._readData(inputFile, dataType):
+
+    def _readData(self, inputFile, dataType):
+        pass
+
+    def _defineDataVector(self, dataType):
+        """Define data and error vectors for likelihood calculation
+
+        Inputs:
+            dataType - string describing data format
+                       "imgPar" - derived PA and axis ratio
+                       "velocities" - derived velocities
+                       "imgPar+velocities" - combined
+                       "datacube" - flux(x, y, lambda)
+                       None - use model priors only
+        Returns:
+            Nothing, self is updated with dataVector and errVector
+        """
+
+        if(dataType is None):
+            self.dataVector=None
+            self.errVector=None
+        elif(dataType == "imgPar"):
+            self.dataVector=np.array([self.diskPA, self.diskBA])
+            self.errVector=np.array([self.diskPAErr, self.diskBAErr])
+        elif(dataType == "velocities"):
+            self.dataVector=self.vObs            
+            self.errVector=self.vObsErr
+        elif(dataType == "imgPar+velocities"):
+            self.dataVector=np.concatenate([np.array([self.diskPA,
+                self.diskBA]), self.vObs])
+            self.errVector=np.concatenate([np.array([self.diskPAErr,
+                self.diskBAErr]), self.vObsErr])
+        elif(dataType == "datacube"):
+            self.dataVector=self.datacube
+            self.errVector=self.datacubeErr
+        else:
+            raise ValueError(dataType)
+
+
 class Model(object):
     """Model class defining fit parameters
 
@@ -83,7 +195,7 @@ class Model(object):
 
     def __init__(self, modelName, galName="default"):
         self.modelName=modelName
-        self.setupAttr(galName)
+        self._setupAttr(galName)
 
         # Define priors and guess for each type of model
         # Note: priors are those used for fitting, 
@@ -155,7 +267,7 @@ class Model(object):
         else:
             raise ValueError(self.modelName)
 
-    def setupAttr(self, galName="default"):
+    def _setupAttr(self, galName="default"):
         """Define Model attributes"""
 
         if(galName == "default"):
