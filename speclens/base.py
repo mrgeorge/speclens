@@ -100,19 +100,6 @@ class TestObservable(object):
     def _setupAttr(self, inputFile=None, dataType=None):
         if(self.ID == "default"):
 
-            # parameters describing detector
-            self.pixScale=0.1  # arcseconds per pixel
-            self.nPix=100
-            self.vSampConfig="crossslit"
-            self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
-            self.nVSamp=20
-            self.vSampPA=self.diskPA
-            pos,self.vSampShape = sim.getSamplePos(self.nVSamp,
-                self.vSampSize, self.vSampConfig, sampPA=self.vSampPA)
-            self.xObs, self.yObs = pos
-            self.xObsErr=0.
-            self.yObsErr=0.
-
             # parameters derived from raw data, with errors
             #   (typically fixed in the model)
             self.redshift=0.5
@@ -145,8 +132,21 @@ class TestObservable(object):
             self.imageErr=None
             self.datacubeErr=None
             
+            # parameters describing detector
+            self.pixScale=0.1  # arcseconds per pixel
+            self.nPix=100
+            self.vSampConfig="crossslit"
+            self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
+            self.nVSamp=20
+            self.vSampPA=self.diskPA
+            pos,self.vSampShape = sim.getSamplePos(self.nVSamp,
+                self.vSampSize, self.vSampConfig, sampPA=self.vSampPA)
+            self.xObs, self.yObs = pos
+            self.xObsErr=0.
+            self.yObsErr=0.
+
         else:
-            self._readData(inputFile, dataType):
+            self._readData(inputFile, dataType)
 
     def _readData(self, inputFile, dataType):
         pass
