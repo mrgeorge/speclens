@@ -246,16 +246,19 @@ vlos = disk_velocity_field(xgrid,ygrid,p[6],p[1]/pixscale,p[2],p[3])
 c = 300000. ; Speed of light, km/s
 
 ;Next, construct the data cube. First, set the baseline wavelength
-;range:
-nlambda_obs = 1000.
-lambda_obs_min = 6000.
-lambda_obs_max = 7000.
-lambda_obs = lambda_obs_min + findgen(nlambda_obs)/float(nlambda_obs-1.)*(lambda_obs_max - lambda_obs_min)
-lambda_rest = lambda_obs / (1. +p[4]) ;Shift into the rest frame of the galaxy
+;range so that it contains OII:
 
-image_smeared = apply_seeing(image)
+dlambda = 0.5 ;Angstroms /pixel
+lambda_OII = 3727.30
+lambda_obs_max =  (lambda_OII * (1+p[4])) * (1 + 2000./300000.)
+lambda_obs_min =  (lambda_OII * (1+p[4])) * (1 - 2000./300000.)
+nlambda_obs = ceil((lambda_obs_max - lambda_obs_min) / dlambda )
+
+lambda_obs = lambda_obs_min + findgen(nlambda_obs)/float(nlambda_obs-1.)*(lambda_obs_max - lambda_obs_min)
+lambda_rest = lambda_obs / (1. + p[4]) ;Shift into the rest frame of the galaxy
+
+
 ; Normalize so that the flux density at the profile peak is the same as the 1-d spectrum.
-image_smeared = image_smeared / max(image_smeared) 
 
 ;Make the data cube.
 tcube = systime(1)
@@ -264,11 +267,9 @@ for i = 0L,npix-1 do begin
    for j = 0L,npix-1 do begin
       reset = (i eq 0) AND (j eq 0)
       zscale = vlos[i,j]/c
-      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm, reset = reset) * p[5] *image_smeared[i,j]/total(image)
+      cube[i,j,*] = galaxy_spectrum(lambda_rest*(1+zscale),p[4],atm=atm, reset = reset) * p[5] * image[i,j] / max(image)
    endfor
 endfor
-
-
 
 
 ;Add the sky flux.
@@ -281,6 +282,12 @@ for i = 0,npix-1 do begin
       sky_cube[i,j,*] = skyspec
    endfor
 endfor
+
+;Convolve the data cube with the psf.
+for i = 0L,nlambda_obs-1 do begin
+   cube[*,*,i] = apply_seeing(cube[*,*,i])
+endfor
+
 
 ;Blur to instrumental resolution.
 tres = systime(1)

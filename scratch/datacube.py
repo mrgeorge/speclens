@@ -16,12 +16,90 @@ except ImportError: # add parent dir to python search path
 import speclens.sim as sim
 
 
+class Aperture(object):
+    """
+    Labels the positions, orientations, and dimensions of the slits,
+    IFU pixels, or fibers used to observe the object.  Positions,
+    dimensions are meant to be given in pixel coordinates, cented on
+    the image center.
+
+    Each aperture consists of a list of the coordinates of the
+    pixels included in the observation.
+
+    The "size" parameter here is the fiber diameter, the slit width, or the side length of an ifu pixel.
+    
+    TODO: Add keyword to allow positions and dimensions to be given in
+    sky coordinates as well.
+    """
+    def __init__(self, model = None, xcenter = 0., ycenter= 0., size = 2., obsType="fiber", position_angle = 0.):
+        availableObsTypes = ["fiber","slit","pixel"]
+        if model == None:  # model should be provided. If not, make a default model.
+            model = speclens.Model("B")
+            xx, yy = np.meshgrid(np.arange(model.nPix) - float(model.nPix)/2.,np.arange(model.nPix) - float(self.nPix)/2.)
+
+        if type(obsType) is str:
+            assert obsType in availableObsTypes, "Problem: obsType argument to Aperture must be one of: "+", ".join(availableObsTypes)+"."
+            if obsType == "slit":
+                #xnew =  xx * np.cos(x) + yy * np.sin(x)
+                ynew = -(xx - xcenter) * np.sin(position_angle) + (yy - ycenter) * np.cos(position_angle)
+                aperture_pixels = np.where(ynew <= size/2.)
+            if obsType == "fiber":
+                dist = np.sqrt((xx - xcenter) * (xx - xcenter)  +  ( yy - ycenter ) * ( yy - ycenter))
+                aperture_pixels = np.where(dist <= size/2.)
+            if obsType == "pixel":
+                xnew =  (xx - xcenter) * np.cos(position_angle) + (yy - ycenter) * np.sin(position_angle)
+                ynew = -(xx - xcenter) * np.sin(position_angle) + (yy - ycenter) * np.cos(position_angle)
+                aperture_pixels = np.where( (np.abs(xnew) <= size/2.) and (np.abs(ynew) <= size/2.))
+                
+        if type(obsType) is list:
+            assert (len(center) == len(size) == len(obsType)), "Problem: Lengths of center, size, and obsType lists should be the same."
+            for i in np.arange(len(obsType)): 
+                assert obsType[i] in availableObsTypes, "Problem: All obsType arguments to Aperture must be one of: "+", ".join(availableObsTypes)+"."
+                aperture_pixels = []
+                if obsType[i] == "slit":
+                    #xnew =  xx * np.cos(position_angle) + yy * np.sin(position_angle)
+                    ynew = -(xx - xcenter[i]) * np.sin(position_angle[i]) + (yy - ycenter[i]) * np.cos(position_angle[i])
+                    if i == 0: 
+                        aperture_pixels = [np.where(ynew <= size/2.)]
+                    else:
+
+
+                        aperture_pixels.append(np.where(ynew <= size/2.))
+                if obsType[i] == "fiber":
+                    dist = np.sqrt((xx - xcenter) * (xx - xcenter)  +  ( yy - ycenter ) * ( yy - ycenter))
+                    if i == 0:
+                        aperture_pixels = np.where(dist <= size/2.)
+                    else:
+                        aperture_pixels.append(np.where(dist <= size/2.))
+                if obsType == "pixel":
+                    xnew =  (xx - xcenter) * np.cos(position_angle) + (yy - ycenter) * np.sin(position_angle)
+                    ynew = -(xx - xcenter) * np.sin(position_angle) + (yy - ycenter) * np.cos(position_angle)
+                    if i == 0:
+                        aperture_pixels = np.where( (np.abs(xnew) <= size/2.) and (np.abs(ynew) <= size/2.))
+                    else:
+                        aperture_pixels.append((np.abs(xnew) <= size/2.) and (np.abs(ynew) <= size/2.))
+        self.aperture_pixels = aperture_pixels
+
+
+
+            
 class EmissionLine(object):
+    """
+    EmissionLine holds the basic information about a single emission
+    line. These objects are meant to be backed into arrays, which are
+    iterated over when constructing galaxy spectra.  
+
+    TODO: Add function which uses provided parameters to return the
+    line profile evaluated at provided wavelengths. This will allow us
+    to use arbitrary line profiles.
+    """
+
     def __init__(self,center = 3727.30, width = 1., peak = 1e-17, name="OII"):
         self.Center = center
-        self.Width = width #Linewidth (angstroms)
+        self.Width = width # Linewidth (angstroms)
         self.PeakFlux = peak
         self.Name = name
+
         
 class Datacube(object):
     """
@@ -49,7 +127,7 @@ class Datacube(object):
         self.pixelScale = 0.2  # Image Pixel scale, in arcsec per pixel
         self.deltaLambdaObs = 1. # wavelength scale, in Angstroms per pixel
         self.LambdaObsMin = 3000. # Starting wavelength, in Angstroms
-        self.nSpectralPixels = 1000.
+        self.nSpectralPixels = 100.
         self.lambdaObs = self.deltaLambdaObs * np.arange(self.nSpectralPixels)+ self.LambdaObsMin
         
         #Parameters describing the galaxy spectrum.
