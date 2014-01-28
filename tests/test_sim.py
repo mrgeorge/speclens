@@ -59,11 +59,11 @@ def test_shearEllipse1():
     obsRad,obsBA,obsPA=sim.shearEllipse([diskRadius,diskBA,diskPA],g1,g2)
     
     np.testing.assert_allclose(expectedRad, obsRad, rtol=rtol,
-        atol=atol, err_msg="shearEllips does not return expected radius in weak limit on gplus")
+        atol=atol, err_msg="shearEllipse does not return expected radius in weak limit on gplus")
     np.testing.assert_allclose(expectedBA, obsBA, rtol=rtol,
-        atol=atol, err_msg="ellModel does not return expected axis ratio in weak limit on gplus")
+        atol=atol, err_msg="shearEllipse does not return expected axis ratio in weak limit on gplus")
     np.testing.assert_allclose(expectedPA, obsPA, rtol=rtolDeg,
-        atol=atolDeg, err_msg="ellModel does not return expected PA in weak limit on gplus")
+        atol=atolDeg, err_msg="shearEllipse does not return expected PA in weak limit on gplus")
 
 def test_shearEllipse2():
     g1=0.01
@@ -82,9 +82,9 @@ def test_shearEllipse2():
     obsRad,obsBA,obsPA=sim.shearEllipse([diskRadius,diskBA,diskPA],g1,g2)
     
     np.testing.assert_allclose(expectedRad, obsRad, rtol=rtol,
-        atol=atol, err_msg="shearEllips does not return expected radius in weak limit on gcross")
+        atol=atol, err_msg="shearEllipse does not return expected radius in weak limit on gcross")
     np.testing.assert_allclose(expectedBA, obsBA, rtol=rtol,
-        atol=atol, err_msg="ellModel does not return expected axis ratio in weak limit on gcross")
+        atol=atol, err_msg="shearEllipse does not return expected axis ratio in weak limit on gcross")
     np.testing.assert_allclose(expectedPA, obsPA, rtol=rtolDeg,
-        atol=atolDeg, err_msg="ellModel does not return expected PA in weak limit on gcross")
+        atol=atolDeg, err_msg="shearEllipse does not return expected PA in weak limit on gcross")
 
