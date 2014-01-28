@@ -91,67 +91,77 @@ class TestObservable(object):
     needed (e.g. phase wrapping for measured PA).
     """
 
-    def __init__(self, ID, inputFile=None, dataType=None):
-        self.ID = ID
-        self.dataType=dataType
-        self._setupAttr(inputFile=inputFile, dataType=dataType)
-        self._defineDataVector(dataType)
+    def __init__(self):
+        # parameters derived from raw data, with errors
+        #   (typically fixed in the model)
+        self.redshift=0.5
+        self.diskRadius=1.
+        self.diskRadiusErr=0.
+        self.diskNu=0.5
+        self.diskNuErr=0.
+        self.bulgeFraction=0.
+        self.bulgeFractionErr=0.
+        self.bulgeRadius=1.
+        self.bulgeRadiusErr=0.
+        self.bulgeNu=-0.6
+        self.bulgeNuErr=0
+        self.galFlux=1.
+        self.galFluxErr=0.
+        self.atmosFWHM=1.
+        self.atmosFWHMErr=0.
 
-    def _setupAttr(self, inputFile=None, dataType=None):
-        if(self.ID == "default"):
+        # parameters derived from raw data, with errors
+        #   (typically free in the model)
+        self.diskPA=0.
+        self.diskPAErr=10.
+        self.diskBA=0.5
+        self.diskBAErr=0.1
+        self.vObs=None
+        self.vObsErr=None
 
-            # parameters derived from raw data, with errors
-            #   (typically fixed in the model)
-            self.redshift=0.5
-            self.diskRadius=1.
-            self.diskRadiusErr=0.
-            self.diskNu=0.5
-            self.diskNuErr=0.
-            self.bulgeFraction=0.
-            self.bulgeFractionErr=0.
-            self.bulgeRadius=1.
-            self.bulgeRadiusErr=0.
-            self.bulgeNu=-0.6
-            self.bulgeNuErr=0
-            self.galFlux=1.
-            self.galFluxErr=0.
-            self.atmosFWHM=1.
-            self.atmosFWHMErr=0.
+        # raw data, with errors
+        self.image=None
+        self.imageErr=None
+        self.datacubeErr=None
 
-            # parameters derived from raw data, with errors
-            #   (typically free in the model)
-            self.diskPA=0.
-            self.diskPAErr=10.
-            self.diskBA=0.5
-            self.diskBAErr=0.1
-            self.vObs=None
-            self.vObsErr=None
+        # parameters describing detector
+        self.pixScale=0.1  # arcseconds per pixel
+        self.nPix=100
+        self.vSampConfig="crossslit"
+        self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
+        self.nVSamp=20
 
-            # raw data, with errors
-            self.image=None
-            self.imageErr=None
-            self.datacubeErr=None
-            
-            # parameters describing detector
-            self.pixScale=0.1  # arcseconds per pixel
-            self.nPix=100
-            self.vSampConfig="crossslit"
-            self.vSampSize=0.5  # arcseconds (radius for fibers, side length for pixels)
-            self.nVSamp=20
-            self.vSampPA=self.diskPA
+
+    def setAttr(self, **kwargs):
+        """Set/update arbitrary attribute list with **kwargs"""
+        self.__dict__.update(**kwargs)
+
+    def readData(self, inputFile, dataType):
+        """Fill object attributes from a data file"""
+        pass
+
+    def setPointing(self, xObs=None, yObs=None, xObsErr=0., yObsErr=0., vSampPA=None):
+        """Assign sampling positions for velocity measurements
+
+        Inputs:
+            Set xObs and yObs to ndarrays to assign positions directly.
+            Defaults use sim.getSamplePos to determine xObs and yObs
+                from vSampConfig and other attributes.
+        """
+
+        if((xObs is not None) & (yObs is not None)):
+            self.xObs=xObs
+            self.yObs=yObs
+        else:
+            self.vSampPA=vSampPA
             pos,self.vSampShape = sim.getSamplePos(self.nVSamp,
                 self.vSampSize, self.vSampConfig, sampPA=self.vSampPA)
             self.xObs, self.yObs = pos
-            self.xObsErr=0.
-            self.yObsErr=0.
 
-        else:
-            self._readData(inputFile, dataType)
+        self.xObsErr=xObsErr
+        self.yObsErr=yObsErr
 
-    def _readData(self, inputFile, dataType):
-        pass
-
-    def _defineDataVector(self, dataType):
+    def defineDataVector(self, dataType):
         """Define data and error vectors for likelihood calculation
 
         Inputs:
@@ -162,26 +172,32 @@ class TestObservable(object):
                        "datacube" - flux(x, y, lambda)
                        None - use model priors only
         Returns:
-            Nothing, self is updated with dataVector and errVector
+            Nothing, self is updated with dataVector, errVector, and
+            wrapVector
         """
 
         if(dataType is None):
             self.dataVector=None
             self.errVector=None
+            self.wrapVector=None
         elif(dataType == "imgPar"):
             self.dataVector=np.array([self.diskPA, self.diskBA])
             self.errVector=np.array([self.diskPAErr, self.diskBAErr])
+            self.wrapVector=[(0.,180.), None]
         elif(dataType == "velocities"):
             self.dataVector=self.vObs            
             self.errVector=self.vObsErr
+            self.wrapVector=None
         elif(dataType == "imgPar+velocities"):
             self.dataVector=np.concatenate([np.array([self.diskPA,
                 self.diskBA]), self.vObs])
             self.errVector=np.concatenate([np.array([self.diskPAErr,
                 self.diskBAErr]), self.vObsErr])
+            self.wrapVector=[(0.,180.), None, np.repeat(None, len(self.vObs))]
         elif(dataType == "datacube"):
             self.dataVector=self.datacube
             self.errVector=self.datacubeErr
+            self.wrapVector=None
         else:
             raise ValueError(dataType)
 
