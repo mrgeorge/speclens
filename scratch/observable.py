@@ -180,16 +180,35 @@ class TestGalaxy(object):
         self.galFlux=1.
         self.rotCurveOpt="arctan"
         self.vCirc=200.
-        self.rotCurvePars=[self.vCirc,self.diskVRadius]
         self.redshift=0.5
         self.diskPA=0.
         self.cosi=np.cos(np.deg2rad(30.))
-        self.diskBA=speclens.sim.convertInclination(diskCA=self.diskCA,
-            inc=np.arccos(self.cosi))
         self.g1=0.
         self.g2=0.
 
+        # Use property decorators to generate attributes on the fly
+        #    that depend on other attributes
+        # These are accessed with the normal syntax (e.g. model.diskBA)
+        @property
+        def diskBA(self):
+            return speclens.sim.convertInclination(diskCA=self.diskCA,
+                inc=np.arccos(self.cosi))
 
+        @property
+        def rotCurvePars(self):
+            # see sim.getOmega for name conventions
+            if(self.rotCurveOpt == "flat"):
+                return [self.vCirc]
+            elif(self.rotCurveOpt == "solid"):
+                return [self.vCirc, self.diskVRadius]
+            elif(self.rotCurveOpt == "arctan"):
+                return [self.vCirc, self.diskVRadius]
+            elif(self.rotCurveOpt == "arctan"):
+                return [self.vCirc, self.diskVRadius]
+            else:
+                raise ValueError(self.rotCurveOpt)
+
+            
 class TestModel(object):
     """Container for simulated observable, generator source galaxy, and model pars"""
     def __init__(self):
@@ -265,8 +284,6 @@ class TestModel(object):
             self.source.vCirc = 10.**log10vCirc
             self.source.g1 = g1
             self.source.g2 = g2
-            self.source.diskBA = speclens.sim.convertInclination(diskCA=diskCA,
-                inc=np.arccos(cosi))
         elif(self.modelName=="B"):
             diskPA, cosi, diskCA, log10vCirc, g1, g2 = pars
             self.source.diskPA = diskPA
@@ -275,8 +292,6 @@ class TestModel(object):
             self.source.vCirc = 10.**log10vCirc
             self.source.g1 = g1
             self.source.g2 = g2
-            self.source.diskBA = speclens.sim.convertInclination(diskCA=diskCA,
-                inc=np.arccos(cosi))
         else:
             raise ValueError(self.modelName)
 
