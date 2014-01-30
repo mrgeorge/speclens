@@ -186,27 +186,27 @@ class TestGalaxy(object):
         self.g1=0.
         self.g2=0.
 
-        # Use property decorators to generate attributes on the fly
-        #    that depend on other attributes
-        # These are accessed with the normal syntax (e.g. model.diskBA)
-        @property
-        def diskBA(self):
-            return speclens.sim.convertInclination(diskCA=self.diskCA,
-                inc=np.arccos(self.cosi))
+    # Use property decorators to generate attributes on the fly
+    #    that depend on other attributes
+    # These are accessed with the normal syntax (e.g. model.diskBA)
+    @property
+    def diskBA(self):
+        return speclens.sim.convertInclination(diskCA=self.diskCA,
+            inc=np.arccos(self.cosi))
 
-        @property
-        def rotCurvePars(self):
-            # see sim.getOmega for name conventions
-            if(self.rotCurveOpt == "flat"):
-                return [self.vCirc]
-            elif(self.rotCurveOpt == "solid"):
-                return [self.vCirc, self.diskVRadius]
-            elif(self.rotCurveOpt == "arctan"):
-                return [self.vCirc, self.diskVRadius]
-            elif(self.rotCurveOpt == "arctan"):
-                return [self.vCirc, self.diskVRadius]
-            else:
-                raise ValueError(self.rotCurveOpt)
+    @property
+    def rotCurvePars(self):
+        # see sim.getOmega for name conventions
+        if(self.rotCurveOpt == "flat"):
+            return [self.vCirc]
+        elif(self.rotCurveOpt == "solid"):
+            return [self.vCirc, self.diskVRadius]
+        elif(self.rotCurveOpt == "arctan"):
+            return [self.vCirc, self.diskVRadius]
+        elif(self.rotCurveOpt == "arctan"):
+            return [self.vCirc, self.diskVRadius]
+        else:
+            raise ValueError(self.rotCurveOpt)
 
             
 class TestModel(object):
@@ -309,16 +309,16 @@ obsData.setPointing(vSampPA=obsData.diskPA)
 obsData.setAttr(vObsErr=vObsErr, diskPAErr=diskPAErr, diskBAErr=diskBAErr)
 
 # TO DO - update makeObs and other sim functions to take a Galaxy and Detector
-xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(TestGalaxy(), TestDetector(),
-    sigma=obsData.vObsErr, ellErr=np.array([obsData.diskPAErr, obsData.diskBAErr]),
-    randomPars=False)
-np.testing.assert_allclose(obsData.xObs, xvals)
-np.testing.assert_allclose(obsData.yObs, yvals)
+#xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(TestGalaxy(), TestDetector(),
+#    sigma=obsData.vObsErr, ellErr=np.array([obsData.diskPAErr, obsData.diskBAErr]),
+#    randomPars=False)
+#np.testing.assert_allclose(obsData.xObs, xvals)
+#np.testing.assert_allclose(obsData.yObs, yvals)
 
-obsData.vObs=vvals
+#obsData.vObs=vvals
 
-dataType="imgPar+velocities"
-obsData.defineDataVector(dataType)
+#dataType="imgPar+velocities"
+#obsData.defineDataVector(dataType)
 
 
 model=TestModel()
@@ -338,6 +338,6 @@ model.defineModelPars("B")
 # compare model.simObs.dataVector to obsData.dataVector
 
 
-computeLikelihood(model, to)
+computeLikelihood(model, obsData)
 
 print "done"
