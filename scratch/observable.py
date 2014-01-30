@@ -142,6 +142,7 @@ class TestObservable(object):
         else:
             raise ValueError(dataType)
 
+
 class TestDetector(object):
     """Properties describing imaging and spectroscopic detectors
 
@@ -156,9 +157,17 @@ class TestDetector(object):
 
 
 class TestGalaxy(object):
-    """Properties needed to generate a model galaxy, including unobservables
+    """Intrinsic properties for a model galaxy
 
-    e.g. include cosi and diskCA, which aren't generally known
+    Note: some parameters overlap with Observable object,
+    e.g. diskRadius. These are both intrinsic and observable
+    properties. For instance, we assume size, flux, and surface
+    brightness profile shape are both necessary to generate a model
+    galaxy and also observationally accessible. On the other hand,
+    cosi and diskCA generally are not observable. Another case is
+    diskPA, which is stored here as the intrinsic source value,
+    whereas in the corresponding Observable object it may differ due
+    to shear.
     """
     def __init__(self):
         self.diskRadius=1.
@@ -175,6 +184,8 @@ class TestGalaxy(object):
         self.redshift=0.5
         self.diskPA=0.
         self.cosi=np.cos(np.deg2rad(30.))
+        self.diskBA=speclens.sim.convertInclination(diskCA=self.diskCA,
+            inc=np.arccos(self.cosi))
         self.g1=0.
         self.g2=0.
 
@@ -185,45 +196,132 @@ class TestModel(object):
         self.obs=TestObservable()
         self.source=TestGalaxy()
 
+    def defineModelPars(self, modelName):
+        self.modelName=modelName
+        if(modelName=="A"):
+            self.description="""Fixed disk thickness, flat rotation curve
+
+                diskPA - disk position angle in degrees [0,180)
+                cosi - cosine of the disk inclination (0=edge on, 1=face on)
+                log10(vmax) - circular velocity
+                g1 - shear 1 (abs<0.5)
+                g2 - shear 2 (abs<0.5)
+            """
+            self.origPars=[self.source.diskPA, self.source.cosi,
+                np.log10(self.source.vCirc), self.source.g1,
+                self.source.g2]
+            self.labels=np.array(["PA","cos(i)","lg10(vc)","g1","g2"])
+            self.origGuess=np.array([10.,0.5,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([30.,0.2,0.06,0.02,0.02])
+            self.origPriors=[("wrap",0.,180.), ("uniform",0.01,0.99),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,180.),
+                              ("uniform",0.01,0.99),
+                              ("fixed",np.log10(200.)),
+                              ("norm",0.,0.05), ("norm",0.,0.05)]
+
+        elif(modelName=="B"):
+            self.description="""Free disk thickness, flat rotation curve
+
+                diskPA - disk position angle in degrees [0,180)
+                cosi - cosine of the disk inclination (0=edge on, 1=face on)
+                diskCA - edge on disk thickness ratio (0=thin,1=sphere)
+                log10(vmax) - circular velocity
+                g1 - shear 1 (abs<0.5)
+                g2 - shear 2 (abs<0.5)
+            """
+            self.origPars=[self.source.diskPA, self.source.cosi,
+                self.source.diskCA, np.log10(self.source.vCirc),
+                self.source.g1, self.source.g2]
+            self.labels=np.array(["PA","cos(i)","c/a","lg10(vc)","g1","g2"])
+            self.origGuess=np.array([10.,0.5,0.2,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([30.,0.2,0.1,0.06,0.02,0.02])
+            self.origPriors=[("wrap",0.,180.), ("uniform",0.01,0.99),
+                             ("truncnorm",0.2,0.05,0.,1.),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,180.),
+                              ("uniform",0.01,0.99), ("fixed",0.2),
+                              ("fixed",np.log10(200.)),
+                              ("norm",0.,0.05), ("norm",0.,0.05)]
+
+        else:
+            raise ValueError(modelName)
+
+    def updatePars(self, pars):
+        """Take a set of model pars and update stored values
+
+        Since fit.lnProbVMapModel requires a pars array and other
+        functions require a model object, this function takes a given pars
+        array and reassigns the stored values in the model object.
+        """
+        if(self.modelName=="A"):
+            diskPA, cosi, log10vCirc, g1, g2 = pars
+            self.source.diskPA = diskPA
+            self.source.cosi = cosi
+            self.source.vCirc = 10.**log10vCirc
+            self.source.g1 = g1
+            self.source.g2 = g2
+            self.source.diskBA = speclens.sim.convertInclination(diskCA=diskCA,
+                inc=np.arccos(cosi))
+        elif(self.modelName=="B"):
+            diskPA, cosi, diskCA, log10vCirc, g1, g2 = pars
+            self.source.diskPA = diskPA
+            self.source.cosi = cosi
+            self.source.diskCA = diskCA
+            self.source.vCirc = 10.**log10vCirc
+            self.source.g1 = g1
+            self.source.g2 = g2
+            self.source.diskBA = speclens.sim.convertInclination(diskCA=diskCA,
+                inc=np.arccos(cosi))
+        else:
+            raise ValueError(self.modelName)
 
 
-def computeLikelihood(model, observable):
+def computeLikelihood(model, obsData):
+    """Compare model.simObs.dataVector to obsData.dataVector"""
     pass
+
 
 vObsErr=np.repeat(10.,20)
 diskPAErr=10.
 diskBAErr=0.1
-to=TestObservable()
-to.setPointing(vSampPA=to.diskPA)
-to.setAttr(vObsErr=vObsErr, diskPAErr=diskPAErr, diskBAErr=diskBAErr)
+obsData=TestObservable()
+obsData.setPointing(vSampPA=obsData.diskPA)
+obsData.setAttr(vObsErr=vObsErr, diskPAErr=diskPAErr, diskBAErr=diskBAErr)
 
-model=speclens.Model("B")
-
-model.redshift=to.redshift
-model.diskRadius=to.diskRadius
-model.diskNu=to.diskNu
-model.bulgeFraction=to.bulgeFraction
-model.bulgeRadius=to.bulgeRadius
-model.bulgeNu=to.bulgeNu
-model.galFlux=to.galFlux
-model.atmosFWHM=to.atmosFWHM
-
-model.pixScale=to.detector.pixScale
-model.nPix=to.detector.nPix
-model.vSampConfig=to.detector.vSampConfig
-model.vSampSize=to.detector.vSampSize
-model.nVSamp=to.detector.nVSamp
-
-xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(model,
-    sigma=to.vObsErr, ellErr=np.array([to.diskPAErr, to.diskBAErr]),
+# TO DO - update makeObs and other sim functions to take a Galaxy and Detector
+xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(TestGalaxy(), TestDetector(),
+    sigma=obsData.vObsErr, ellErr=np.array([obsData.diskPAErr, obsData.diskBAErr]),
     randomPars=False)
-np.testing.assert_allclose(to.xObs, xvals)
-np.testing.assert_allclose(to.yObs, yvals)
+np.testing.assert_allclose(obsData.xObs, xvals)
+np.testing.assert_allclose(obsData.yObs, yvals)
 
-to.vObs=vvals
+obsData.vObs=vvals
 
 dataType="imgPar+velocities"
-to.defineDataVector(dataType)
+obsData.defineDataVector(dataType)
+
+
+model=TestModel()
+model.defineModelPars("B")
+
+#TO DO
+# assign model.simObs based on obsData
+
+# assign model.source based on model.simObs
+
+# generate free model pars
+
+# update model.source
+
+# update model.simObs by generating observables form model.source
+
+# compare model.simObs.dataVector to obsData.dataVector
+
 
 computeLikelihood(model, to)
 
