@@ -191,9 +191,10 @@ class Galaxy(object):
         self.g1=0.
         self.g2=0.
 
-    # Use property decorators to generate attributes on the fly
-    #    that depend on other attributes
-    # These are accessed with the normal syntax (e.g. model.diskBA)
+    # Use property decorators to generate attributes on the fly that
+    # depend on other attributes. These are accessed with the normal
+    # syntax (e.g. model.diskBA) but the setter is not implemented
+    # (e.g. model.diskBA=x fails)
     @property
     def diskBA(self):
         return sim.convertInclination(diskCA=self.diskCA,
@@ -315,7 +316,8 @@ class Model(object):
         self.dataType = dataType
 
         if(dataType is None):  # do nothing
-        elif(dataType in ("imgPar", "imgPar+velocities"):
+            pass
+        elif(dataType in ("imgPar", "imgPar+velocities")):
             diskPASheared, diskBASheared = sim.ellModel(self.source)
             self.obs.diskPA = diskPASheared
             self.obs.diskBA = diskBASheared
