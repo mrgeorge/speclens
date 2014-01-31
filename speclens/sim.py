@@ -15,7 +15,7 @@ except ImportError:
 
 
 def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
-    """Return fiber center positions and fiber shape given config string.
+    """Return fiber center positions given config string.
 
     Inputs:
         nSamp - number of fibers
@@ -24,39 +24,32 @@ def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
         sampConfig - configuration string (hex|hexNoCen|slit|ifu|triNoCen)
         sampPA - position angle for configs with square fibers (default None)
     Returns:
-        (pos, fibShape)
-            pos - 2 x nSamp ndarray with fiber centers in arcsecs from origin
-            fibShape - string "circle" or "square"
+        pos - 2 x nSamp ndarray with fiber centers in arcsecs from origin
     """        
 
     pos=np.zeros((2,nSamp))
 
     if(sampConfig=="hex"):
-        fibShape="circle"
         pos[:,0]=np.array([0.,0.])
         theta=np.linspace(0,2*np.pi,num=nSamp-1,endpoint=False)
         rad=2.*sampSize
         pos[0,1:]=rad*np.cos(theta)
         pos[1,1:]=rad*np.sin(theta)
     elif(sampConfig=="hexNoCen"):
-        fibShape="circle"
         theta=np.linspace(0,2*np.pi,num=nSamp,endpoint=False)
         rad=2.*sampSize
         pos[0,:]=rad*np.cos(theta)
         pos[1,:]=rad*np.sin(theta)
     elif(sampConfig=="slit"):
-        fibShape="square"
         slitX=np.linspace(-1,1,num=nSamp)*0.5*sampSize*(nSamp-1)
         pos[0,:]=slitX*np.cos(np.deg2rad(sampPA))
         pos[1,:]=slitX*np.sin(np.deg2rad(sampPA))
     elif(sampConfig=="crossslit"):
-        fibShape="square"
         slit1X=np.linspace(-1,1,num=0.5*nSamp)*0.5*sampSize*(0.5*nSamp-1)
         slit2X=np.linspace(-1,1,num=0.5*nSamp)*0.5*sampSize*(0.5*nSamp-1)
         pos[0,:]=np.append(slit1X*np.cos(np.deg2rad(sampPA)), slit2X*np.cos(np.deg2rad(sampPA+90.)))
         pos[1,:]=np.append(slit1X*np.sin(np.deg2rad(sampPA)), slit2X*np.sin(np.deg2rad(sampPA+90.)))
     elif(sampConfig=="ifu"):
-        fibShape="square"
         numSide=np.sqrt(nSamp)
         if(np.int(numSide) != numSide):
             print "Error: ifu config needs a square number of fibers"
@@ -69,7 +62,6 @@ def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
             pos[0,:]=xx*np.cos(PArad)-yy*np.sin(PArad)
             pos[1,:]=xx*np.sin(PArad)+yy*np.cos(PArad)
     elif(sampConfig=="triNoCen"):
-        fibShape="circle"
         theta=np.linspace(0,2*np.pi,num=nSamp,endpoint=False)
         rad=sampSize
         pos[0,:]=rad*np.cos(theta)
@@ -78,7 +70,7 @@ def getSamplePos(nSamp,sampSize,sampConfig,sampPA=None):
         # TO DO - add other configs - e.g. circle, extend hex for MaNGA style
         pass 
 
-    return (pos,fibShape)
+    return pos
 
 
 def getFiberFluxes(xobs,yobs,sampSize,fibConvolve,image,imgSizePix,pixScale):
@@ -231,8 +223,8 @@ def shearLines(lines,g1,g2):
 
     return lines_prime
 
-def defineEllipse(model):
-    return [model.diskRadius, model.diskBA, model.diskPA]
+def defineEllipse(galaxy):
+    return [galaxy.diskRadius, galaxy.diskBA, galaxy.diskPA]
 
 def getEllipseAxes(ellipse):
     """Return endpoints of major and minor axis of an ellipse
@@ -311,10 +303,10 @@ def getOmega(rad,rotCurvePars,rotCurveOpt="flat"):
     else:
         raise ValueError(rotCurveOpt)
 
-def makeGalVMap(model):
+def makeGalVMap(galaxy, detector, psf):
     """Construct galsim objects for image, velocity map, and flux-weighted velocity map.
 
-    Inputs (model object must contain the following):
+    Inputs (galaxy object must contain the following):
         bulgeSersic - bulge Sersic index
         bulgeRadius - bulge half-light radius
         diskSersic - disk Sersic index
@@ -324,44 +316,56 @@ def makeGalVMap(model):
         diskCA - edge-on axis ratio
         diskPA - position angle in degrees
         galFlux - normalization of image flux
-        atmosFWHM - FWHM of gaussian PSF
         rotCurveOpt - option for getOmega ("flat", "solid", "nfw", or "arctan")
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
+
+        (detector object contains)
         pixScale - arcseconds per pixel
         nPix - number of pixels per side of each image
+
+        (psf object contains)
+        atmosFWHM - FWHM of gaussian PSF
     Returns:
         (vmap,fluxVMap,gal) - tuple of galsim objects
 
-    Note: See also makeGalVMap2, which uses pixel arrays instead of galsim objects
+    Note: See also makeGalVMap2, which uses pixel arrays instead of
+          galsim objects
     """
 
     if(not hasGalSim):
         raise ValueError(hasGalSim)
     
     # Define the galaxy velocity map
-    if(0 < model.bulgeFraction < 1):
-        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
+    if(0 < galaxy.bulgeFraction < 1):
+        bulge=galsim.Sersic(galaxy.bulgeSersic,
+            half_light_radius=galaxy.bulgeRadius)
+        disk=galsim.Sersic(galaxy.diskSersic,
+            half_light_radius=galaxy.diskRadius)
+        gal=(galaxy.bulgeFraction * bulge + (1.-galaxy.bulgeFraction)
+             * disk)
+    elif(galaxy.bulgeFraction == 0):
+        gal=galsim.Sersic(galaxy.diskSersic,
+            half_light_radius=galaxy.diskRadius)
+    elif(galaxy.bulgeFraction == 1):
+        gal=galsim.Sersic(galaxy.bulgeSersic,
+            half_light_radius=galaxy.bulgeRadius)
 
-        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
-    elif(model.bulgeFraction == 0):
-        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
-    elif(model.bulgeFraction == 1):
-        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-
-    gal.setFlux(model.galFlux)
+    gal.setFlux(galaxy.galFlux)
     
     # Set shape of galaxy from axis ratio and position angle
-    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
+    gal_shape=galsim.Shear(q=galaxy.diskBA,
+        beta=galaxy.diskPA*galsim.degrees)
     gal.applyShear(gal_shape)
 
     # Generate galaxy image and empty velocity map array
-    halfWidth=0.5*model.nPix*model.pixScale
-    imgFrame=galsim.ImageF(model.nPix,model.nPix)
-    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
-    imgArr=galImg.array.copy()   # must store these arrays as copies to avoid overwriting with shared imgFrame
+    halfWidth=0.5*detector.nPix*detector.pixScale
+    imgFrame=galsim.ImageF(detector.nPix,detector.nPix)
+    galImg=gal.draw(image=imgFrame,dx=detector.pixScale)
+    imgArr=galImg.array.copy()   # must store these arrays as copies
+                                 #to avoid overwriting with shared
+                                 #imgFrame
 
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
@@ -370,17 +374,17 @@ def makeGalVMap(model):
     xCen=0.5*(galImg.xmax-galImg.xmin)
     yCen=0.5*(galImg.ymax-galImg.ymin)
 
-    inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
+    inc=np.arccos(galaxy.cosi)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(model.diskPA)
+    gal_beta_rad=np.deg2rad(galaxy.diskPA)
 
     # Fill velocity map array
-    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))  # pixels
-    xp=((xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad))*model.pixScale  # arcseconds
-    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*model.pixScale  # arcseconds
+    xx, yy=np.meshgrid(range(detector.nPix), range(detector.nPix))  # pixels
+    xp=(((xx-xCen) * np.cos(gal_beta_rad) + (yy-yCen) * np.sin(gal_beta_rad)) * detector.pixScale) # arcseconds
+    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*detector.pixScale  # arcseconds
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))  # arcseconds
-    vmapArr=getOmega(radNorm,model.rotCurvePars,option=model.rotCurveOpt) * sini * xp
+    vmapArr=getOmega(radNorm,detector.rotCurvePars,option=detector.rotCurveOpt) * sini * xp
     vmapArr[0,:]=0 # galsim.InterpolatedImage has a problem with this array if I don't do something weird at the edge like this
 
     # Weight velocity map by galaxy flux and make galsim object
@@ -392,30 +396,30 @@ def makeGalVMap(model):
         fluxVMapArr/=sumFVM
         gal.scaleFlux(1./sumFVM)
 
-    fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=model.pixScale)
+    fluxVMapImg=galsim.ImageViewD(fluxVMapArr,scale=detector.pixScale)
     fluxVMap=galsim.InterpolatedImage(fluxVMapImg,pad_factor=6.)
-    vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=model.pixScale)) # not flux-weighted
+    vmap=galsim.InterpolatedImage(galsim.ImageViewD(vmapArr,scale=detector.pixScale)) # not flux-weighted
 
     # Apply lensing shear to galaxy and velocity maps
-    if((model.g1 != 0.) | (model.g2 != 0.)):
-        gal.applyShear(g1=model.g1,g2=model.g2)
-        fluxVMap.applyShear(g1=model.g1,g2=model.g2)
-        vmap.applyShear(g1=model.g1,g2=model.g2)
+    if((galaxy.g1 != 0.) | (galaxy.g2 != 0.)):
+        gal.applyShear(g1=galaxy.g1,g2=galaxy.g2)
+        fluxVMap.applyShear(g1=galaxy.g1,g2=galaxy.g2)
+        vmap.applyShear(g1=galaxy.g1,g2=galaxy.g2)
 
     # Convolve velocity map and galaxy with PSF
-    if(model.atmosFWHM > 0):
+    if(psf.atmosFWHM > 0):
         # Define atmospheric PSF
         #    atmos=galsim.Kolmogorov(fwhm=atmos_fwhm)
-        atmos=galsim.Gaussian(fwhm=model.atmosFWHM)
+        atmos=galsim.Gaussian(fwhm=psf.atmosFWHM)
         fluxVMap=galsim.Convolve([atmos, fluxVMap])
         gal=galsim.Convolve([atmos, gal])
 
     return (vmap,fluxVMap,gal)
 
-def makeGalVMap2(model):
+def makeGalVMap2(galaxy, detector):
     """Construct pixel arrays for image, velocity map, and flux-weighted velocity map.
 
-    Inputs (model object must contain the following):
+    Inputs (galaxy object must contain the following):
         bulgeSersic - bulge Sersic index
         bulgeRadius - bulge half-light radius
         diskSersic - disk Sersic index
@@ -429,6 +433,8 @@ def makeGalVMap2(model):
         rotCurvePars - parameters for getOmega (depends on rotCurveOpt)
         g1 - shear 1
         g2 - shear 2
+
+        (detector object must contain the following)
         pixScale - arcseconds per pixel
         nPix - number of pixels per side of each image
     Returns:
@@ -438,58 +444,36 @@ def makeGalVMap2(model):
     """
 
     # Define the galaxy
-#    if(0 < model.bulgeFraction < 1):
-#        bulge=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-#        disk=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
-#
-#        gal=model.bulgeFraction * bulge + (1.-model.bulgeFraction) * disk
-#    elif(model.bulgeFraction == 0):
-#        gal=galsim.Sersic(model.diskSersic, half_light_radius=model.diskRadius)
-#    elif(model.bulgeFraction == 1):
-#        gal=galsim.Sersic(model.bulgeSersic, half_light_radius=model.bulgeRadius)
-#
-#    gal.setFlux(model.galFlux)
-#    
-#    # Set shape of galaxy from axis ratio and position angle
-#    gal_shape=galsim.Shear(q=model.diskBA, beta=model.diskPA*galsim.degrees)
-#    gal.applyShear(gal_shape)
-#
-#    # Generate galaxy image and empty velocity map array
-#    halfWidth=0.5*model.nPix*model.pixScale
-#    imgFrame=galsim.ImageF(model.nPix,model.nPix)
-#    galImg=gal.draw(image=imgFrame,dx=model.pixScale)
-#    imgArr=galImg.array.copy()    # must store these arrays as copies to avoid overwriting with shared imgFrame
-
-    imgArr=makeImageBessel(model)
+    imgArr=makeImageBessel(galaxy, detector)
     
     vmapArr=np.zeros_like(imgArr)
     fluxVMapArr=np.zeros_like(imgArr)
 
     # Set up velocity map parameters
-    xCen=0.5*model.nPix-0.5 # half-pixel offsets help avoid nans at r=0
-    yCen=0.5*model.nPix-0.5
+    xCen=0.5*detector.nPix-0.5 # half-pixel offsets help avoid nans at r=0
+    yCen=0.5*detector.nPix-0.5
 
-    inc=np.arccos(model.cosi)
+    inc=np.arccos(galaxy.cosi)
     sini=np.sin(inc)
     tani=np.tan(inc)
-    gal_beta_rad=np.deg2rad(model.diskPA)
+    gal_beta_rad=np.deg2rad(galaxy.diskPA)
 
     # Fill velocity map array
-    xx, yy=np.meshgrid(range(model.nPix),range(model.nPix))  # pixels
-    xp=((xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad))*model.pixScale  # arcseconds
-    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*model.pixScale  # arcseconds
+    xx, yy=np.meshgrid(range(detector.nPix),range(detector.nPix))  # pixels
+    xp=((xx-xCen)*np.cos(gal_beta_rad)+(yy-yCen)*np.sin(gal_beta_rad))*detector.pixScale  # arcseconds
+    yp=(-(xx-xCen)*np.sin(gal_beta_rad)+(yy-yCen)*np.cos(gal_beta_rad))*detector.pixScale  # arcseconds
     radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))  # arcseconds
-    vmapArr=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
+    vmapArr=getOmega(radNorm,galaxy.rotCurvePars,rotCurveOpt=galaxy.rotCurveOpt) * sini * xp
 
     # Weight velocity map by galaxy flux
     # Note we assume the emission line flux is from a thin disk
     # rather than weighting by the flux from the stellar image
-    thinImgArr=makeImageBessel(model,diskCA=0.,bulgeFraction=0.)
+    thinImgArr=makeImageBessel(galaxy, detector, diskCA=0., bulgeFraction=0.)
     fluxVMapArr=vmapArr*thinImgArr
 
     # Apply lensing shear to galaxy and velocity maps
-    if((model.g1 != 0.) | (model.g2 != 0.)):
-        shear=np.array([[1-model.g1,-model.g2],[-model.g2,1+model.g1]])/np.sqrt(1.-model.g1**2-model.g2**2)
+    if((galaxy.g1 != 0.) | (galaxy.g2 != 0.)):
+        shear=np.array([[1-galaxy.g1,-galaxy.g2],[-galaxy.g2,1+galaxy.g1]])/np.sqrt(1.-galaxy.g1**2-galaxy.g2**2)
         xs=shear[0,0]*(xx-xCen) + shear[0,1]*(yy-yCen) + xCen
         ys=shear[1,0]*(xx-xCen) + shear[1,1]*(yy-yCen) + yCen
         vmapArr=scipy.ndimage.map_coordinates(vmapArr.T,(xs,ys))
@@ -499,13 +483,13 @@ def makeGalVMap2(model):
 
     return (vmapArr,fluxVMapArr,thinImgArr,imgArr)
 
-def makeImageBessel(model,diskCA=None,bulgeFraction=None):
+def makeImageBessel(galaxy, detector, diskCA=None, bulgeFraction=None):
     """Draw a galaxy image using Bessel functions
 
     Follows Spergel 2010 to generate analytic surface brightness
     profiles. To be tested against galsim approach.
 
-    Inputs (model object must contain the following):
+    Inputs (galaxy object must contain the following):
         bulgeNu - bulge slope (Sersic index 4 -> nu~-0.6)
         bulgeRadius - bulge half-light radius
         diskNu - disk slope (Sersic index 1 -> nu~0.5)
@@ -515,59 +499,61 @@ def makeImageBessel(model,diskCA=None,bulgeFraction=None):
         diskCA - edge-on axis ratio
         diskPA - position angle in degrees
         galFlux - normalization of image flux
+
+        (detector object must contain the following)
         pixScale - arcseconds per pixel
         nPix - number of pixels per side of each image
 
     Optional inputs (to use different thickness or bulge fraction than
-    model value (model is unchanged)). Allows easy creation of thick
+    model value (galaxy is unchanged)). Allows easy creation of thick
     and thin disk images without altering model object (e.g. for
     flux-weighting the emission line velocity map using a thin disk)
 
         diskCA - default None
         bulgeFraction - default None
-                 
+
     Returns:
         image - 2d array of observable image
     """
 
     if(diskCA is None):
-        diskCA=model.diskCA
+        diskCA=galaxy.diskCA
     
-    xx, yy = np.meshgrid(np.arange(model.nPix)-0.5*model.nPix,
-                         np.arange(model.nPix)-0.5*model.nPix)
+    xx, yy = np.meshgrid(np.arange(detector.nPix)-0.5*detector.nPix,
+                         np.arange(detector.nPix)-0.5*detector.nPix)
 
-    if(model.bulgeFraction < 1.):
-        paRad=np.deg2rad(model.diskPA)
+    if(galaxy.bulgeFraction < 1.):
+        paRad=np.deg2rad(galaxy.diskPA)
         xp_disk = xx * np.cos(paRad) + yy * np.sin(paRad)
         yp_disk = -xx * np.sin(paRad) + yy * np.cos(paRad)
         phi_r = np.arctan2(yp_disk,xp_disk)-np.pi/2. # rotated by pi/2 so PA=0 is at x,y=1,0
         rr_disk = np.sqrt(xp_disk**2 + yp_disk**2)
-        eps_disk = np.sqrt(1.-(1.-diskCA**2)*model.cosi**2)
-        uu_disk = (rr_disk*model.pixScale)/model.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/(1.-eps_disk**2))
-        f_disk = (uu_disk/2.)**model.diskNu*scipy.special.kv(model.diskNu,uu_disk)/scipy.special.gamma(model.diskNu+1.)
+        eps_disk = np.sqrt(1.-(1.-diskCA**2)*galaxy.cosi**2)
+        uu_disk = (rr_disk*detector.pixScale)/galaxy.diskRadius*np.sqrt((1.+eps_disk*np.cos(2.*phi_r))/(1.-eps_disk**2))
+        f_disk = (uu_disk/2.)**galaxy.diskNu*scipy.special.kv(galaxy.diskNu,uu_disk)/scipy.special.gamma(galaxy.diskNu+1.)
 
         # handle the r=0 case (at least for nu>0)
         # Note error in Spergel 2010 following Eq. 7,
         #   small u behavior is f->1/(2nu), not 1/(2(nu+1))
         #   (check examples in Eqs 6 & 7 to verify)
-        if(model.diskNu > 0):
-            f_disk[uu_disk==0] = 1./(2.*model.diskNu)
+        if(galaxy.diskNu > 0):
+            f_disk[uu_disk==0] = 1./(2.*galaxy.diskNu)
 
     else:
         f_disk=0.
         
-    if(model.bulgeFraction > 0.):
+    if(galaxy.bulgeFraction > 0.):
         rr_bulge = np.sqrt(xx**2 + yy**2)
-        uu_bulge = (rr_bulge*model.pixScale)/model.bulgeRadius
-        f_bulge = (uu_bulge/2.)**model.bulgeNu*scipy.special.kv(model.bulgeNu,uu_bulge)/scipy.special.gamma(model.bulgeNu+1.)
+        uu_bulge = (rr_bulge*detector.pixScale)/galaxy.bulgeRadius
+        f_bulge = (uu_bulge/2.)**galaxy.bulgeNu*scipy.special.kv(galaxy.bulgeNu,uu_bulge)/scipy.special.gamma(galaxy.bulgeNu+1.)
     else:
         f_bulge=0.
 
-    image = (1.-model.bulgeFraction)*f_disk + model.bulgeFraction*f_bulge
+    image = (1.-galaxy.bulgeFraction)*f_disk + galaxy.bulgeFraction*f_bulge
     return image
 
     
-def makeConvolutionKernel(xobs,yobs,model):
+def makeConvolutionKernel(xobs, yobs, detector, psf):
     """Construct the fiber x PSF convolution kernel
 
     When using pixel arrays (instead of galsim objects),
@@ -578,45 +564,46 @@ def makeConvolutionKernel(xobs,yobs,model):
     Inputs:
         xobs - float or ndarray of fiber x-centers
         yobs - float or ndarray of fiber y-centers
-        model - object containing the following attributes
-            atmosFWHM - FWHM of gaussian PSF
+        detector - object containing the following attributes
             vSampSize - fiber radius in arcsecs or IFU/slit pixel size
             vSampConvolve - if False, just sample the image at central position 
                           without convolving, else convolve
             vSampShape - string "circle" or "square"
             vSampPA - position angle for configs with square fibers 
-                    (can be None for fibShape="circle")
+                    (can be None for vSampShape="circle")
             nPix - number of pixels on image side
             pixScale - arcseconds per pixel
+        psf - object containing the following attributes
+            atmosFWHM - FWHM of gaussian PSF
     Returns:
         kernel - an ndarray of size [xobs.size, imgSizePix, imgSizePix]
     """
 
-    half=model.nPix/2
-    xx,yy=np.meshgrid((np.arange(model.nPix)-half)*model.pixScale,(np.arange(model.nPix)-half)*model.pixScale)
-    if(model.atmosFWHM > 0):
-        atmos_sigma=model.atmosFWHM/(2.*np.sqrt(2.*np.log(2.)))
-        if(model.vSampConvolve): # PSF and Fiber convolution
+    half=detector.nPix/2
+    xx,yy=np.meshgrid((np.arange(detector.nPix)-half)*detector.pixScale,(np.arange(detector.nPix)-half)*detector.pixScale)
+    if(psf.atmosFWHM > 0):
+        atmos_sigma=psf.atmosFWHM/(2.*np.sqrt(2.*np.log(2.)))
+        if(detector.vSampConvolve): # PSF and Fiber convolution
             psfArr=np.exp(-(xx**2 + yy**2)/(2.*atmos_sigma**2))
-            fibArrs=np.zeros((model.nVSamp,model.nPix,model.nPix))
-            if(model.vSampShape=="circle"):
-                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampSize**2) for pos in zip(xobs,yobs)])
-            elif(model.vSampShape=="square"):
-                PArad=np.deg2rad(model.vSampPA)
-                sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampSize)) for pos in zip(xobs,yobs)])
+            fibArrs=np.zeros((detector.nVSamp,detector.nPix,detector.nPix))
+            if(detector.vSampShape=="circle"):
+                sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < detector.vSampSize**2) for pos in zip(xobs,yobs)])
+            elif(detector.vSampShape=="square"):
+                PArad=np.deg2rad(detector.vSampPA)
+                sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*detector.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*detector.vSampSize)) for pos in zip(xobs,yobs)])
             fibArrs[sel]=1.
-            kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(model.nVSamp)])
+            kernel=np.array([scipy.signal.fftconvolve(psfArr,fibArrs[ii],mode="same") for ii in range(detector.nVSamp)])
         else:
             # this is basically the psf convolved with a delta function at the center of each fiber
             kernel=np.array([np.exp(-((xx-pos[0])**2 + (yy-pos[1])**2)/(2.*atmos_sigma**2)) for pos in zip(xobs,yobs)])
     else:
         # Fiber only
-        kernel=np.zeros((model.nVSamp,model.nPix,model.nPix))
-        if(model.vSampShape=="circle"):
-            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < model.vSampSize**2) for pos in zip(xobs,yobs)])
-        elif(model.vSampShape=="square"):
-            PArad=np.deg2rad(model.vSampPA)
-            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*model.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*model.vSampSize)) for pos in zip(xobs,yobs)])
+        kernel=np.zeros((detector.nVSamp,detector.nPix,detector.nPix))
+        if(detector.vSampShape=="circle"):
+            sel=np.array([((xx-pos[0])**2 + (yy-pos[1])**2 < detector.vSampSize**2) for pos in zip(xobs,yobs)])
+        elif(detector.vSampShape=="square"):
+            PArad=np.deg2rad(detector.vSampPA)
+            sel=np.array([((np.abs((xx-pos[0])*np.cos(PArad) - (yy-pos[1])*np.sin(PArad)) < 0.5*detector.vSampSize) & (np.abs((xx-pos[0])*np.sin(PArad) + (yy-pos[1])*np.cos(PArad)) < 0.5*detector.vSampSize)) for pos in zip(xobs,yobs)])
         kernel[sel]=1.
         
     return kernel
@@ -640,46 +627,46 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     """
 
     if(model.convOpt=="galsim"):
-        vmap,fluxVMap,gal=makeGalVMap(model)
+        vmap,fluxVMap,gal=makeGalVMap(model.galaxy, model.obs.detector, model.obs.psf)
 
         if(showPlot):
             if(not hasGalSim):
                 raise ValueError(hasGalSim)
-            vmapArr=plot.drawGSObject(vmap,model)
-            fluxVMapArr=plot.drawGSObject(vmap,model)
-            imgArr=plot.drawGSObject(vmap,model)
+            vmapArr=plot.drawGSObject(vmap,model.obs.detector)
+            fluxVMapArr=plot.drawGSObject(vmap,model.obs.detector)
+            imgArr=plot.drawGSObject(vmap,model.obs.detector)
 
             plot.showImage(imgArr,model,xobs,yobs,showPlot=True)
             plot.showImage(vmapArr,model,xobs,yobs,showPlot=True)
             plot.showImage(fluxVMapArr,model,xobs,yobs,showPlot=True)
 
         # Get the flux in each fiber
-        galFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,gal,model.nPix,model.pixScale)
-        vmapFibFlux=getFiberFluxes(xobs,yobs,model.vSampSize,model.vSampConvolve,fluxVMap,model.nPix,model.pixScale)
+        galFibFlux=getFiberFluxes(xobs,yobs,model.obs.detector.vSampSize,model.obs.detector.vSampConvolve,gal,model.obs.detector.nPix,model.obs.detector.pixScale)
+        vmapFibFlux=getFiberFluxes(xobs,yobs,model.obs.detector.vSampSize,model.obs.detector.vSampConvolve,fluxVMap,model.obs.detector.nPix,model.obs.detector.pixScale)
 
     elif(model.convOpt=="pixel"):
-        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model)
+        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model.galaxy, model.obs.detector, model.obs.psf)
         if(showPlot):
-            plot.showImage(imgArr,model,xobs,yobs,showPlot=True,title="Full image")
-            plot.showImage(thinImgArr,model,xobs,yobs,showPlot=True,title="Thin disk")
-            plot.showImage(vmapArr,model,xobs,yobs,showPlot=True,title="Velocity map")
-            plot.showImage(fluxVMapArr,model,xobs,yobs,showPlot=True,title="Flux-weighted velocity map")
-        vmapFibFlux=np.array([np.sum(model.kernel[ii]*fluxVMapArr) for ii in range(model.nVSamp)])
-        galFibFlux=np.array([np.sum(model.kernel[ii]*thinImgArr) for ii in range(model.nVSamp)])
+            plot.showImage(imgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Full image")
+            plot.showImage(thinImgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Thin disk")
+            plot.showImage(vmapArr,model.obs.detector,xobs,yobs,showPlot=True,title="Velocity map")
+            plot.showImage(fluxVMapArr,model.obs.detector,xobs,yobs,showPlot=True,title="Flux-weighted velocity map")
+        vmapFibFlux=np.array([np.sum(model.obs.kernel[ii]*fluxVMapArr) for ii in range(model.obs.detector.nVSamp)])
+        galFibFlux=np.array([np.sum(model.obs.kernel[ii]*thinImgArr) for ii in range(model.obs.detector.nVSamp)])
 
     return vmapFibFlux/galFibFlux
 
-def vmapModel(model, xobs, yobs):
-    """Evaluate model velocity field at given coordinates
+def vmapModel(galaxy, xobs, yobs):
+    """Evaluate galaxy velocity field at given coordinates
 
     Inputs:
-        model - object with these values 
-          [diskPA, diskBA, diskCA, rotCurvePars rotCurveOpt, g1, g2] 
+        galaxy - object with these values 
+          [diskPA, diskBA, diskCA, rotCurvePars, rotCurveOpt, g1, g2] 
           *unsheared* values
         xobs, yobs - the N positions (in arcsec) relative to the center at which
                      the *sheared* (observed) field is sampled
     Returns:
-        vmodel is an N array of fiber velocities
+        vmodel is an N-element array of velocity samples
 
     Note: vmapModel is like vmapObs without PSF and fiber convolution
     """
@@ -687,45 +674,45 @@ def vmapModel(model, xobs, yobs):
     # compute spectroscopic observable
     if(xobs is not None):
         # convert coords to source plane
-        pairs=shearPairs(np.array(zip(xobs,yobs)),-model.g1,-model.g2)
+        pairs=shearPairs(np.array(zip(xobs,yobs)),-galaxy.g1,-galaxy.g2)
         xx=pairs[:,0]
         yy=pairs[:,1]
 
         # rotated coords aligned with PA guess of major axis
         xCen,yCen=0,0 # assume centroid is well-measured
-        PArad=np.deg2rad(model.diskPA)
+        PArad=np.deg2rad(galaxy.diskPA)
         xp=(xx-xCen)*np.cos(PArad)+(yy-yCen)*np.sin(PArad)
         yp=-(xx-xCen)*np.sin(PArad)+(yy-yCen)*np.cos(PArad)
         # projection along apparent major axis in rotated coords
         kvec=np.array([1,0,0])
     
-        inc=convertInclination(diskBA=model.diskBA, diskCA=model.diskCA)
+        inc=np.arccos(galaxy.cosi)
         sini=np.sin(inc)
         tani=np.tan(inc)
 
         nSamp=xobs.size
         vmodel=np.zeros(nSamp)
         radNorm=np.sqrt(xp**2 + yp**2 * (1.+tani**2))
-        vmodel=getOmega(radNorm,model.rotCurvePars,rotCurveOpt=model.rotCurveOpt) * sini * xp
+        vmodel=getOmega(radNorm,galaxy.rotCurvePars,rotCurveOpt=galaxy.rotCurveOpt) * sini * xp
     else:
         vmodel=None
 
     return vmodel
 
-def ellModel(model):
+def ellModel(galaxy):
     """Compute sheared ellipse pars for a model galaxy
 
     Inputs:
-        model - object with these values 
+        galaxy - object with these values 
           [diskPA, diskBA, diskCA, rotCurvePars rotCurveOpt, g1, g2] 
           *unsheared* values
     Returns:
         ndarray([gal_beta, gal_q]) *sheared* values
     """
 
-    ellipse=(model.diskRadius,model.diskBA,model.diskPA) # unsheared ellipse
-    disk_r_prime,gal_q_prime,gal_beta_prime=shearEllipse(ellipse,model.g1,model.g2)
-    ellmodel=np.array([gal_beta_prime,gal_q_prime]) # model sheared ellipse observables
+    ellipse=defineEllipse(galaxy)  # unsheared ellipse
+    diskRadiusSheared, diskBASheared, diskPASheared=shearEllipse(ellipse, galaxy.g1, galaxy.g2)
+    ellmodel=np.array([diskPASheared, diskBASheared])  # model sheared ellipse observables
 
     return ellmodel
 
