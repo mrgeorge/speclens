@@ -113,6 +113,13 @@ class Observable(object):
         self.xObsErr=xObsErr
         self.yObsErr=yObsErr
 
+    def makeConvolutionKernel(self, convOpt):
+        if(convOpt == "pixel"):
+            self.kernel = sim.makeConvolutionKernel(self.xObs,
+                self.yObs, self.detector, self.psf)
+        else:  #convOpt is "galsim" or None
+            self.kernel=None
+
     def defineDataVector(self, dataType):
         """Define data and error vectors for likelihood calculation
 
@@ -293,3 +300,36 @@ class Model(object):
             self.source.g2 = g2
         else:
             raise ValueError(self.modelName)
+
+    def updateObservable(self, dataType):
+        """Generate new observable based on self.source
+
+        Inputs:
+            dataType - string describing data format
+                       "imgPar" - derived PA and axis ratio
+                       "velocities" - derived velocities
+                       "imgPar+velocities" - combined
+                       "datacube" - flux(x, y, lambda)
+                       None - use model priors only
+        """
+        self.dataType = dataType
+
+        if(dataType is None):  # do nothing
+        elif(dataType in ("imgPar", "imgPar+velocities"):
+            diskPASheared, diskBASheared = sim.ellModel(self.source)
+            self.obs.diskPA = diskPASheared
+            self.obs.diskBA = diskBASheared
+        elif(dataType == "velocities"):
+            if(self.convOpt is not None):
+                vObs = sim.vmapObs(self, self.obs.xObs, self.obs.yObs)
+            else:  # faster, don't need to convolve with psf or fiber
+                vObs = sim.vmapModel(self.source, self.obs.xObs,
+                    self.obs.yObs)
+            self.obs.vObs = vObs
+        elif(dataType == "datacube"):
+            pass # TO DO - generate simulated datacube here
+        else:
+            raise ValueError(dataType)
+
+        # update dataVector, errVector, wrapVector attributes
+        self.obs.defineDataVector(dataType)
