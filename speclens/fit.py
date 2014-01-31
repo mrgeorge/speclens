@@ -141,6 +141,26 @@ def removeFixedPars(model):
 # Evaluate Likelihood
 ####
 
+def chisq(modelVector, dataVector, errVector, wrapVector):
+    if(wrapVector is None):
+        return np.sum(((modelVector - dataVector) / errVector)**2)
+
+    # handle wrapped pars
+    chisq = 0.
+    for model, data, error, wrap in zip(modelVector, dataVector,
+                                        errVector, wrapVector):
+        if(wrap is None):
+            chisq += ((model - data) / err)**2
+        else:
+            width = wrap[1] - wrap[0]
+            assert(err < width)
+            model = (model-wrap[0]) % width + wrap[0]
+            data = (data-wrap[0]) % width + wrap[0]
+            delta = np.min([np.abs(model - data),
+                            np.abs(width - (model-data))])
+            chisq += (delta / err)**2
+    return chisq
+
 def lnProbVMapModel(pars, model, observation):
     """Return ln(P(model|data)) = -0.5*chisq to evaluate likelihood surface.
 
@@ -168,16 +188,16 @@ def lnProbVMapModel(pars, model, observation):
 
     # First evaluate prior
     # If out of range, ignore (return -np.Inf)
-    lnp_prior=0.
+    lnPPrior=0.
     priorFuncs=getPriorFuncs(model.priors)
     if(priorFuncs is not None):
         for ii in range(len(priorFuncs)):
             func=priorFuncs[ii]
             if(func is not None):
-                lnp_prior+=func.logpdf(pars[ii])  # logpdf requires a
+                lnPPrior+=func.logpdf(pars[ii])  # logpdf requires a
                                                   # modern version of
                                                   # scipy
-        if(lnp_prior == -np.Inf):  # we can skip likelihood evaluation
+        if(lnPPrior == -np.Inf):  # we can skip likelihood evaluation
             return -np.Inf
 
     # re-insert any fixed parameters into pars array
@@ -199,14 +219,14 @@ def lnProbVMapModel(pars, model, observation):
 
     # Compute likelihood
     if(observation.dataVector is None):  # no data, only priors
-        chisq_like = 0.
-    elif(observation.dataType)
-        chisq_like = np.sum(((model.obs.dataVector -
-            observation.dataVector) / obsevation.errVector)**2)
-        # TO DO - use wrapVector for comparison
+        chisqLike = 0.
+    elif(observation.dataType):
+        chisqLike = chisq(model.obs.dataVector,
+            observation.dataVector, observation.errVector,
+            observation.wrapVector)
 
     # Compute lnP
-    lnP = -0.5 * chisq_like + lnp_prior
+    lnP = -0.5 * chisqLike + lnPPrior
 
     return lnP
 
