@@ -18,12 +18,12 @@ rtolDeg=0.
 atolDeg=1.
 
 def test_ellModel0():
-    model=speclens.Model("B")
-    model.g1=0.
-    model.g2=0.
-    expected=np.array([model.diskPA,model.diskBA])
+    galaxy=speclens.Galaxy()
+    galaxy.g1=0.
+    galaxy.g2=0.
+    expected=np.array([galaxy.diskPA, galaxy.diskBA])
 
-    ell=sim.ellModel(model)
+    ell=sim.ellModel(galaxy)
 
     np.testing.assert_allclose(expected, ell, rtol=rtol, atol=atol,
         err_msg="ellModel with no shear should return original values")
