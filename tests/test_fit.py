@@ -45,7 +45,7 @@ def test_chisq1():
     wrapVector5 = [(0.,2.0)]
     
     expected1 = 1.**2
-    expected2 = 10.**2
+    expected2 = 0.
     expected3 = 0.
     expected4 = 1.**2
     expected5 = 10.**2
@@ -58,5 +58,5 @@ def test_chisq1():
     np.testing.assert_allclose(expected1, result1, rtol=rtol, atol=atol)
     np.testing.assert_allclose(expected2, result2, rtol=rtol, atol=atol)
     np.testing.assert_allclose(expected3, result3, rtol=rtol, atol=atol)
-    np.testing.assert_allclose(expected4, result4, rtol=rtol, atol=atol)
+    np.testing.assert_allclose(expected4, result4, rtol=rtol, atol=atol) # FAILS - because chisq uses mod operator with floats - check this
     np.testing.assert_allclose(expected5, result5, rtol=rtol, atol=atol)
