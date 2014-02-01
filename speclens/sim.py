@@ -627,7 +627,7 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     """
 
     if(model.convOpt=="galsim"):
-        vmap,fluxVMap,gal=makeGalVMap(model.galaxy, model.obs.detector, model.obs.psf)
+        vmap,fluxVMap,gal=makeGalVMap(model.source, model.obs.detector, model.obs.psf)
 
         if(showPlot):
             if(not hasGalSim):
@@ -645,7 +645,7 @@ def vmapObs(model,xobs,yobs,showPlot=False):
         vmapFibFlux=getFiberFluxes(xobs,yobs,model.obs.detector.vSampSize,model.obs.detector.vSampConvolve,fluxVMap,model.obs.detector.nPix,model.obs.detector.pixScale)
 
     elif(model.convOpt=="pixel"):
-        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model.galaxy, model.obs.detector, model.obs.psf)
+        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model.source, model.obs.detector)
         if(showPlot):
             plot.showImage(imgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Full image")
             plot.showImage(thinImgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Thin disk")
