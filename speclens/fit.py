@@ -147,7 +147,7 @@ def chisq(modelVector, dataVector, errVector, wrapVector):
 
     # handle wrapped pars
     chisq = 0.
-    for model, data, error, wrap in zip(modelVector, dataVector,
+    for model, data, err, wrap in zip(modelVector, dataVector,
                                         errVector, wrapVector):
         if(wrap is None):
             chisq += ((model - data) / err)**2
@@ -220,7 +220,7 @@ def lnProbVMapModel(pars, model, observation):
     # Compute likelihood
     if(observation.dataVector is None):  # no data, only priors
         chisqLike = 0.
-    elif(observation.dataType):
+    else:
         chisqLike = chisq(model.obs.dataVector,
             observation.dataVector, observation.errVector,
             observation.wrapVector)
@@ -294,10 +294,16 @@ def fitObs(model, observation, **kwargs):
     """
 
     print "Imaging"
+    observation.dataType = "imgPar"
+    observation.defineDataVector(observation.dataType)
     samplerI=vmapFit(model, observation, **kwargs)
     print "Spectroscopy"
+    observation.dataType = "velocities"
+    observation.defineDataVector(observation.dataType)
     samplerS=vmapFit(model, observation, **kwargs)
     print "Combined"
+    observation.dataType = "imgPar+velocities"
+    observation.defineDataVector(observation.dataType)
     samplerIS=vmapFit(model, observation, **kwargs)
     
     flatchainI=samplerI.flatchain
