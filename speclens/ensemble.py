@@ -91,7 +91,7 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
 
     return (xvals,yvals,vvals,ellObs,inputPars)
 
-def runGal(chainDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figExt="pdf",**kwargs):
+def runGal(chainDir, plotDir, galID, inputPars, model, observation, figExt="pdf", **kwargs):
     """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
 
     This is what create_qsub_galArr calls to run each galaxy
@@ -114,7 +114,7 @@ def runGal(chainDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figE
         nothing, chains and plots written to chainDir, plotDir
     """
 
-    chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,model,**kwargs)
+    chains,lnprobs=fit.fitObs(model, observation, **kwargs)
     io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),chainDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
     io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),chainDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
     io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),chainDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
