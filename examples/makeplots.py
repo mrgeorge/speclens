@@ -294,9 +294,12 @@ def modelConstraintPlot(chainDir, plotDir, figExt="pdf", showPlot=False):
     model = speclens.Model()
     model.defineModelPars(modelName)
 
-    # set model sampling locations to same as observation
+    # set model sampling locations and errors to same as observation
     model.obs.setPointing(xObs=observation.xObs, yObs=observation.yObs,
         vSampPA=observation.vSampPA)
+    model.obs.vObsErr = observation.vObsErr
+    model.obs.diskPAErr = observation.diskPAErr
+    model.obs.diskBAErr = observation.diskBAErr
 
     # first try w/o PSF and fiber convolution
     galID=0

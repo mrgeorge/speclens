@@ -152,7 +152,8 @@ class Observable(object):
                 self.diskBA]), self.vObs])
             self.errVector=np.concatenate([np.array([self.diskPAErr,
                 self.diskBAErr]), self.vObsErr])
-            self.wrapVector=[(0.,180.), None, np.repeat(None, len(self.vObs))]
+            self.wrapVector=[(0.,180.), None]
+            [self.wrapVector.append(None) for xx in range(self.vObs.size)]
         elif(dataType == "datacube"):
             self.dataVector=self.datacube
             self.errVector=self.datacubeErr
