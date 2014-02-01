@@ -135,12 +135,12 @@ def samplingPlot(plotDir, figExt="pdf", showPlot=False):
 
     plt.clf()
     speclens.plot.showImage(img, detector, xpos, ypos,
-        filename="{}/fig2a".format(plotDir,figExt), trim=trim,
+        filename="{}/fig2a.{}".format(plotDir,figExt), trim=trim,
         colorbar=True, cmap=matplotlib.cm.gray, colorbarLabel=None,
         showPlot=showPlot)
     plt.clf()
     speclens.plot.showImage(fluxVMap, detector, xpos, ypos,
-        filename="{}/fig2b".format(plotDir,figExt), trim=trim,
+        filename="{}/fig2b.{}".format(plotDir,figExt), trim=trim,
         colorbar=True, cmap=matplotlib.cm.jet, colorbarLabel=None,
         showPlot=showPlot)
 
@@ -252,49 +252,81 @@ def modelConstraintPlot(chainDir, plotDir, figExt="pdf", showPlot=False):
     fit likelihood. Plot joint posterior constraints and store chain.
     """
 
-    nThreads = 8
+    nThreads = 1
 
-    model = speclens.Model("A")
-
+    # we'll generate the observables using the inputModel object then
+    # assign them to the observation (this is a bit backwards but
+    # until we have data we have to fill the observable somehow)
     observation = speclens.Observable()
+    modelName = "B"
+    inputModel = speclens.Model()
+    inputModel.defineModelPars(modelName)
+    inputPars = inputModel.origPars
+
+    # first get observed PA so we can set sampling PA
+    # i.e. mimic the step of taking an image of the sky
+    inputModel.updateObservable("imgPar")
+    observation.diskPA = inputModel.obs.diskPA
+    observation.diskBA = inputModel.obs.diskBA
+
+    # define observation pointing and alignment
+    # i.e. mimic the step of spectroscopic targeting
+    observation.vSampPA = observation.diskPA # align slit with observed PA
+    observation.setPointing(vSampPA = observation.diskPA)
+
+    # now get velocity samples
+    # i.e. mimic the step of taking spectra and deriving velocities
+    inputModel.obs.setPointing(xObs=observation.xObs, yObs=observation.yObs,
+        vSampPA=observation.vSampPA)
+    inputModel.obs.makeConvolutionKernel(inputModel.convOpt)
+    inputModel.updateObservable("velocities")
+    observation.vObs=inputModel.obs.vObs
+
+    # define observation errors
     observation.vObsErr = np.repeat(10., observation.detector.nVSamp)
     observation.diskPAErr = 10.
     observation.diskBAErr = 0.1
-    observation.setPointing(vSampPA = observation.diskPA)
+
+    # From here on, no more use of inputModel (that would be cheating)
+
+
+    # Define model to be used for fitting observation
+    model = speclens.Model()
+    model.defineModelPars(modelName)
+
+    # set model sampling locations to same as observation
+    model.obs.setPointing(xObs=observation.xObs, yObs=observation.yObs,
+        vSampPA=observation.vSampPA)
 
     # first try w/o PSF and fiber convolution
     galID=0
     model.convOpt=None
-    observation.psf.atmosFWHM=None
-    observation.detector.vSampConvolve=False
-
-    xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
-        model, sigma=sigma, ellErr=ellErr, randomPars=False)
+    model.obs.psf.atmosFWHM = None
+    model.obs.detector.vSampConvolve = False
+    model.obs.makeConvolutionKernel(model.convOpt)
 
     # compare imaging vs spectro vs combined
     # store chains and make contour plot
-    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars, vvals,
-        sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
+    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars,
+        model, observation, figExt=figExt, addNoise=True,
         nThreads=nThreads, seed=0)
+
 
     # now try with PSF and fiber convolution
     galID=1
     model.convOpt="pixel"
-    observation.psf.atmosFWHM=1.
-    observation.detector.vSampConvolve=True
-    observation.makeConvolutionKernel(model.convOpt)
+    model.obs.psf.atmosFWHM = 1.
+    model.obs.detector.vSampConvolve = True
+    model.obs.makeConvolutionKernel(model.convOpt)
 
-    xvals,yvals,vvals,ellObs,inputPars = speclens.ensemble.makeObs(
-        model, sigma=sigma, ellErr=ellErr, randomPars=False)
-
-    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars, vvals,
-        sigma, ellObs, ellErr, model, figExt=figExt, addNoise=True,
+    speclens.ensemble.runGal(chainDir, plotDir, galID, inputPars,
+        model, observation, figExt=figExt, addNoise=True,
         nThreads=nThreads, seed=0)
 
     print "Finished Fig 4 - gal 0 and 1"
     return
 
-    
+
 if __name__ == "__main__":
 
     # set up paths for output dirs
