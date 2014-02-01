@@ -157,7 +157,7 @@ def chisq(modelVector, dataVector, errVector, wrapVector):
             model = (model-wrap[0]) % width + wrap[0]
             data = (data-wrap[0]) % width + wrap[0]
             delta = np.min([np.abs(model - data),
-                            np.abs(width - (model-data))])
+                            (width - np.abs(model-data))])
             chisq += (delta / err)**2
     return chisq
 
