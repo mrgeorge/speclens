@@ -105,11 +105,11 @@ class Observable(object):
             self.xObs=xObs
             self.yObs=yObs
         else:
-            self.detector.vSampPA=vSampPA
             pos = sim.getSamplePos(self.detector.nVSamp,
                 self.detector.vSampSize, self.detector.vSampConfig, sampPA=vSampPA)
             self.xObs, self.yObs = pos
 
+        self.detector.vSampPA=vSampPA
         self.xObsErr=xObsErr
         self.yObsErr=yObsErr
 
@@ -315,23 +315,21 @@ class Model(object):
         """
         self.dataType = dataType
 
-        if(dataType is None):  # do nothing
-            pass
-        elif(dataType in ("imgPar", "imgPar+velocities")):
+        if(dataType in ("imgPar", "imgPar+velocities")):
             diskPASheared, diskBASheared = sim.ellModel(self.source)
             self.obs.diskPA = diskPASheared
             self.obs.diskBA = diskBASheared
-        elif(dataType == "velocities"):
+
+        if(dataType in ("velocities", "imgPar+velocities")):
             if(self.convOpt is not None):
                 vObs = sim.vmapObs(self, self.obs.xObs, self.obs.yObs)
             else:  # faster, don't need to convolve with psf or fiber
                 vObs = sim.vmapModel(self.source, self.obs.xObs,
                     self.obs.yObs)
             self.obs.vObs = vObs
-        elif(dataType == "datacube"):
+
+        if(dataType == "datacube"):
             pass # TO DO - generate simulated datacube here
-        else:
-            raise ValueError(dataType)
 
         # update dataVector, errVector, wrapVector attributes
         self.obs.defineDataVector(dataType)
