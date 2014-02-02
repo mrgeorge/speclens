@@ -27,7 +27,7 @@ def generatePars(nGal,priors,seed=None):
     # getPriorFuncs can't handle fixed values
     # so they need to be treated separately
     # otherwise use the function's rvs method to generate random deviates
-    for ii,prior in priors:
+    for ii,prior in enumerate(priors):
         if(prior[0] == "fixed"):
             pars[:,ii]=np.copy(prior[1])
         else:
@@ -36,34 +36,8 @@ def generatePars(nGal,priors,seed=None):
 
     return pars
     
-def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True):
-    """Generate input model parameters and observables for one galaxy
-
-    Inputs:
-        (model object must contain the following)
-        inputPriors - list of priors for input pars, 
-                      see fit.interpretPriors for format
-                      default [[0,360],[0,1],150,(0,0.05),(0,0.05)]
-        disk_r - galaxy size, float or ndarray (default None)
-        convOpt - None, "galsim", or "pixel"
-        atmos_fwhm - gaussian PSF FWHM (default None)
-        nVSamp - number of velocity samples
-        vSampSize - fiber radius or slit/ifu pixel length in arcsecs
-        vSampConvolve - bool for whether to convolved with fiber
-                      (note PSF and fiber convolution controlled separately)
-        vSampConfig - string used by sim.getSamplePos to describe 
-                      slit/ifu/fiber config
-        vSampPA - fiber position angle if shape is square (default None)
-
-    
-        sigma - rms velocity error in km/s (default 30.)
-        ellErr - ndarray (diskPA_err degrees, diskBA_err), default [10,0.1]
-        seed - random number generator repeatability (default None)
-        randomPars - if True (default), make a random instance of inputPars
-                       given inputPriors, else use model.origPars
-    Returns:
-        (xvals,yvals,vvals,ellObs,inputPars) tuple    
-    """
+def makeObs(model, dataType, randomPars=False, seed=None):
+    """Generate input model parameters and observables for one galaxy"""
 
     # Setup galaxy properties
     if(randomPars):
@@ -73,25 +47,17 @@ def makeObs(model,sigma=30.,ellErr=np.array([10.,0.1]),seed=None,randomPars=True
         model.updatePars(inputPars) # overwrite individual attributes
     else:
         inputPars=model.origPars
-    
-    # get imaging and spectroscopic observables
-    # note, no noise added here 
-    # if PA offsets are desired, set model.vSampPA first
-    ellObs=sim.ellModel(model)
 
-    pos,sampShape=sim.getSamplePos(model.nVSamp,model.vSampSize,
-                                  model.vSampConfig,sampPA=model.vSampPA)
-    xvals,yvals=pos
-    model.vSampShape=sampShape
-    if(model.convOpt is not None):
-        model.kernel=sim.makeConvolutionKernel(xvals,yvals,model)
-        vvals=sim.vmapObs(model,xvals,yvals)
-    else: # this is faster if we don't need to convolve with psf or fiber
-        vvals=sim.vmapModel(model,xvals,yvals)
+    # get observed PA for image ellipse and use it for spec PA
+    model.updateObservable("imgPar")
+    if(dataType != "imgPar"):
+        model.obs.setPointing(vSampPA=model.obs.diskPA)
+        model.obs.makeConvolutionKernel(model.convOpt)
+        model.updateObservable(dataType)
 
-    return (xvals,yvals,vvals,ellObs,inputPars)
+    model.obs.defineDataVector(dataType)
 
-def runGal(chainDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figExt="pdf",**kwargs):
+def runGal(chainDir, plotDir, galID, inputPars, model, observation, figExt="pdf", **kwargs):
     """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
 
     This is what create_qsub_galArr calls to run each galaxy
@@ -114,7 +80,7 @@ def runGal(chainDir,plotDir,galID,inputPars,vvals,sigma,ellObs,ellErr,model,figE
         nothing, chains and plots written to chainDir, plotDir
     """
 
-    chains,lnprobs=fit.fitObs(vvals,sigma,ellObs,ellErr,model,**kwargs)
+    chains,lnprobs=fit.fitObs(model, observation, **kwargs)
     io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),chainDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
     io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),chainDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
     io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),chainDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")

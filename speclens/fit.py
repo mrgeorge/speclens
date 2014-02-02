@@ -141,7 +141,27 @@ def removeFixedPars(model):
 # Evaluate Likelihood
 ####
 
-def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
+def chisq(modelVector, dataVector, errVector, wrapVector):
+    if(wrapVector is None):
+        return np.sum(((modelVector - dataVector) / errVector)**2)
+
+    # handle wrapped pars
+    chisq = 0.
+    for model, data, err, wrap in zip(modelVector, dataVector,
+                                        errVector, wrapVector):
+        if(wrap is None):
+            chisq += ((model - data) / err)**2
+        else:
+            width = wrap[1] - wrap[0]
+            assert(err < width)
+            model = (model-wrap[0]) % width + wrap[0]
+            data = (data-wrap[0]) % width + wrap[0]
+            delta = np.min([np.abs(model - data),
+                            (width - np.abs(model-data))])
+            chisq += (delta / err)**2
+    return chisq
+
+def lnProbVMapModel(pars, model, observation):
     """Return ln(P(model|data)) = -0.5*chisq to evaluate likelihood surface.
 
     Take model parameters, priors, and data and compute chisq=sum[((model-data)/error)**2].
@@ -166,15 +186,18 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
     # wrap any pars that need wrapping, e.g. PA
     wrapPars(model.priors, pars)
 
-    # First evaluate the prior to see if this set of pars should be ignored
-    lnp_prior=0.
+    # First evaluate prior
+    # If out of range, ignore (return -np.Inf)
+    lnPPrior=0.
     priorFuncs=getPriorFuncs(model.priors)
     if(priorFuncs is not None):
         for ii in range(len(priorFuncs)):
             func=priorFuncs[ii]
             if(func is not None):
-                lnp_prior+=func.logpdf(pars[ii])  # logpdf requires a modern version of scipy
-        if(lnp_prior == -np.Inf):  # we can skip likelihood evaluation
+                lnPPrior+=func.logpdf(pars[ii])  # logpdf requires a
+                                                  # modern version of
+                                                  # scipy
+        if(lnPPrior == -np.Inf):  # we can skip likelihood evaluation
             return -np.Inf
 
     # re-insert any fixed parameters into pars array
@@ -191,44 +214,34 @@ def lnProbVMapModel(pars, model, xobs, yobs, vobs, verr, ellobs, ellerr):
     # Reassign model object attributes with pars array
     model.updatePars(fullPars)
 
-    if((xobs is None) & (ellobs is None)): # no data, only priors
-        chisq_like=0.
+    # Project new model into observable space (time-consuming step)
+    model.updateObservable(observation.dataType)
+
+    # Compute likelihood
+    if(observation.dataVector is None):  # no data, only priors
+        chisqLike = 0.
     else:
-        if((xobs is None) & (ellobs is not None)): # use only imaging data
-            modelVals=sim.ellModel(model)
-            dataVals=ellobs
-            errorVals=ellerr
-        elif((xobs is not None) & (ellobs is None)): # use only velocity data
-            if(model.convOpt is not None):
-                modelVals=sim.vmapObs(model,xobs,yobs)
-            else: # this is faster if we don't need to convolve with psf or fiber
-                modelVals=sim.vmapModel(model,xobs,yobs)
-            dataVals=vobs
-            errorVals=verr
-        elif((xobs is not None) & (ellobs is not None)): # use both imaging and velocity data
-            if(model.convOpt is not None):
-                vmodel=sim.vmapObs(model,xobs,yobs)
-            else: # this is faster if we don't need to convolve with psf or fiber
-                vmodel=sim.vmapModel(model,xobs,yobs)
-            modelVals=np.concatenate([vmodel,sim.ellModel(model)])
-            dataVals=np.concatenate([vobs,ellobs])
-            errorVals=np.concatenate([verr,ellerr])
+        chisqLike = chisq(model.obs.dataVector,
+            observation.dataVector, observation.errVector,
+            observation.wrapVector)
 
-        chisq_like=np.sum(((modelVals-dataVals)/errorVals)**2)
+    # Compute lnP
+    lnP = -0.5 * chisqLike + lnPPrior
 
-    return -0.5*chisq_like + lnp_prior
+    return lnP
 
 
-def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nSteps=250,nThreads=1,seed=None):
-    """Call emcee and return sampler to fit model to velocity and/or imaging data
+def vmapFit(model, observation, addNoise=True, nWalkers=2000,
+            nBurn=50, nSteps=250, nThreads=1, seed=None):
+    """Run MCMC to fit model to observation
 
     Inputs:
-        vobs - velocity data array to be fit
-        sigma - errorbars on vobs (e.g. 30 km/s)
-        imObs - imaging data array to be fit
-        imErr - errorbars on imObs
+        (observation object contains)
+            dataVector
+            errVector
+            wrapVector
         model object with priors
-        addNoise - bool for whether to fit noisy or noise-free observations
+        addNoise - bool for noisy or noise-free observations
         nWalkers, nBurn, nSteps, nThreads - see emcee documentation
         seed - optional int for random number repeatability
     
@@ -236,53 +249,25 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
         sampler - emcee object with posterior chains
     """
 
-    # SETUP DATA
-    if(vobs is not None):
-        numFib=vobs.size
-        pos,fibShape=sim.getSamplePos(model.nVSamp,model.vSampSize,model.vSampConfig,sampPA=model.vSampPA)
-        xobs,yobs=pos
-        vel=np.array(vobs).copy()
-        velErr=np.repeat(sigma,numFib)
-
-        # SETUP CONVOLUTION KERNEL
-        if(model.convOpt=="pixel"):
-            model.kernel=sim.makeConvolutionKernel(xobs,yobs,model)
-        else: #convOpt is "galsim" or None
-            model.kernel=None
-    else:
-        xobs=None
-        yobs=None
-        vel=None
-        velErr=None
-        model.kernel=None
-
-    if(imObs is not None):
-        ellObs=np.array(imObs).copy()
-        ellErr=np.array(imErr).copy()
-    else:
-        ellObs=None
-        ellErr=None
-
+    # ADD OPTIONAL NOISE
     if(addNoise): # useful when simulating many realizations to
                   # project parameter constraints
         np.random.seed(seed)
-        # NOTE: imObs will always be 2 number, but len(vobs) may vary
-        # with fiber configuration. To preserve random seed, generate
-        # imObs noise first
-        if(imObs is not None):
-            imNoise=np.random.randn(ellObs.size)*ellErr
-            ellObs+=imNoise
-        if(vobs is not None):
-            specNoise=np.random.randn(numFib)*sigma
-            vel+=specNoise
+        noise = np.random.randn(observation.dataVector.size)
+        observation.dataVector += (noise.reshape(observation.dataVector.shape) *
+                observation.errVector)
 
     # SETUP CHAIN SHAPE
     removeFixedPars(model)
     nPars=len(model.guess) # number of FREE pars to fit
 
     # RUN MCMC
-    walkerStart=np.array([np.random.randn(nWalkers)*model.guessScale[ii]+model.guess[ii] for ii in xrange(nPars)]).T
-    sampler=emcee.EnsembleSampler(nWalkers,nPars,lnProbVMapModel,args=[model, xobs, yobs, vel, velErr, ellObs, ellErr],threads=nThreads)
+
+    walkerStart = np.array([np.random.randn(nWalkers) *
+        model.guessScale[ii] + model.guess[ii] for ii in
+        xrange(nPars)]).T
+    sampler = emcee.EnsembleSampler(nWalkers, nPars, lnProbVMapModel,
+        args=[model, observation], threads=nThreads)
     print "emcee burnin"
     pos, prob, state = sampler.run_mcmc(walkerStart,nBurn)
     sampler.reset()
@@ -302,18 +287,24 @@ def vmapFit(vobs,sigma,imObs,imErr,model,addNoise=True,nWalkers=2000,nBurn=50,nS
     
     return sampler
 
-def fitObs(specObs,specErr,imObs,imErr,model,**kwargs):
+def fitObs(model, observation, **kwargs):
     """Wrapper to vmapFit to compute chains for each set of observables
 
     Passes kwargs to vmapFit
     """
 
     print "Imaging"
-    samplerI=vmapFit(None,specErr,imObs,imErr,model,**kwargs)
+    observation.dataType = "imgPar"
+    observation.defineDataVector(observation.dataType)
+    samplerI=vmapFit(model, observation, **kwargs)
     print "Spectroscopy"
-    samplerS=vmapFit(specObs,specErr,None,imErr,model,**kwargs)
+    observation.dataType = "velocities"
+    observation.defineDataVector(observation.dataType)
+    samplerS=vmapFit(model, observation, **kwargs)
     print "Combined"
-    samplerIS=vmapFit(specObs,specErr,imObs,imErr,model,**kwargs)
+    observation.dataType = "imgPar+velocities"
+    observation.defineDataVector(observation.dataType)
+    samplerIS=vmapFit(model, observation, **kwargs)
     
     flatchainI=samplerI.flatchain
     flatlnprobI=samplerI.flatlnprobability

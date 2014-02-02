@@ -16,27 +16,47 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
     """Run fits for an ensemble, store chains and make plots for each
 
     Generate a large sample of galaxy orientations and shears, fit
-    their observables with a 5-parameter model, and compute offsets
+    their observables with parametric model, and compute offsets
     in the recovered values from the input values. This provides an
     estimate of the precision with which shear and other variables
     can be estimated from the data.
     """
 
     nGal=10
-    model=speclens.Model(modelName)
 
-    sigma=30.
-    ellErr=np.array([10.,0.1])
+    # model to use for generating fake data
+    inputModel=speclens.Model()
+    inputModel.defineModelPars(modelName)
+
+    # model to use for fitting
+    fitModel=speclens.Model()
+    fitModel.defineModelPars(modelName)
+
+    vObsErr = 10.
+    diskPAErr = 10.
+    diskBAErr = 0.1
+
+    inputModel.obs.vObsErr = np.repeat(vObsErr,
+        inputModel.obs.detector.nVSamp)
+    inputModel.obs.diskPAErr = diskPAErr
+    inputModel.obs.diskBAErr = diskBAErr
 
     for ii in range(nGal):
         print "************Running Galaxy {}".format(ii)
-        thisModel=copy.deepcopy(model)
+        thisInputModel = copy.deepcopy(inputModel)
+        thisFitModel = copy.deepcopy(fitModel)
 
-        # Get model galaxy and observables
-        xvals,yvals,vvals,ellObs,inputPars=speclens.ensemble.makeObs(thisModel,sigma=sigma,ellErr=ellErr,seed=ii,randomPars=True)
+        speclens.ensemble.makeObs(thisInputModel,
+            "imgPar+velocities", randomPars=True, seed=ii)
+
+        # set up fitModel matching observation parameters like psf
+        thisFitModel.obs = copy.deepcopy(thisInputModel.obs)
 
         # Fit these data with a model
-        speclens.ensemble.runGal(dataDir,plotDir,ii,inputPars,vvals,sigma,ellObs,ellErr,thisModel,figExt=figExt,addNoise=True,nWalkers=20,nBurn=5,nSteps=25,nThreads=1,seed=ii)
+        speclens.ensemble.runGal(dataDir, plotDir, ii,
+            thisInputModel.origPars, thisFitModel, thisInputModel.obs,
+            figExt=figExt, addNoise=True, nWalkers=20, nBurn=5,
+            nSteps=25, nThreads=1, seed=ii)
 
 
 if __name__ == "__main__":
@@ -48,7 +68,7 @@ if __name__ == "__main__":
     if not os.path.isdir(speclensDir):
         raise NameError(speclensDir)
     plotDir=speclensDir+"plots/"+modelName
-    dataDir=speclensDir+"data/"+modelName
+    dataDir=speclensDir+"chains/"+modelName
     if not os.path.isdir(plotDir):
         os.mkdir(plotDir)
     if not os.path.isdir(dataDir):

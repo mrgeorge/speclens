@@ -22,18 +22,18 @@ plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica'],'size':20})
 plt.rc('text', usetex=True)
 plt.rc('axes',linewidth=1.5)
 
-def drawGSObject(profile, model):
+def drawGSObject(profile, detector):
     """Extract 2d array from galsim object"""
 
     if(not hasGalSim):
         raise ValueError(hasGalSim)
 
-    imgFrame=galsim.ImageF(model.nPix,model.nPix)
-    img=profile.draw(image=imgFrame,dx=model.pixScale)
+    imgFrame=galsim.ImageF(detector.nPix,detector.nPix)
+    img=profile.draw(image=imgFrame,dx=detector.pixScale)
 
     return img.array
 
-def showImage(arr, model, xsamp, ysamp, filename=None, colorbar=True,
+def showImage(arr, detector, xsamp, ysamp, filename=None, colorbar=True,
               colorbarLabel=r"v$_{LOS}$ (km/s)",
               cmap=matplotlib.cm.jet, plotScale="linear", trim=0,
               xlabel="x (arcsec)", ylabel="y (arcsec)", ellipse=None,
@@ -43,7 +43,7 @@ def showImage(arr, model, xsamp, ysamp, filename=None, colorbar=True,
 
     Inputs:
         arr - 2d array with pixel values (image, vmap, etc)
-        model - object with nPix,pixScale,vSampShape,vSampeSize,vSampPA
+        detector - object with nPix,pixScale,vSampShape,vSampSize,vSampPA
     Optional inputs:
         xsamp, ysamp - positions of velocity sampling (can be None)
                        If specified, plot sampling config (fibers, slits, etc)
@@ -53,7 +53,7 @@ def showImage(arr, model, xsamp, ysamp, filename=None, colorbar=True,
         plot is optionally displayed and optionally saved
     """
 
-    halfWidth=0.5*model.nPix*model.pixScale # arcsec
+    halfWidth=0.5*detector.nPix*detector.pixScale # arcsec
     
     if(plotScale=="linear"):
         plotArr=arr
@@ -64,17 +64,17 @@ def showImage(arr, model, xsamp, ysamp, filename=None, colorbar=True,
 
     if(xsamp is not None):
         for pos in zip(xsamp,ysamp):
-            if(model.vSampShape=="circle"):
-                circ=plt.Circle((pos[0],pos[1]),radius=model.vSampSize,fill=False,color='white',lw=lw)
+            if(detector.vSampShape=="circle"):
+                circ=plt.Circle((pos[0],pos[1]),radius=detector.vSampSize,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(circ)
-            elif(model.vSampShape=="square"):
-                PArad=np.deg2rad(model.vSampPA)
+            elif(detector.vSampShape=="square"):
+                PArad=np.deg2rad(detector.vSampPA)
                 corners=np.zeros((4,2))
                 xx=np.array([-1,1,1,-1])
                 yy=np.array([-1,-1,1,1])
-                corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*model.vSampSize+pos[0]
-                corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*model.vSampSize+pos[1]
+                corners[:,0]=(xx*np.cos(PArad)-yy*np.sin(PArad))*0.5*detector.vSampSize+pos[0]
+                corners[:,1]=(xx*np.sin(PArad)+yy*np.cos(PArad))*0.5*detector.vSampSize+pos[1]
                 sq=plt.Polygon(corners,fill=False,color='white',lw=lw)
                 ax=plt.gca()
                 ax.add_patch(sq)
