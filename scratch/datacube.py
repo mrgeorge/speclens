@@ -31,11 +31,11 @@ class Aperture(object):
     TODO: Add keyword to allow positions and dimensions to be given in
     sky coordinates as well.
     """
-    def __init__(self, model = None, xcenter = 0., ycenter= 0., size = 2., obsType="fiber", position_angle = 0.):
+    def __init__(self, detector = None, xcenter = 0., ycenter= 0., size = 2., obsType="fiber", position_angle = 0.):
         availableObsTypes = ["fiber","slit","pixel"]
-        if model == None:  # model should be provided. If not, make a default model.
-            model = speclens.Model("B")
-            xx, yy = np.meshgrid(np.arange(model.nPix) - float(model.nPix)/2.,np.arange(model.nPix) - float(self.nPix)/2.)
+        if detector == None:  # detector should be provided. If not, make a default one.
+            detector = speclens.Detector()
+            xx, yy = np.meshgrid(np.arange(detector.nPix) - float(detector.nPix)/2.,np.arange(detector.nPix) - float(detector.nPix)/2.)
 
         if type(obsType) is str:
             assert obsType in availableObsTypes, "Problem: obsType argument to Aperture must be one of: "+", ".join(availableObsTypes)+"."
@@ -114,15 +114,15 @@ class Datacube(object):
 
     def __init__(self, model = None, linelist = None):
         if model == None:
-            model = speclens.Model("B")
+            model = speclens.Model()
+            model.defineModelPars("B")
         assert isinstance(model,speclens.Model), "Argument to Datacube, if provided, must be a Model class instance"
-        self.galaxyModel = model
 
         # Parameters describing the observation.
         self.expTime = 1. # Exposure time (s)
         self.aperture = 10. # Collecting area diameter (m)
         self.spectralResolution = 10000. # Spectral resolution, Delta lambda / lambda
-        self.Npix = model.nPix # Number of spatial pixels on image side
+        self.Npix = model.obs.detector.nPix # Number of spatial pixels on image side
         self.seeingScale = 40. # characteristic wavenumber of seeing disk, in arcsec^-1. 40 gets us a ~1'' psf
         self.pixelScale = 0.2  # Image Pixel scale, in arcsec per pixel
         self.deltaLambdaObs = 1. # wavelength scale, in Angstroms per pixel
@@ -132,7 +132,7 @@ class Datacube(object):
         
         #Parameters describing the galaxy spectrum.
         self.baseModel = model
-        self.z = model.redshift # galaxy redshift
+        self.z = model.source.redshift # galaxy redshift
         self.ContinuumReferenceWavelength = 5000. # Wavelength at which to normalize the continuum, in Angstroms
         self.ContinuumReferenceNorm = 1e-18 # Value of continuum at reference wavelength, in erg/s/cm^2
         
@@ -154,8 +154,6 @@ class Datacube(object):
  
  
     def _makePsfConvKernel(self):
-        # Draw the galaxy surface-brightness profile.
-        image = sim.makeImageBessel(self.galaxyModel)
         #Make a seeing disk.
         kx, ky = np.meshgrid(np.arange(self.Npix) - float(self.Npix)/2.,np.arange(self.Npix) - float(self.Npix)/2.)
         kk2 = (kx*kx + ky*ky)/(self.seeingScale)**2
@@ -168,16 +166,16 @@ class Datacube(object):
     
     def makeDataCube(self):
         # draw the psf-convolved galaxy surface-brightness profile.
-        image = sim.makeImageBessel(self.galaxyModel)
+        image = sim.makeImageBessel(self.baseModel.source, self.baseModel.obs.detector)
         xx, yy = np.meshgrid(np.arange(self.Npix) - float(self.Npix)/2.,np.arange(self.Npix) - float(self.Npix)/2.)
-        vmap = sim.vmapModel(self.baseModel,xx,yy)
+        vmap = sim.vmapModel(self.baseModel.source,xx,yy)
         self._loadTransparency()
         self._loadThroughput()
         self._loadSky()
         self._loadGalaxySpectrum()
         # Loop  over the  spatial  grid;  in each  pixel,  look up  the
         # velocity,  and  interpolate  the  galaxy  spectrum  onto  the
-        # redshift wavelength scale.
+        # reshift wavelength scale.
         c = 300000. # Speed of light, km/s
         dataCube = np.zeros([self.Npix,self.Npix,self.nSpectralPixels])
         thisSky = np.interp(self.lambdaObs,self.lambdaSky,self.skyFluxTemplate)
@@ -252,10 +250,19 @@ class Datacube(object):
             self.GalaxyFlux += line.PeakFlux /(np.sqrt(2* np.pi) * line.Width) * \
               np.exp(-( (self.lambdaGalaxy - line.Center)**2 )/(2 * line.Width))
 
+if __name__ == "__main__":
 
-import matplotlib.pyplot as plt
+    import matplotlib.pyplot as plt
 
-data = Datacube()
-cube = data.makeDataCube()
-plot = plt.plot(cube[50,50,:])
-plt.savefig("cube_peak_spectrum")
+    # set up paths for output dirs
+    speclensDir="../"
+    if not os.path.isdir(speclensDir):
+        raise NameError(speclensDir)
+    plotDir=speclensDir+"plots/"
+    if not os.path.isdir(plotDir):
+        os.mkdir(plotDir)
+
+    data = Datacube()
+    cube = data.makeDataCube()
+    plot = plt.plot(cube[50,50,:])
+    plt.savefig(plotDir+"cube_peak_spectrum.pdf")
