@@ -75,7 +75,7 @@ def wrapPars(priors, pars):
         pars - ndarray of parameters
 
     Returns:
-        pars is updated with any wraps
+        pars - updated with any wraps
     """
     for ii,prior in enumerate(priors):
         if(prior is not None):
@@ -86,7 +86,7 @@ def wrapPars(priors, pars):
                     pars[:,ii]=(pars[:,ii]-pmin) % (pmax-pmin) + pmin
                 except IndexError:  # allow if pars is a single entry
                     pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
-    return
+    return pars
 
 def removeFixedPars(model):
     """Find pars to be fixed and removed from MCMC
@@ -184,7 +184,7 @@ def lnProbVMapModel(pars, model, observation):
     """
 
     # wrap any pars that need wrapping, e.g. PA
-    wrapPars(model.priors, pars)
+    pars = wrapPars(model.priors, pars)
 
     # First evaluate prior
     # If out of range, ignore (return -np.Inf)
@@ -278,12 +278,12 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
     # wrap chain entries this handles cases where emcee guesses a
     # value outside of the wrap range. The lnP returned may be good,
     # but we want to store the wrapped values, e.g. for plotting
-    wrapPars(model.priors, sampler.flatchain)
+    flatchain = wrapPars(model.priors, sampler.flatchain)
 
     # we probably only care about flatchain, but let's reset sampler's
     # chain attr too. To do this, need to set _chain since chain can't
     # be set directly
-    sampler._chain=sampler.flatchain.reshape((nWalkers,nSteps,nPars))
+    sampler._chain=flatchain.reshape((nWalkers,nSteps,nPars))
     
     return sampler
 
