@@ -226,7 +226,7 @@ class Model(object):
     def defineModelPars(self, modelName):
         self.modelName=modelName
         if(modelName=="A"):
-            self.description="""Fixed disk thickness, flat rotation curve
+            self.description="""Fixed disk thickness, fixed rotation scale
 
                 diskPA - disk position angle in degrees [0,180)
                 cosi - cosine of the disk inclination (0=edge on, 1=face on)
@@ -250,7 +250,7 @@ class Model(object):
                               ("norm",0.,0.05), ("norm",0.,0.05)]
 
         elif(modelName=="B"):
-            self.description="""Free disk thickness, flat rotation curve
+            self.description="""Free disk thickness, fixed rotation scale
 
                 diskPA - disk position angle in degrees [0,180)
                 cosi - cosine of the disk inclination (0=edge on, 1=face on)
@@ -275,6 +275,35 @@ class Model(object):
                               ("fixed",np.log10(200.)),
                               ("norm",0.,0.05), ("norm",0.,0.05)]
 
+        elif(modelName=="C"):
+            self.description="""Free disk thickness, free rotation scale
+
+                diskPA - disk position angle in degrees [0,180)
+                cosi - cosine of the disk inclination (0=edge on, 1=face on)
+                diskCA - edge on disk thickness ratio (0=thin,1=sphere)
+                vRadRatio - ratio of diskVRadius / diskRadius
+                log10(vmax) - circular velocity
+                g1 - shear 1 (abs<0.5)
+                g2 - shear 2 (abs<0.5)
+            """
+            self.origPars=[self.source.diskPA, self.source.cosi,
+                self.source.diskCA,
+                self.source.diskVRadius/self.source.diskRadius,
+                np.log10(self.source.vCirc), self.source.g1,
+                self.source.g2]
+            self.labels=np.array(["PA","cos(i)","c/a","Rv/R","lg10(vc)","g1","g2"])
+            self.origGuess=np.array([10.,0.5,0.2,2.2,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([30.,0.2,0.1,0.2,0.06,0.02,0.02])
+            self.origPriors=[("wrap",0.,180.), ("uniform",0.01,0.99),
+                             ("truncnorm",0.2,0.05,0.,1.),
+                             ("uniform",1.,4.),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,180.),
+                              ("uniform",0.01,0.99), ("fixed",0.2),
+                              ("fixed",2.2), ("fixed",np.log10(200.)),
+                              ("norm",0.,0.05), ("norm",0.,0.05)]
         else:
             raise ValueError(modelName)
 
@@ -297,6 +326,15 @@ class Model(object):
             self.source.diskPA = diskPA
             self.source.cosi = cosi
             self.source.diskCA = diskCA
+            self.source.vCirc = 10.**log10vCirc
+            self.source.g1 = g1
+            self.source.g2 = g2
+        elif(self.modelName=="C"):
+            diskPA, cosi, diskCA, vRadRatio, log10vCirc, g1, g2 = pars
+            self.source.diskPA = diskPA
+            self.source.cosi = cosi
+            self.source.diskCA = diskCA
+            self.source.diskVRadius = self.source.diskRadius * vRadRatio
             self.source.vCirc = 10.**log10vCirc
             self.source.g1 = g1
             self.source.g2 = g2
