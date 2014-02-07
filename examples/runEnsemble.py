@@ -55,13 +55,13 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
         # Fit these data with a model
         speclens.ensemble.runGal(dataDir, plotDir, ii,
             thisInputModel.origPars, thisFitModel, thisInputModel.obs,
-            figExt=figExt, addNoise=True, nWalkers=20, nBurn=5,
-            nSteps=25, nThreads=1, seed=ii)
+            figExt=figExt, addNoise=False, nWalkers=2000, nBurn=50,
+            nSteps=250, nThreads=8, seed=ii)
 
 
 if __name__ == "__main__":
 
-    modelName="B"
+    modelName="C"
 
     # set up paths for output dirs
     speclensDir="../"
