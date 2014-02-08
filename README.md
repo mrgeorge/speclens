@@ -21,6 +21,8 @@ speclens currently uses the following packages:
 
 Optional:
 
+* [acorr](https://github.com/dfm/acor) For MCMC convergence testing
+
 * [GalSim](https://github.com/GalSim-developers/GalSim) The GalSim
   package for galaxy images, PSFs, shear. Currently GalSim is used as
   an optional path to generating, convolving, and shearing galaxy

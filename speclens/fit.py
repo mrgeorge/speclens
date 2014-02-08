@@ -5,6 +5,11 @@ import emcee
 import scipy.stats
 import sim
 
+try:
+    import acor
+except ImportError:
+    acor = None
+
 ####
 # Priors
 ####
@@ -232,7 +237,8 @@ def lnProbVMapModel(pars, model, observation):
 
 
 def vmapFit(model, observation, addNoise=True, nWalkers=2000,
-            nBurn=50, nSteps=250, nThreads=1, seed=None):
+            nBurn=50, nSteps=250, nThreads=1, seed=None, minAF=None,
+            maxAF=None, nEff=None):
     """Run MCMC to fit model to observation
 
     Inputs:
@@ -244,7 +250,12 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
         addNoise - bool for noisy or noise-free observations
         nWalkers, nBurn, nSteps, nThreads - see emcee documentation
         seed - optional int for random number repeatability
-    
+        minAF, maxAF, nEff - optional criteria for checking
+            convergence. If set, exit chain early if mean acceptance
+            fraction falls between minAF and maxAF, and step number
+            exceeds nEff * auto-correlation time 
+            (recommended minAF=0.2, maxAF=0.5, nEff>=10)
+
     Returns:
         sampler - emcee object with posterior chains
     """
@@ -273,7 +284,37 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
     sampler.reset()
 
     print "emcee running"
-    sampler.run_mcmc(pos, nSteps)
+    # Run sampler with convergence testing
+    if((minAF is not None) & (minAF is not None) & (nEff is not None)):
+        if(acor is None):
+            raise ImportError("To run chain with convergence testing,\
+                              you need to install acor")
+
+        for ii, results in enumerate(sampler.sample(pos, iterations=nSteps)):
+            if(minAF < np.mean(sampler.acceptance_fraction) < maxAF):
+                try:
+                    # don't use sampler.acor since it uses the full
+                    # chain (including the zeros after step ii)
+                    act = [acor.acor(sampler.chain[:,0:ii+1,jj])[0] for jj in range(sampler.dim)]
+                    if(ii > np.max(act) * nEff):
+                        sampler._chain = sampler._chain[:,0:ii+1,:]
+                        sampler._lnprob = sampler._lnprob[:,0:ii+1]
+                        print "Breaking chain at step {}".format(ii)
+                        break
+                except RuntimeError:
+                    # acor raises exception if the chain isn't long
+                    # enough to compute the acor time
+                    pass
+        finishedSteps = ii+1
+        if(finishedSteps == nSteps):
+            print "Warning: chain did not converge after {}\
+                steps. (AF={}, AC={})".format(nSteps,
+                np.mean(sampler.acceptance_fraction),
+                np.max(sampler.acor))
+
+    else: # Run sampler with fixed number of steps
+        sampler.run_mcmc(pos, nSteps)
+        finishedSteps = nSteps
 
     # wrap chain entries this handles cases where emcee guesses a
     # value outside of the wrap range. The lnP returned may be good,
@@ -283,7 +324,7 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
     # we probably only care about flatchain, but let's reset sampler's
     # chain attr too. To do this, need to set _chain since chain can't
     # be set directly
-    sampler._chain=flatchain.reshape((nWalkers,nSteps,nPars))
+    sampler._chain=flatchain.reshape((nWalkers,finishedSteps,nPars))
     
     return sampler
 
