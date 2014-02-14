@@ -299,7 +299,10 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
                     if(ii > np.max(act) * nEff):
                         sampler._chain = sampler._chain[:,0:ii+1,:]
                         sampler._lnprob = sampler._lnprob[:,0:ii+1]
-                        print "Breaking chain at step {}".format(ii)
+                        print "Breaking chain at step {}.\
+                            (AF={}, AC={})".format(ii,
+                            np.mean(sampler.acceptance_fraction),
+                            np.max(act))
                         break
                 except RuntimeError:
                     # acor raises exception if the chain isn't long
