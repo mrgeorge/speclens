@@ -1,9 +1,67 @@
 #! env python
 
 import astropy.io.ascii
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib
+
+
+# Target selection for Abell 1689
+# given CFHT MegaCam g,r,z images
+
+# Start with COSMOS Mock Catalogs
+# Count successful targets as those with
+# Flux_OII > limit
+# type == 1 (galaxy)
+# zmin < z < zmax
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+import sklearn
+from sklearn import svm
+
+import fitsio
+
+# read the data
+# see http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
+cmcfull = fitsio.read("CMC081211_all.fits", ext=1)
+
+# clean the data
+gMagMin = 18.
+gMagMax = 23.
+rMagMin = 18.
+rMagMax = 23.
+zMagMin = 18.
+zMagMax = 23.
+good = ((cmcfull['Ran_g_subaru'] > gMagMin) &
+        (cmcfull['Ran_g_subaru'] < gMagMax) &
+        (cmcfull['Ran_r_subaru'] > rMagMin) &
+        (cmcfull['Ran_r_subaru'] < rMagMax) &
+        (cmcfull['Ran_z_subaru'] > zMagMin) &
+        (cmcfull['Ran_z_subaru'] < zMagMax))
+cmc = cmcfull[good]
+
+features = ('Ran_g_subaru', 'Ran_r_subaru', 'Ran_z_subaru')
+data = np.array([cmc[feat] for feat in features])
+
+lineFluxMin = 1.e-17
+lambdaMin = 6000.
+lambdaMax = 8500.
+target = ((cmc['Flux_OII'] > lineFluxMin) &
+          (cmc['type'] == 1) &
+          (lambdaMin < cmc['Lambda_OII']) &
+          (cmc['Lambda_OII'] < lambdaMax))
+
+est = svm.SVC(kernel="linear")
+est.fit(data.T, target)
+
+# TO DO: try cross-validation, introduce a simple model to fit for
+# linear combinations of color cuts
+
+
+
+
+
+# Older CFHTLS stuff
 
 def ccPlot(plt,xColor,yColor,zphot,xlabel,ylabel,title):
     norm=matplotlib.colors.Normalize(vmin=0,vmax=1.2)
