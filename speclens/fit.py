@@ -4,6 +4,7 @@ import numpy as np
 import emcee
 import scipy.stats
 import sim
+import ensemble
 
 try:
     import acor
@@ -235,10 +236,31 @@ def lnProbVMapModel(pars, model, observation):
 
     return lnP
 
+def initializeWalkers(model, nWalkers, nPars, walkerOpt="sphere"):
+    """Define initial positions of walkers
+
+    Inputs:
+        walkerOpt - specify method of initialization
+            "sphere" (default) - draw from a gaussian hypersphere
+            "prior" - generate deviates from prior distributions
+    Returns:
+        walkerStart - (nWalkers, nPars) array with initial positions
+    """
+
+    if(walkerOpt == "sphere"):
+        walkerStart = np.array([np.random.randn(nWalkers) *
+            model.guessScale[ii] + model.guess[ii] for ii in
+            xrange(nPars)]).T
+    elif(walkerOpt == "prior"):
+        walkerStart = ensemble.generatePars(nWalkers, model.priors)
+    else:
+        raise ValueError(walkerOpt)
+
+    return walkerStart
 
 def vmapFit(model, observation, addNoise=True, nWalkers=2000,
             nBurn=50, nSteps=250, nThreads=1, seed=None, minAF=None,
-            maxAF=None, nEff=None):
+            maxAF=None, nEff=None, walkerOpt="sphere"):
     """Run MCMC to fit model to observation
 
     Inputs:
@@ -255,15 +277,17 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
             fraction falls between minAF and maxAF, and step number
             exceeds nEff * auto-correlation time 
             (recommended minAF=0.2, maxAF=0.5, nEff>=10)
+        walkerOpt - specification for walker initialization
 
     Returns:
         sampler - emcee object with posterior chains
     """
 
+    np.random.seed(seed)
+
     # ADD OPTIONAL NOISE
     if(addNoise): # useful when simulating many realizations to
                   # project parameter constraints
-        np.random.seed(seed)
         noise = np.random.randn(observation.dataVector.size)
         observation.dataVector += (noise.reshape(observation.dataVector.shape) *
                 observation.errVector)
@@ -273,10 +297,7 @@ def vmapFit(model, observation, addNoise=True, nWalkers=2000,
     nPars=len(model.guess) # number of FREE pars to fit
 
     # RUN MCMC
-
-    walkerStart = np.array([np.random.randn(nWalkers) *
-        model.guessScale[ii] + model.guess[ii] for ii in
-        xrange(nPars)]).T
+    walkerStart = initializeWalkers(model, nWalkers, nPars, walkerOpt=walkerOpt)
     sampler = emcee.EnsembleSampler(nWalkers, nPars, lnProbVMapModel,
         args=[model, observation], threads=nThreads)
     print "emcee burnin"
