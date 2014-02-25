@@ -2,9 +2,8 @@ speclens
 ========
 
 speclens is a package for simulating galaxy images and velocity maps
-for spectroscopic weak lensing. The code is in an early development
-stage. The goal is to determine optimal approaches to measuring galaxy
-kinematics for the suppression of shape noise, including the
+for spectroscopic weak lensing. The goal is to determine optimal 
+approaches to measuring galaxy kinematics for the suppression of shape noise, including the
 dependence on spatial and spectral resolution, and uncertainties in
 seeing and pointing.
 
