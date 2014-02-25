@@ -3,14 +3,17 @@
 import fitsio
 import numpy as np
 
-def writeRec(rec,filename,clobber=True,compress="GZIP"):
+def writeRec(rec, filename, header=None, clobber=True, compress="GZIP"):
     """Write recarray to fits file"""
-    fitsio.write(filename,rec,clobber=clobber,compress=compress)
+    fitsio.write(filename, rec, header=header, clobber=clobber,
+        compress=compress)
 
-def readRec(filename):
-    """Read fits file into recarray"""
-    rec=fitsio.read(filename)
-    return rec
+def readRec(filename, header=False):
+    """Read fits file into recarray
+
+    header - if True, return (rec, header) tuple, else return rec
+    """
+    return fitsio.read(filename, header=header)
 
 def parsToRec(pars,labels=np.array(["PA","b/a","vmax","g1","g2"])):
     """Convert pars ndarray to recarray"""
@@ -67,3 +70,6 @@ def statsToRec(inputPars,mp,kde,hw):
     rec["hw"]=hw
     return rec
 
+def makeHeader(iterations, accfrac):
+    """Generate dictionary to store in fits header"""
+    return {"ITERATIONS":iterations, "ACCFRAC":accfrac}
