@@ -384,7 +384,9 @@ def fitObs(model, observation, **kwargs):
 
     chains=[flatchainI[goodI], flatchainS[goodS], flatchainIS[goodIS]]
     lnprobs=[flatlnprobI[goodI],flatlnprobS[goodS],flatlnprobIS[goodIS]]
-    return (chains,lnprobs)
+    iterations=[samplerI.iterations, samplerS.iterations, samplerIS.iterations]
+    accfracs=[samplerI.acceptance_fraction, samplerS.acceptance_fraction, samplerIS.acceptance_fraction]
+    return (chains, lnprobs, iterations, accfracs)
 
 ####
 # Chain statistics

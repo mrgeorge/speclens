@@ -57,7 +57,8 @@ def makeObs(model, dataType, randomPars=False, seed=None):
 
     model.obs.defineDataVector(dataType)
 
-def runGal(chainDir, plotDir, galID, inputPars, model, observation, figExt="pdf", **kwargs):
+def runGal(chainDir, plotDir, galID, inputPars, model, observation,
+           figExt="pdf", **kwargs):
     """Call fit.fitObs to run MCMC for a galaxy and save the resulting chains
 
     This is what create_qsub_galArr calls to run each galaxy
@@ -80,11 +81,22 @@ def runGal(chainDir, plotDir, galID, inputPars, model, observation, figExt="pdf"
         nothing, chains and plots written to chainDir, plotDir
     """
 
-    chains,lnprobs=fit.fitObs(model, observation, **kwargs)
-    io.writeRec(io.chainToRec(chains[0],lnprobs[0],labels=model.labels),chainDir+"/chainI_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[1],lnprobs[1],labels=model.labels),chainDir+"/chainS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    io.writeRec(io.chainToRec(chains[2],lnprobs[2],labels=model.labels),chainDir+"/chainIS_{:03d}.fits.gz".format(galID),compress="GZIP")
-    plot.contourPlotAll(chains,lnprobs=lnprobs,inputPars=inputPars,showMax=True,showPeakKDE=True,show68=True,smooth=3,percentiles=[0.68,0.95],labels=model.labels,showPlot=False,filename=plotDir+"/gal_{:03d}.{}".format(galID,figExt))
+    chains,lnprobs,iterations,accfracs=fit.fitObs(model, observation,
+        **kwargs)
+    headers = [io.makeHeader(iterations[ii], accfracs[ii]) for ii in range(3)]
+    io.writeRec(io.chainToRec(chains[0], lnprobs[0], labels=model.labels),
+        chainDir+"/chainI_{:03d}.fits.gz".format(galID), header=headers[0],
+        compress="GZIP")
+    io.writeRec(io.chainToRec(chains[1], lnprobs[1], labels=model.labels),
+        chainDir+"/chainS_{:03d}.fits.gz".format(galID), header=headers[1],
+        compress="GZIP")
+    io.writeRec(io.chainToRec(chains[2], lnprobs[2], labels=model.labels),
+        chainDir+"/chainIS_{:03d}.fits.gz".format(galID), header=headers[2],
+        compress="GZIP")
+    plot.contourPlotAll(chains, lnprobs=lnprobs, inputPars=inputPars,
+        showMax=True, showPeakKDE=True, show68=True, smooth=3,
+        percentiles=[0.68,0.95], labels=model.labels, showPlot=False,
+        filename=plotDir+"/gal_{:03d}.{}".format(galID, figExt))
 
 
 def getScatter(dir,nGal,inputPriors=[[0,360],[0,1],150,(0,0.05),(0,0.05)],labels=np.array(["PA","b/a","vmax","g1","g2"]),free=np.array([0,1,2,3,4]),fileType="chain"):
