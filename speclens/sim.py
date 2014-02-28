@@ -623,11 +623,20 @@ def vmapObs(model,xobs,yobs,showPlot=False):
     Returns:
         ndarray of flux-weighted fiber-averaged velocities
 
-    Note: see vmapModel for faster vmap evaluation without PSF and fiber convolution
+    Note: see vmapModel for faster vmap evaluation without PSF and fiber
+    convolution
     """
 
     if(model.convOpt=="galsim"):
-        vmap,fluxVMap,gal=makeGalVMap(model.source, model.obs.detector, model.obs.psf)
+        vmap,fluxVMap,gal=makeGalVMap(model.source, model.obs.detector,
+            model.obs.psf)
+        # Get the flux in each fiber
+        galFibFlux=getFiberFluxes(xobs, yobs, model.obs.detector.vSampSize,
+            model.obs.detector.vSampConvolve, gal, model.obs.detector.nPix,
+            model.obs.detector.pixScale)
+        vmapFibFlux=getFiberFluxes(xobs, yobs, model.obs.detector.vSampSize,
+            model.obs.detector.vSampConvolve, fluxVMap,model.obs.detector.nPix,
+            model.obs.detector.pixScale)
 
         if(showPlot):
             if(not hasGalSim):
@@ -640,21 +649,25 @@ def vmapObs(model,xobs,yobs,showPlot=False):
             plot.showImage(vmapArr,model,xobs,yobs,showPlot=True)
             plot.showImage(fluxVMapArr,model,xobs,yobs,showPlot=True)
 
-        # Get the flux in each fiber
-        galFibFlux=getFiberFluxes(xobs,yobs,model.obs.detector.vSampSize,model.obs.detector.vSampConvolve,gal,model.obs.detector.nPix,model.obs.detector.pixScale)
-        vmapFibFlux=getFiberFluxes(xobs,yobs,model.obs.detector.vSampSize,model.obs.detector.vSampConvolve,fluxVMap,model.obs.detector.nPix,model.obs.detector.pixScale)
-
     elif(model.convOpt=="pixel"):
-        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model.source, model.obs.detector)
-        if(showPlot):
-            plot.showImage(imgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Full image")
-            plot.showImage(thinImgArr,model.obs.detector,xobs,yobs,showPlot=True,title="Thin disk")
-            plot.showImage(vmapArr,model.obs.detector,xobs,yobs,showPlot=True,title="Velocity map")
-            plot.showImage(fluxVMapArr,model.obs.detector,xobs,yobs,showPlot=True,title="Flux-weighted velocity map")
-        vmapFibFlux=np.array([np.sum(model.obs.kernel[ii]*fluxVMapArr) for ii in range(model.obs.detector.nVSamp)])
-        galFibFlux=np.array([np.sum(model.obs.kernel[ii]*thinImgArr) for ii in range(model.obs.detector.nVSamp)])
+        vmapArr,fluxVMapArr,thinImgArr,imgArr=makeGalVMap2(model.source,
+            model.obs.detector)
+        galFibFlux=np.array([np.sum(model.obs.kernel[ii]*thinImgArr)
+            for ii in range(model.obs.detector.nVSamp)])
+        vmapFibFlux=np.array([np.sum(model.obs.kernel[ii]*fluxVMapArr)
+            for ii in range(model.obs.detector.nVSamp)])
 
-    return vmapFibFlux/galFibFlux
+        if(showPlot):
+            plot.showImage(imgArr, model.obs.detector, xobs, yobs,
+                showPlot=True, title="Full image")
+            plot.showImage(thinImgArr, model.obs.detector, xobs, yobs,
+                showPlot=True, title="Thin disk")
+            plot.showImage(vmapArr, model.obs.detector, xobs, yobs,
+                showPlot=True, title="Velocity map")
+            plot.showImage(fluxVMapArr, model.obs.detector, xobs, yobs,
+                showPlot=True, title="Flux-weighted velocity map")
+
+    return (galFibFlux, vmapFibFlux)
 
 def vmapModel(galaxy, xobs, yobs):
     """Evaluate galaxy velocity field at given coordinates

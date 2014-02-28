@@ -361,7 +361,9 @@ class Model(object):
 
         if(dataType in ("velocities", "imgPar+velocities")):
             if(self.convOpt is not None):
-                vObs = sim.vmapObs(self, self.obs.xObs, self.obs.yObs)
+                galFibFlux, vmapFibFlux = sim.vmapObs(self, self.obs.xObs,
+                    self.obs.yObs)
+                vObs = vmapFibFlux / galFibFlux
             else:  # faster, don't need to convolve with psf or fiber
                 vObs = sim.vmapModel(self.source, self.obs.xObs,
                     self.obs.yObs)
