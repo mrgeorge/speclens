@@ -192,6 +192,10 @@ class Galaxy(object):
         self.g1=0.
         self.g2=0.
 
+    def setAttr(self, **kwargs):
+        """Set/update arbitrary attribute list with **kwargs"""
+        self.__dict__.update(**kwargs)
+
     # Use property decorators to generate attributes on the fly that
     # depend on other attributes. These are accessed with the normal
     # syntax (e.g. model.diskBA) but the setter is not implemented
