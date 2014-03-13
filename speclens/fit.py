@@ -370,7 +370,9 @@ def fitObs(model, observation, **kwargs):
     observation.dataType = "imgPar+velocities"
     observation.defineDataVector(observation.dataType)
     samplerIS=vmapFit(model, observation, **kwargs)
-    
+
+    nWalkers = [samplerI.k, samplerS.k, samplerIS.k]
+
     flatchainI=samplerI.flatchain
     flatlnprobI=samplerI.flatlnprobability
     flatchainS=samplerS.flatchain
@@ -386,7 +388,7 @@ def fitObs(model, observation, **kwargs):
     lnprobs=[flatlnprobI[goodI],flatlnprobS[goodS],flatlnprobIS[goodIS]]
     iterations=[samplerI.iterations, samplerS.iterations, samplerIS.iterations]
     accfracs=[samplerI.acceptance_fraction, samplerS.acceptance_fraction, samplerIS.acceptance_fraction]
-    return (chains, lnprobs, iterations, accfracs)
+    return (chains, lnprobs, iterations, accfracs, nWalkers)
 
 ####
 # Chain statistics

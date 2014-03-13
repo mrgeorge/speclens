@@ -81,9 +81,10 @@ def runGal(chainDir, plotDir, galID, inputPars, model, observation,
         nothing, chains and plots written to chainDir, plotDir
     """
 
-    chains,lnprobs,iterations,accfracs=fit.fitObs(model, observation,
+    chains,lnprobs,iterations,accfracs,nWalkers=fit.fitObs(model, observation,
         **kwargs)
-    headers = [io.makeHeader(iterations[ii], accfracs[ii]) for ii in range(3)]
+    headers = [io.makeHeader(iterations[ii], accfracs[ii],
+                             nWalkers[ii]) for ii in range(3)]
     io.writeRec(io.chainToRec(chains[0], lnprobs[0], labels=model.labels),
         chainDir+"/chainI_{:03d}.fits.gz".format(galID), header=headers[0],
         compress="GZIP")

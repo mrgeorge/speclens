@@ -70,6 +70,6 @@ def statsToRec(inputPars,mp,kde,hw):
     rec["hw"]=hw
     return rec
 
-def makeHeader(iterations, accfrac):
+def makeHeader(iterations, accfrac, nWalkers):
     """Generate dictionary to store in fits header"""
-    return {"ITERATIONS":iterations, "ACCFRAC":accfrac}
+    return {"ITERATIONS":iterations, "ACCFRAC":accfrac, "NWALKERS":nWalkers}
