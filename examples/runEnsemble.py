@@ -12,6 +12,29 @@ except ImportError: # add parent dir to python search path
     sys.path.append(os.path.abspath(os.path.join(path,"../")))
     import speclens
 
+def exampleGalaxies(modelName, exampleName):
+    inputModel = speclens.Model()
+    examples = {"edge":(0.02, 0.),
+                "face":(0.98, 0.),
+                "horizontal":(0.5, 0.),
+                "diagonal":(0.5, 45.),
+                "vertical":(0.5, 90.)
+                }
+    cosi, diskPA = examples[exampleName]
+    inputModel.source.setAttr(cosi=cosi, diskPA=diskPA)
+    inputModel.defineModelPars(modelName)
+
+    vObsErr = 10.
+    diskPAErr = 10.
+    diskBAErr = 0.1
+
+    inputModel.obs.vObsErr = np.repeat(vObsErr,
+        inputModel.obs.detector.nVSamp)
+    inputModel.obs.diskPAErr = diskPAErr
+    inputModel.obs.diskBAErr = diskBAErr
+
+    return inputModel
+
 def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
     """Run fits for an ensemble, store chains and make plots for each
 
