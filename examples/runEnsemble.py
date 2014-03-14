@@ -65,6 +65,7 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False,
         thisInputModel = copy.deepcopy(inputModel)
         if not randomPars: # set pars from list of examples
             inputPars = exampleGalaxies(modelName, exampleNames[ii])
+            thisInputModel.origPars = inputPars
             thisInputModel.updatePars(inputPars)
 
         speclens.ensemble.makeObs(thisInputModel,
