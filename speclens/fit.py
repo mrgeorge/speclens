@@ -371,8 +371,6 @@ def fitObs(model, observation, **kwargs):
     observation.defineDataVector(observation.dataType)
     samplerIS=vmapFit(model, observation, **kwargs)
 
-    nWalkers = [samplerI.k, samplerS.k, samplerIS.k]
-
     flatchainI=samplerI.flatchain
     flatlnprobI=samplerI.flatlnprobability
     flatchainS=samplerS.flatchain
@@ -387,7 +385,11 @@ def fitObs(model, observation, **kwargs):
     chains=[flatchainI[goodI], flatchainS[goodS], flatchainIS[goodIS]]
     lnprobs=[flatlnprobI[goodI],flatlnprobS[goodS],flatlnprobIS[goodIS]]
     iterations=[samplerI.iterations, samplerS.iterations, samplerIS.iterations]
-    accfracs=[samplerI.acceptance_fraction, samplerS.acceptance_fraction, samplerIS.acceptance_fraction]
+    accfracs=[np.mean(samplerI.acceptance_fraction),
+              np.mean(samplerS.acceptance_fraction),
+              np.mean(samplerIS.acceptance_fraction)]
+    nWalkers = [samplerI.k, samplerS.k, samplerIS.k]
+
     return (chains, lnprobs, iterations, accfracs, nWalkers)
 
 ####
