@@ -13,7 +13,10 @@ except ImportError: # add parent dir to python search path
     import speclens
 
 def exampleGalaxies(modelName, exampleName):
-    inputModel = speclens.Model()
+    model = speclens.Model()
+
+    # Current examples just set cosi and diskPA
+    # all other params are left to defaults
     examples = {"edge":(0.02, 0.),
                 "face":(0.98, 0.),
                 "horizontal":(0.5, 0.),
@@ -21,21 +24,13 @@ def exampleGalaxies(modelName, exampleName):
                 "vertical":(0.5, 90.)
                 }
     cosi, diskPA = examples[exampleName]
-    inputModel.source.setAttr(cosi=cosi, diskPA=diskPA)
-    inputModel.defineModelPars(modelName)
+    model.source.setAttr(cosi=cosi, diskPA=diskPA)
+    model.defineModelPars(modelName)
 
-    vObsErr = 10.
-    diskPAErr = 10.
-    diskBAErr = 0.1
+    return model.origPars
 
-    inputModel.obs.vObsErr = np.repeat(vObsErr,
-        inputModel.obs.detector.nVSamp)
-    inputModel.obs.diskPAErr = diskPAErr
-    inputModel.obs.diskBAErr = diskBAErr
-
-    return inputModel
-
-def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
+def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False,
+                  randomPars=True):
     """Run fits for an ensemble, store chains and make plots for each
 
     Generate a large sample of galaxy orientations and shears, fit
@@ -45,20 +40,20 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
     can be estimated from the data.
     """
 
-    nGal=10
-
-    # model to use for generating fake data
-    inputModel=speclens.Model()
-    inputModel.defineModelPars(modelName)
-
-    # model to use for fitting
-    fitModel=speclens.Model()
-    fitModel.defineModelPars(modelName)
-
+    # Measurement errors
     vObsErr = 10.
     diskPAErr = 10.
     diskBAErr = 0.1
 
+    # model to use for generating observables
+    inputModel = speclens.Model()
+    if randomPars:
+        nGal=10
+    else:
+        exampleNames = ("edge", "face", "horizontal", "diagonal", "vertical")
+        nGal = len(exampleNames)
+
+    inputModel.defineModelPars(modelName)
     inputModel.obs.vObsErr = np.repeat(vObsErr,
         inputModel.obs.detector.nVSamp)
     inputModel.obs.diskPAErr = diskPAErr
@@ -66,21 +61,27 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False):
 
     for ii in range(nGal):
         print "************Running Galaxy {}".format(ii)
+
         thisInputModel = copy.deepcopy(inputModel)
-        thisFitModel = copy.deepcopy(fitModel)
+        if not randomPars: # set pars from list of examples
+            inputPars = exampleGalaxies(modelName, exampleNames[ii])
+            thisInputModel.updatePars(inputPars)
 
         speclens.ensemble.makeObs(thisInputModel,
-            "imgPar+velocities", randomPars=True, seed=ii)
+            "imgPar+velocities", randomPars=randomPars, seed=ii)
 
+        # model to use for fitting
+        fitModel=speclens.Model()
+        fitModel.defineModelPars(modelName)
         # set up fitModel matching observation parameters like psf
-        thisFitModel.obs = copy.deepcopy(thisInputModel.obs)
+        fitModel.obs = copy.deepcopy(thisInputModel.obs)
 
         # Fit these data with a model
         speclens.ensemble.runGal(dataDir, plotDir, ii,
-            thisInputModel.origPars, thisFitModel, thisInputModel.obs,
+            thisInputModel.origPars, fitModel, thisInputModel.obs,
             figExt=figExt, addNoise=False, nWalkers=2000, nBurn=50,
-            nSteps=500, nThreads=8, seed=ii, minAF=0.2, maxAF=0.5,
-            nEff=10.)
+            nSteps=500, nThreads=8, seed=ii, minAF=None, maxAF=None,
+            nEff=None, walkerOpt="prior")
 
 
 if __name__ == "__main__":
@@ -100,5 +101,7 @@ if __name__ == "__main__":
 
     figExt="pdf" # pdf or png
     showPlot=False
+    randomPars=False
 
-    ensemblePlots(modelName,dataDir,plotDir,figExt=figExt,showPlot=showPlot)
+    ensemblePlots(modelName, dataDir, plotDir, figExt=figExt,
+                  showPlot=showPlot, randomPars=randomPars)
