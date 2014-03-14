@@ -81,7 +81,7 @@ def ensemblePlots(modelName, dataDir, plotDir, figExt="pdf", showPlot=False,
         speclens.ensemble.runGal(dataDir, plotDir, ii,
             thisInputModel.origPars, fitModel, thisInputModel.obs,
             figExt=figExt, addNoise=False, nWalkers=2000, nBurn=50,
-            nSteps=500, nThreads=8, seed=ii, minAF=None, maxAF=None,
+            nSteps=1000, nThreads=8, seed=ii, minAF=None, maxAF=None,
             nEff=None, walkerOpt="prior")
 
 
