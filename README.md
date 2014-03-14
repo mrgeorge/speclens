@@ -18,7 +18,10 @@ speclens currently uses the following packages:
 * [emcee](http://dan.iel.fm/emcee/) Dan Foreman-Mackey's parallel
   sampler for fast MCMC
 
-Optional:
+* [fitsio](https://github.com/esheldon/fitsio) Erin Sheldon's fitsio
+  for python - used for storing MCMC chains
+
+ Optional:
 
 * [acorr](https://github.com/dfm/acor) For MCMC convergence testing
 
@@ -30,9 +33,6 @@ Optional:
 
 The following packages are imported by some scripts in scratch/ but
 aren't essential for the main functions:
-
-* [fitsio](https://github.com/esheldon/fitsio) Erin Sheldon's fitsio
-  for python
 
 * [esutil](http://code.google.com/p/esutil/) Erin Sheldon's python
   utilities for some cosmological distance calculations
