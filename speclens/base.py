@@ -308,6 +308,37 @@ class Model(object):
                               ("uniform",0.01,0.99), ("fixed",0.2),
                               ("fixed",2.2), ("fixed",np.log10(200.)),
                               ("norm",0.,0.05), ("norm",0.,0.05)]
+        elif(modelName=="D"):
+            self.description="""Free disk thickness, free rotation scale
+
+                phig - 0.5 * arctan(g2/g1) (0-pi)
+                cosi - cosine of the disk inclination (0=edge on, 1=face on)
+                diskCA - edge on disk thickness ratio (0=thin,1=sphere)
+                vRadRatio - ratio of diskVRadius / diskRadius
+                log10(vmax) - circular velocity
+                gcosPA - shear (abs < 1)
+                gsinPA - shear (abs < 1)
+            """
+            self.origPars=[np.sqrt(self.source.g1**2 + self.source.g2**2),
+                self.source.cosi,
+                self.source.diskCA,
+                self.source.diskVRadius/self.source.diskRadius,
+                np.log10(self.source.vCirc),
+                self.source.g1 * np.cos(np.deg2rad(self.source.diskPA)),
+                self.source.g2 * np.cos(np.deg2rad(self.source.diskPA))]
+            self.labels=np.array(["phig","cos(i)","c/a","Rv/R","lg10(vc)","gcosPA","gsinPA"])
+            self.origGuess=np.array([0.,0.5,0.2,2.2,np.log10(200.),0.,0.])
+            self.origGuessScale=np.array([0.03,0.2,0.1,0.2,0.06,0.02,0.02])
+            self.origPriors=[("wrap",0.,np.pi), ("uniform",0.01,0.99),
+                             ("truncnorm",0.2,0.05,0.,1.),
+                             ("uniform",1.,4.),
+                             ("norm",np.log10(200.),0.06),
+                             ("uniform",-0.5,0.5),
+                             ("uniform",-0.5,0.5)]
+            self.inputPriors=[("uniform",0.0,np.pi),
+                              ("uniform",0.01,0.99), ("fixed",0.2),
+                              ("fixed",2.2), ("fixed",np.log10(200.)),
+                              ("norm",0.,0.05), ("norm",0.,0.05)]
         else:
             raise ValueError(modelName)
 
@@ -342,6 +373,20 @@ class Model(object):
             self.source.vCirc = 10.**log10vCirc
             self.source.g1 = g1
             self.source.g2 = g2
+        elif(self.modelName=="D"):
+            phig, cosi, diskCA, vRadRatio, log10vCirc, gcosPA, gsinPA = pars
+            g = np.sqrt(gcosPA**2 + gsinPA**2)
+            tan2phig = np.tan(2*phig)
+            if g==0:
+                self.source.diskPA = 0.
+            else:
+                self.source.diskPA = np.arccos(gcosPA/g)
+            self.source.cosi = cosi
+            self.source.diskCA = diskCA
+            self.source.diskVRadius = self.source.diskRadius * vRadRatio
+            self.source.vCirc = 10.**log10vCirc
+            self.source.g1 = g / np.sqrt(1. + tan2phig**2)
+            self.source.g2 = self.source.g1 * tan2phig
         else:
             raise ValueError(self.modelName)
 
