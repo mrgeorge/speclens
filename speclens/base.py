@@ -18,6 +18,10 @@ class Detector(object):
         return "%s.%s(%r)" % (self.__class__.__module__,
                               self.__class__.__name__,
                               self.__dict__)
+    def __str__(self):
+        return "%s.%s\n%s" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__.__str__().replace(',','\n'))
 
     @property
     def vSampShape(self):
@@ -41,6 +45,11 @@ class PSF(object):
         return "%s.%s(%r)" % (self.__class__.__module__,
                               self.__class__.__name__,
                               self.__dict__)
+
+    def __str__(self):
+        return "%s.%s\n%s" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__.__str__().replace(',','\n'))
 
 class Observable(object):
     """Collection of data and self-description for lnP calculation
@@ -98,6 +107,11 @@ class Observable(object):
         return "%s.%s(%r)" % (self.__class__.__module__,
                               self.__class__.__name__,
                               self.__dict__)
+
+    def __str__(self):
+        return "%s.%s\n%s" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__.__str__().replace(',','\n'))
 
     def setAttr(self, **kwargs):
         """Set/update arbitrary attribute list with **kwargs"""
@@ -212,6 +226,11 @@ class Galaxy(object):
                               self.__class__.__name__,
                               self.__dict__)
 
+    def __str__(self):
+        return "%s.%s\n%s" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__.__str__().replace(',','\n'))
+
     def setAttr(self, **kwargs):
         """Set/update arbitrary attribute list with **kwargs"""
         self.__dict__.update(**kwargs)
@@ -251,6 +270,11 @@ class Model(object):
         return "%s.%s(%r)" % (self.__class__.__module__,
                               self.__class__.__name__,
                               self.__dict__)
+
+    def __str__(self):
+        return "%s.%s\n%s" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__.__str__().replace(',','\n'))
 
     def defineModelPars(self, modelName):
         self.modelName=modelName
