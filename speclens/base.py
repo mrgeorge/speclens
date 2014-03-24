@@ -14,6 +14,11 @@ class Detector(object):
         self.nVSamp=20
         self.vSampConvolve=True
 
+    def __repr__(self):
+        return "%s.%s(%r)" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__)
+
     @property
     def vSampShape(self):
         # see sim.getSamplePos for acceptable vSampConfig values
@@ -32,6 +37,11 @@ class PSF(object):
         self.atmosFWHM=1.
         self.atmosFWHMErr=0.
         
+    def __repr__(self):
+        return "%s.%s(%r)" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__)
+
 class Observable(object):
     """Collection of data and self-description for lnP calculation
 
@@ -83,6 +93,11 @@ class Observable(object):
         # parameters describing detector and seeing
         self.detector=Detector()
         self.psf=PSF()
+
+    def __repr__(self):
+        return "%s.%s(%r)" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__)
 
     def setAttr(self, **kwargs):
         """Set/update arbitrary attribute list with **kwargs"""
@@ -192,6 +207,11 @@ class Galaxy(object):
         self.g1=0.
         self.g2=0.
 
+    def __repr__(self):
+        return "%s.%s(%r)" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__)
+
     def setAttr(self, **kwargs):
         """Set/update arbitrary attribute list with **kwargs"""
         self.__dict__.update(**kwargs)
@@ -227,6 +247,11 @@ class Model(object):
         self.source=Galaxy()
         self.convOpt="pixel"
         
+    def __repr__(self):
+        return "%s.%s(%r)" % (self.__class__.__module__,
+                              self.__class__.__name__,
+                              self.__dict__)
+
     def defineModelPars(self, modelName):
         self.modelName=modelName
         if(modelName=="A"):
