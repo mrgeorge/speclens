@@ -90,7 +90,7 @@ def wrapPars(priors, pars):
                 pmax=np.float64(np.copy(prior[2]))
                 try:  # assume pars is a chain (nsteps x npars)
                     pars[:,ii]=(pars[:,ii]-pmin) % (pmax-pmin) + pmin
-                except IndexError:  # allow if pars is a single entry
+                except (IndexError, TypeError):  # allow if pars is a single entry
                     pars[ii]=(pars[ii]-pmin) % (pmax-pmin) + pmin
     return pars
 
