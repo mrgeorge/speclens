@@ -73,3 +73,9 @@ def statsToRec(inputPars,mp,kde,hw):
 def makeHeader(iterations, accfrac, nWalkers):
     """Generate dictionary to store in fits header"""
     return {"ITERATIONS":iterations, "ACCFRAC":accfrac, "NWALKERS":nWalkers}
+
+def writeObj(obj, filename):
+    """Print string representation of object (e.g. a model) to text file"""
+    of = open(filename, 'w')
+    of.write(str(obj))
+    of.close()
