@@ -16,46 +16,73 @@ import matplotlib
 
 import matplotlib.pyplot as plt
 import numpy as np
-import sklearn
-from sklearn import svm
+from sklearn import svm, neighbors, cross_validation
 
 import fitsio
 
 # read the data
-# see http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
-cmcfull = fitsio.read("CMC081211_all.fits", ext=1)
+# http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
+cmcfull = fitsio.read("../chains/CMC081211_all.fits", ext=1)
+asPerPix = 0.03
 
 # clean the data
+bMagMin = 18.
+bMagMax = 23.5
 gMagMin = 18.
-gMagMax = 23.
+gMagMax = 23.5
 rMagMin = 18.
-rMagMax = 23.
-zMagMin = 18.
-zMagMax = 23.
-good = ((cmcfull['Ran_g_subaru'] > gMagMin) &
+rMagMax = 23.5
+iMagMin = 18.
+iMagMax = 23.5
+minHLRpix = 0.3/asPerPix # half-light radius in pixels
+good = ((cmcfull['Ran_B_subaru'] > bMagMin) &
+        (cmcfull['Ran_B_subaru'] < bMagMax) &
+        (cmcfull['Ran_g_subaru'] > gMagMin) &
         (cmcfull['Ran_g_subaru'] < gMagMax) &
         (cmcfull['Ran_r_subaru'] > rMagMin) &
         (cmcfull['Ran_r_subaru'] < rMagMax) &
-        (cmcfull['Ran_z_subaru'] > zMagMin) &
-        (cmcfull['Ran_z_subaru'] < zMagMax))
+        (cmcfull['Ran_i_subaru'] > iMagMin) &
+        (cmcfull['Ran_i_subaru'] < iMagMax) &
+        (cmcfull['Half_light_radius'] > minHLRpix))
 cmc = cmcfull[good]
+print "Initial cuts leave {} out of {} objects".format(len(cmc), len(cmcfull))
 
-features = ('Ran_g_subaru', 'Ran_r_subaru', 'Ran_z_subaru')
-data = np.array([cmc[feat] for feat in features])
+# Set up design matrix
+features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_i_subaru')
+data = np.array([cmc[feat] for feat in features]).T
 
-lineFluxMin = 1.e-17
+# Define training class labels, True = good target, False = bad target
 lambdaMin = 6000.
 lambdaMax = 8500.
-target = ((cmc['Flux_OII'] > lineFluxMin) &
+target = (#(cmc['Flux_OII'] > lineFluxMin) &
           (cmc['type'] == 1) &
           (lambdaMin < cmc['Lambda_OII']) &
           (cmc['Lambda_OII'] < lambdaMax))
+print "{} of {} are good targets".format(len(target.nonzero()[0]), len(target))
 
-est = svm.SVC(kernel="linear")
-est.fit(data.T, target)
+# Define classifiers
+lin = svm.SVC(kernel="linear")
+rbf = svm.SVC(kernel="rbf")
+knn = neighbors.KNeighborsClassifier(n_neighbors=10)
+classifiers = (lin, rbf, knn)
 
-# TO DO: try cross-validation, introduce a simple model to fit for
-# linear combinations of color cuts
+# Train classifiers
+for est in classifiers:
+    est.fit(data, target)
+
+# Score classifiers
+for est in classifiers:
+    est.score(data, target)
+
+# Cross-validate
+nFolds = 10
+skf = cross_validation.StratifiedKFold(target, nFolds)
+for est in classifiers:
+    print np.mean(cross_validation.cross_val_score(est, data, y=target, cv=skf))
+
+
+# TO DO: print false positives vs false negatives,
+# introduce a simple model to fit for linear combinations of color cuts
 
 
 
