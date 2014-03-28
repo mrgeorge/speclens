@@ -16,7 +16,7 @@ import matplotlib
 
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn import svm, neighbors, cross_validation
+from sklearn import svm, neighbors, cross_validation, metrics
 
 import fitsio
 
@@ -27,14 +27,14 @@ asPerPix = 0.03
 
 # clean the data
 bMagMin = 18.
-bMagMax = 23.5
+bMagMax = 25.
 gMagMin = 18.
-gMagMax = 23.5
+gMagMax = 25.
 rMagMin = 18.
-rMagMax = 23.5
+rMagMax = 25.
 iMagMin = 18.
-iMagMax = 23.5
-minHLRpix = 0.3/asPerPix # half-light radius in pixels
+iMagMax = 25.
+minHLRpix = 0.5/asPerPix # half-light radius in pixels
 good = ((cmcfull['Ran_B_subaru'] > bMagMin) &
         (cmcfull['Ran_B_subaru'] < bMagMax) &
         (cmcfull['Ran_g_subaru'] > gMagMin) &
@@ -68,24 +68,34 @@ classifiers = (lin, rbf, knn)
 
 # Train classifiers
 for est in classifiers:
+    print est.__class__
     est.fit(data, target)
 
 # Score classifiers
-for est in classifiers:
-    est.score(data, target)
+#for est in classifiers:
+#    print est.__class__
+#    est.score(data, target)
+
+# Create custom scorer
+def targetPurityScore(yTrue, yPred):
+    return metrics.precision_score(yTrue, yPred, average=None)[1]
+def targetCompletenessScore(yTrue, yPred):
+    return metrics.recall_score(yTrue, yPred, average=None)[1]
+
+targetPurityScorer = sklearn.metrics.make_scorer(targetPurityScore)
+targetCompletenessScorer = sklearn.metrics.make_scorer(targetCompletenessScore)
 
 # Cross-validate
 nFolds = 10
 skf = cross_validation.StratifiedKFold(target, nFolds)
 for est in classifiers:
-    print np.mean(cross_validation.cross_val_score(est, data, y=target, cv=skf))
+    print est.__class__
+    print np.mean(cross_validation.cross_val_score(est, data, y=target, cv=skf,
+                scoring=targetPurityScorer))
+    print np.mean(cross_validation.cross_val_score(est, data, y=target, cv=skf,
+                scoring=targetCompletenessScorer))
 
-
-# TO DO: print false positives vs false negatives,
-# introduce a simple model to fit for linear combinations of color cuts
-
-
-
+# TO DO: introduce a simple model to fit for linear combinations of color cuts
 
 
 # Older CFHTLS stuff
