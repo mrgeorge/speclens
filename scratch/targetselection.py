@@ -17,38 +17,68 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import svm, neighbors, cross_validation, metrics
-
+from astropy.coordinates.angle_utilities import angular_separation
 import fitsio
 
-# read the data
+# read the CMC (training set)
 # http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
 cmcfull = fitsio.read("../chains/CMC081211_all.fits", ext=1)
 asPerPix = 0.03
+
+# read the A1689 data (test set)
+catfull = fitsio.read("../chains/CFHT-A1689-merged_catalog.fits",ext=1)
+# pick only sources within 2.8 arcmin of cluster center
+# (http://wiki.lbto.org/bin/view/PartnerObserving/MODSQuickRefWiki)
+raCen = 197.87292
+decCen = -1.33806
+maxSep = 2.8 # arcmins
+near = (np.rad2deg(angular_separation(np.deg2rad(cat['ALPHAWIN_J2000']),
+                                      np.deg2rad(cat['DELTAWIN_J2000']),
+                                      np.deg2rad(raCen),
+                                      np.deg2rad(decCen)
+                                     ))*60. < maxSep)
+cat = catfull[near]
+
+def setupData(rec, filters, type="train"):
+    cuts = {"train":{"B":(18., 25.),
+                     "g":(18., 25.),
+                     "r":(18., 25.),
+                     "z":(18., 25.)},
+            "test": {"B":(18., 25.),
+                     "g":(18., 25.),
+                     "r":(18., 25.),
+                     "z":(18., 25.)}
+            }
+    if type == "train":
 
 # clean the data
 bMagMin = 18.
 bMagMax = 25.
 gMagMin = 18.
-gMagMax = 25.
+gMagMax = 24.5
 rMagMin = 18.
-rMagMax = 25.
+rMagMax = 22.5
 iMagMin = 18.
 iMagMax = 25.
+zMagMin = 18.
+zMagMax = 22.
 minHLRpix = 0.5/asPerPix # half-light radius in pixels
-good = ((cmcfull['Ran_B_subaru'] > bMagMin) &
-        (cmcfull['Ran_B_subaru'] < bMagMax) &
+good = (#(cmcfull['Ran_B_subaru'] > bMagMin) &
+        #(cmcfull['Ran_B_subaru'] < bMagMax) &
         (cmcfull['Ran_g_subaru'] > gMagMin) &
         (cmcfull['Ran_g_subaru'] < gMagMax) &
         (cmcfull['Ran_r_subaru'] > rMagMin) &
         (cmcfull['Ran_r_subaru'] < rMagMax) &
-        (cmcfull['Ran_i_subaru'] > iMagMin) &
-        (cmcfull['Ran_i_subaru'] < iMagMax) &
+#        (cmcfull['Ran_i_subaru'] > iMagMin) &
+#        (cmcfull['Ran_i_subaru'] < iMagMax) &
+        (cmcfull['Ran_z_subaru'] > rMagMin) &
+        (cmcfull['Ran_z_subaru'] < rMagMax) &
         (cmcfull['Half_light_radius'] > minHLRpix))
 cmc = cmcfull[good]
 print "Initial cuts leave {} out of {} objects".format(len(cmc), len(cmcfull))
 
 # Set up design matrix
-features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_i_subaru')
+features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_z_subaru')
 data = np.array([cmc[feat] for feat in features]).T
 
 # Define training class labels, True = good target, False = bad target
@@ -96,7 +126,7 @@ for est in classifiers:
                 scoring=targetCompletenessScorer))
 
 # TO DO: introduce a simple model to fit for linear combinations of color cuts
-
+# try decision tree(s)
 
 # Older CFHTLS stuff
 
