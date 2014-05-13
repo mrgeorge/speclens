@@ -1,4 +1,6 @@
 import astropy.io.ascii
+from astropy.coordinates import ICRS
+from astropy import units
 import pandas as pd
 
 dataDir = "/Users/mgeorge/data/speclens/Keck/catalogs/"
@@ -48,3 +50,15 @@ sel = ((fullCat.RC < maxRC) &
        (fullCat.odds > minOdds))
 
 print "Sample size after cuts: ", len(fullCat[sel])
+
+cat = fullCat[sel]
+
+coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
+raStr = coords.ra.to_string(unit=units.hour, sep=':')
+decStr = coords.dec.to_string(unit=units.deg, sep=':')
+
+printCat = cat[['RA','Dec','RC']].copy()
+printCat['RA'] = raStr
+printCat['Dec'] = raStr
+
+# use printCat.to_string() with buf = file and formatters for zero-padded widths etc.
