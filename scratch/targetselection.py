@@ -19,10 +19,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import svm, neighbors, cross_validation, metrics
 import scipy.interpolate
-
+from astropy.coordinates.angle_utilities import angular_separation
 import fitsio
 
-# read the data
+# read the CMC (training set)
 # http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
 #cmcfullclean = fitsio.read("../chains/CMC081211_all.fits", ext=1)
 cmcfullnoise = fitsio.read("../chains/CFHT-CMC-matched.fits", ext=1)
@@ -65,6 +65,11 @@ sel = ((g-r < a) & (g-r < b*(r-z)-c))
 print sel.nonzero()[0].size
 
 # proximity to cluster selection
+
+# read the A1689 data (test set)
+catfull = fitsio.read("../chains/CFHT-A1689-merged_catalog.fits",ext=1)
+# pick only sources within 2.8 arcmin of cluster center
+# (http://wiki.lbto.org/bin/view/PartnerObserving/MODSQuickRefWiki)
 raCen = 197.87292
 decCen = -1.33806
 maxSep = 2.8 # arcmins
@@ -109,36 +114,38 @@ f.close()
 
 
 
+
+
 # clean the data
-magMin = 15.
-magMax = 25.
+bMagMin = 18.
+bMagMax = 25.
+gMagMin = 18.
+gMagMax = 24.5
+rMagMin = 18.
+rMagMax = 22.5
+iMagMin = 18.
+iMagMax = 25.
+zMagMin = 18.
+zMagMax = 22.
 minHLRpix = 0.5/asPerPix # half-light radius in pixels
-good = (#(cmcfull['RAN_B_subaru'] > magMin) &
-        #(cmcfull['RAN_B_subaru'] < magMax) &
-        #(cmcfull['RAN_g_subaru'] > magMin) &
-        #(cmcfull['RAN_g_subaru'] < magMax) &
-        #(cmcfull['R_r_subaru'] > magMin) &
-        #(cmcfull['Ran_r_subaru'] < magMax) &
-        #(cmcfull['Ran_z_subaru'] > magMin) &
-        #(cmcfull['Ran_z_subaru'] < magMax) &
-        (cmcfull['HALF_LIGHT_RADIUS'] > minHLRpix))
+good = (#(cmcfull['Ran_B_subaru'] > bMagMin) &
+        #(cmcfull['Ran_B_subaru'] < bMagMax) &
+        (cmcfull['Ran_g_subaru'] > gMagMin) &
+        (cmcfull['Ran_g_subaru'] < gMagMax) &
+        (cmcfull['Ran_r_subaru'] > rMagMin) &
+        (cmcfull['Ran_r_subaru'] < rMagMax) &
+#        (cmcfull['Ran_i_subaru'] > iMagMin) &
+#        (cmcfull['Ran_i_subaru'] < iMagMax) &
+        (cmcfull['Ran_z_subaru'] > rMagMin) &
+        (cmcfull['Ran_z_subaru'] < rMagMax) &
+        (cmcfull['Half_light_radius'] > minHLRpix))
 cmc = cmcfull[good]
 print "Initial cuts leave {} out of {} objects".format(len(cmc), len(cmcfull))
 
 
-# Get typical errors in each band from CFHT data
-def fitNoise(testMags, testMagErrs):
-    magBins = np.linspace(magMin, magMax, 100)
-    binIDs = np.digitize(testMags, magBins)
-    
-    
-def addNoise(trainMags, testMags, testMagErrs):
-    
-
-
-
 # Set up design matrix
 #features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_i_subaru')
+features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_z_subaru')
 data = np.array([cmc[feat] for feat in features]).T
 
 # Define training class labels, True = good target, False = bad target
@@ -186,7 +193,7 @@ for est in classifiers:
                 scoring=targetCompletenessScorer))
 
 # TO DO: introduce a simple model to fit for linear combinations of color cuts
-
+# try decision tree(s)
 
 # Older CFHTLS stuff
 
