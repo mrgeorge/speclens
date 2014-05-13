@@ -2,6 +2,7 @@
 
 import astropy.io.ascii
 import matplotlib
+from astropy.coordinates.angle_utilities import angular_separation
 
 
 # Target selection for Abell 1689
@@ -17,38 +18,127 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn import svm, neighbors, cross_validation, metrics
+import scipy.interpolate
 
 import fitsio
 
 # read the data
 # http://lamwws.oamp.fr/cosmowiki/RealisticSpectroPhotCat
-cmcfull = fitsio.read("../chains/CMC081211_all.fits", ext=1)
+#cmcfullclean = fitsio.read("../chains/CMC081211_all.fits", ext=1)
+cmcfullnoise = fitsio.read("../chains/CFHT-CMC-matched.fits", ext=1)
 asPerPix = 0.03
 
+cmc = cmcfullnoise
+
+features = ('RAN_B_SUBARU', 'RAN_G_SUBARU', 'RAN_R_SUBARU', 'RAN_Z_SUBARU')
+cmcB,cmcg,cmcr,cmcz = [cmc[str] for str in features]
+
+
+# CFHT data for A1689
+catfull = fitsio.read("../chains/CFHT-A1689-merged_catalog.fits",ext=1)
+catcut = fitsio.read("../chains/CFHT-A1689-candidates.fits",ext=1)
+catext = fitsio.read("../chains/CFHT-A1689-candidates-extended.fits",ext=1)
+cat = catext
+
+B,g,r,z = [cat['MAG_AUTO'][:,ii] for ii in range(4)]
+
+
+plt.scatter(r-z, g-r, color="gray", s=5)
+plt.scatter(cmcr-cmcz, cmcg-cmcr, c=cmc['Z'],
+            norm=matplotlib.colors.Normalize(0,1.5), s=5, linewidth=0)
+cbar = plt.colorbar()
+cbar.set_label("z")
+plt.xlabel('r-z')
+plt.ylabel('g-r')
+plt.xlim((-0.5,2.5))
+plt.ylim((-0.5,2.0))
+
+a=1.1
+b=1.0
+c=0.1
+xr = np.array(plt.xlim())
+plt.plot(xr, b*xr-c,lw=5)
+plt.plot(xr, np.repeat(a,2),lw=5)
+
+# color selection
+sel = ((g-r < a) & (g-r < b*(r-z)-c))
+print sel.nonzero()[0].size
+
+# proximity to cluster selection
+raCen = 197.87292
+decCen = -1.33806
+maxSep = 2.8 # arcmins
+near = (np.rad2deg(angular_separation(np.deg2rad(cat['ALPHAWIN_J2000']),
+                                      np.deg2rad(cat['DELTAWIN_J2000']),
+                                      np.deg2rad(raCen),
+                                      np.deg2rad(decCen)
+                                     ))*60. < maxSep)
+
+morecuts = ((cat['FWHM_IMAGE'][:,2] > 4.) &
+            (cat['FWHM_IMAGE'][:,2] < 30.) &
+            (cat['MAG_AUTO'][:,2] > 18.) &
+            (cat['MAG_AUTO'][:,2] < 23.5) &
+            (cat['FLAGS'][:,2] < 4))
+
+good = (sel & near & morecuts)
+
+plt.scatter((r-z)[good],(g-r)[good], s=30, c="black")
+plt.show()
+            
+
+f = open("targets.skycat",'w')
+f.write("ID\tRA\t\tDec\n")
+f.write("--\t------------\t-----------\n")
+for ii,rec in enumerate(cat[good]):
+    f.write("{:2d}\t{:0.8f}\t{:0.8f}\n".format(ii, rec['ALPHAWIN_J2000'], rec['DELTAWIN_J2000']))
+f.close()
+
+
+stars = fitsio.read("../chains/A1689-r-stars.fits",ext=1)
+starMags = 22.5 - 2.5*np.log10(stars['PSFFLUX'][:,2])
+starColors = np.repeat("     ",stars.size)
+starColors[starMags < 15] = "green"
+starColors[starMags > 15] = "red"
+f = open("stars.reg",'w')
+for ss,sc in zip(stars,starColors):
+    f.write("wcs;j2000;circle {} {} 3\" # color = {}\n".format(ss['RA'],ss['DEC'],sc))
+f.close()
+
+
+
+
+
+
 # clean the data
-bMagMin = 18.
-bMagMax = 25.
-gMagMin = 18.
-gMagMax = 25.
-rMagMin = 18.
-rMagMax = 25.
-iMagMin = 18.
-iMagMax = 25.
+magMin = 15.
+magMax = 25.
 minHLRpix = 0.5/asPerPix # half-light radius in pixels
-good = ((cmcfull['Ran_B_subaru'] > bMagMin) &
-        (cmcfull['Ran_B_subaru'] < bMagMax) &
-        (cmcfull['Ran_g_subaru'] > gMagMin) &
-        (cmcfull['Ran_g_subaru'] < gMagMax) &
-        (cmcfull['Ran_r_subaru'] > rMagMin) &
-        (cmcfull['Ran_r_subaru'] < rMagMax) &
-        (cmcfull['Ran_i_subaru'] > iMagMin) &
-        (cmcfull['Ran_i_subaru'] < iMagMax) &
-        (cmcfull['Half_light_radius'] > minHLRpix))
+good = (#(cmcfull['RAN_B_subaru'] > magMin) &
+        #(cmcfull['RAN_B_subaru'] < magMax) &
+        #(cmcfull['RAN_g_subaru'] > magMin) &
+        #(cmcfull['RAN_g_subaru'] < magMax) &
+        #(cmcfull['R_r_subaru'] > magMin) &
+        #(cmcfull['Ran_r_subaru'] < magMax) &
+        #(cmcfull['Ran_z_subaru'] > magMin) &
+        #(cmcfull['Ran_z_subaru'] < magMax) &
+        (cmcfull['HALF_LIGHT_RADIUS'] > minHLRpix))
 cmc = cmcfull[good]
 print "Initial cuts leave {} out of {} objects".format(len(cmc), len(cmcfull))
 
+
+# Get typical errors in each band from CFHT data
+def fitNoise(testMags, testMagErrs):
+    magBins = np.linspace(magMin, magMax, 100)
+    binIDs = np.digitize(testMags, magBins)
+    
+    
+def addNoise(trainMags, testMags, testMagErrs):
+    
+
+
+
 # Set up design matrix
-features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_i_subaru')
+#features = ('Ran_B_subaru', 'Ran_g_subaru', 'Ran_r_subaru', 'Ran_i_subaru')
 data = np.array([cmc[feat] for feat in features]).T
 
 # Define training class labels, True = good target, False = bad target
