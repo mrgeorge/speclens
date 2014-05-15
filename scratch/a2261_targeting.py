@@ -36,14 +36,15 @@ fullCat = df.join(red[copyCols].join(blue[copyCols], how='outer',
 # color cuts designed to cleanly pick out background sample
 # Umetsu14 uses BVR for these cuts and R for shape measurements
 
-minRg = 1. # gaussian size (units?)
+minRg = 0. # gaussian size (units?)
 minRC = 18. # R mag (used as primary band)
-maxRC = 23.7 # R mag (used as primary band)
+maxRC = 24. # R mag (used as primary band)
 minZb = 0.6 # photoz
 maxZb = 1.2 # photoz
 minOdds = 0.8 # odds cut used by Umetsu
 
-sel = ((fullCat.RC < maxRC) &
+sel = ((fullCat.RC > minRC) &
+       (fullCat.RC < maxRC) &
        (fullCat.zb > minZb) &
        (fullCat.zb < maxZb) &
        ((fullCat.rg_red > minRg) | (fullCat.rg_blue > minRg)) &
@@ -57,8 +58,22 @@ coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
 raStr = coords.ra.to_string(unit=units.hour, sep=':')
 decStr = coords.dec.to_string(unit=units.deg, sep=':')
 
-printCat = cat[['RA','Dec','RC']].copy()
-printCat['RA'] = raStr
-printCat['Dec'] = raStr
-
-# use printCat.to_string() with buf = file and formatters for zero-padded widths etc.
+objFilename = dataDir + "a2261_targets.dat"
+with open(objFilename, 'w') as ff:
+    ff.write("# OBJNAME         RA          DEC        EQX   MAG band PCODE "
+             "LIST SEL? PA L1 L2\n")
+    for ii in range(len(cat)):
+        ff.write("{name:10} {ra:14} {dec:14} {eqx:8.1f} {mag:6.2f} {band:4} "
+                 "{pcode:4} {sample:4} {presel:4} {pa} {len1} {len2}\n".format(
+                     name=str(cat.iloc[ii].name).zfill(5),
+                     ra=raStr[ii],
+                     dec=decStr[ii],
+                     eqx=2000.0,
+                     mag=cat['RC'].iloc[ii],
+                     band='R',
+                     pcode=1,
+                     sample=1,
+                     presel=0,
+                     pa=5,
+                     len1='',
+                     len2=''))
