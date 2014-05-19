@@ -59,12 +59,20 @@ cat = fullCat[sel]
 # Compute position angle
 PA = np.empty(len(cat))
 PA[:] = None
+rad = np.empty_like(PA)
+rad[:] = None
+ba = np.empty_like(PA)
+ba[:] = None
 redSel = np.isfinite(cat['g1_red'].values)
 blueSel = np.isfinite(cat['g1_blue'].values)
 PA[redSel] = np.rad2deg(0.5 * np.arctan2(cat[redSel]['g2_red'],
                                          cat[redSel]['g1_red'])).values
 PA[blueSel] = np.rad2deg(0.5 * np.arctan2(cat[blueSel]['g2_blue'],
                                           cat[blueSel]['g1_blue'])).values
+rad[redSel] = cat[redSel]['rg_red']
+rad[blueSel] = cat[blueSel]['rg_blue']
+
+# TO DO - compute axis ratio ba
 
 # Print target list for IRAF DSIMULATOR
 coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
@@ -90,3 +98,15 @@ with open(objFilename, 'w') as ff:
                      pa=PA[ii],
                      len1='',
                      len2=''))
+
+# Print target list for DS9 region file
+regFilename = dataDir + "a2261_targets.reg"
+with open(regFilename, 'w') as ff:
+    for ii in range(len(cat)):
+        ff.write("wcs;ellipse({ra:14.6f},{dec:14.6f},{arad:6.1f}p,{brad:6.1f}p,"
+                 "{pa:6.1f}) #\n".format(
+                    ra=cat.iloc[ii]['RA'],
+                    dec=cat.iloc[ii]['Dec'],
+                    arad=rad[ii]*5,
+                    brad=0.5*rad[ii]*5,
+                    pa=PA[ii]))
