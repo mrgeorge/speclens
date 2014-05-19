@@ -2,6 +2,7 @@ import astropy.io.ascii
 from astropy.coordinates import ICRS
 from astropy import units
 import pandas as pd
+import numpy as np
 
 dataDir = "/Users/mgeorge/data/speclens/Keck/catalogs/"
 catFile = dataDir + "A2261_Subaru_mario_photbpz.cat"
@@ -54,6 +55,18 @@ print "Sample size after cuts: ", len(fullCat[sel])
 
 cat = fullCat[sel]
 
+
+# Compute position angle
+PA = np.empty(len(cat))
+PA[:] = None
+redSel = np.isfinite(cat['g1_red'].values)
+blueSel = np.isfinite(cat['g1_blue'].values)
+PA[redSel] = np.rad2deg(0.5 * np.arctan2(cat[redSel]['g2_red'],
+                                         cat[redSel]['g1_red'])).values
+PA[blueSel] = np.rad2deg(0.5 * np.arctan2(cat[blueSel]['g2_blue'],
+                                          cat[blueSel]['g1_blue'])).values
+
+# Print target list for IRAF DSIMULATOR
 coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
 raStr = coords.ra.to_string(unit=units.hour, sep=':')
 decStr = coords.dec.to_string(unit=units.deg, sep=':')
@@ -64,7 +77,7 @@ with open(objFilename, 'w') as ff:
              "LIST SEL? PA L1 L2\n")
     for ii in range(len(cat)):
         ff.write("{name:10} {ra:14} {dec:14} {eqx:8.1f} {mag:6.2f} {band:4} "
-                 "{pcode:4} {sample:4} {presel:4} {pa} {len1} {len2}\n".format(
+                 "{pcode:4} {sample:4} {presel:4} {pa:6.1f} {len1} {len2}\n".format(
                      name=str(cat.iloc[ii].name).zfill(5),
                      ra=raStr[ii],
                      dec=decStr[ii],
@@ -74,6 +87,6 @@ with open(objFilename, 'w') as ff:
                      pcode=1,
                      sample=1,
                      presel=0,
-                     pa=5,
+                     pa=PA[ii],
                      len1='',
                      len2=''))
