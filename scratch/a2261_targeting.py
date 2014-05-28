@@ -8,6 +8,7 @@ dataDir = "/Users/mgeorge/data/speclens/Keck/catalogs/"
 catFile = dataDir + "A2261_Subaru_mario_photbpz.cat"
 redFile = dataDir + "A2261_redcomb.asc"
 blueFile = dataDir + "A2261_bluecomb.asc"
+starFile = dataDir + "sdss_stars.csv"
 
 # use astropy to ingest file since it handles the header well
 # then convert to pandas dataframe
@@ -18,6 +19,7 @@ wlCols = ["ID", "RA", "Dec", "X", "Y", "g1", "g2", "weight", "rg", "mag",
 widths = [10, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14]
 red = pd.read_fwf(redFile, index_col=0, names=wlCols, widths=widths)
 blue = pd.read_fwf(blueFile, index_col=0, names=wlCols, widths=widths)
+starCat = pd.read_csv(starFile, names=["ra","dec","mag"])
 
 copyCols = ["g1", "g2", "weight", "rg"]
 fullCat = df.join(red[copyCols].join(blue[copyCols], how='outer',
@@ -79,13 +81,33 @@ coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
 raStr = coords.ra.to_string(unit=units.hour, sep=':')
 decStr = coords.dec.to_string(unit=units.deg, sep=':')
 
+starCoords = ICRS(starCat.ra, starCat.dec, unit=(units.deg, units.deg))
+starRaStr = starCoords.ra.to_string(unit=units.hour, sep=':')
+starDecStr = starCoords.dec.to_string(unit=units.deg, sep=':')
+
 objFilename = dataDir + "a2261_targets.dat"
 with open(objFilename, 'w') as ff:
     ff.write("# OBJNAME         RA          DEC        EQX   MAG band PCODE "
              "LIST SEL? PA L1 L2\n")
+    for ii in range(len(starCat)):
+        ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
+                 "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
+                     name=str(starCat.iloc[ii].name + 99000).zfill(5),
+                     ra=starRaStr[ii],
+                     dec=starDecStr[ii],
+                     eqx=2000.0,
+                     mag=starCat['mag'].iloc[ii],
+                     band='r',
+                     pcode=-2,
+                     sample=1,
+                     presel=0,
+                     pa="INDEF",
+                     len1='',
+                     len2=''))
     for ii in range(len(cat)):
-        ff.write("{name:10} {ra:14} {dec:14} {eqx:8.1f} {mag:6.2f} {band:4} "
-                 "{pcode:4} {sample:4} {presel:4} {pa:6.1f} {len1} {len2}\n".format(
+        ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
+#                 "{pcode:4} {sample:4} {presel:4} {pa:6.1f} {len1} {len2}\n".format(
+                 "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
                      name=str(cat.iloc[ii].name).zfill(5),
                      ra=raStr[ii],
                      dec=decStr[ii],
@@ -95,7 +117,8 @@ with open(objFilename, 'w') as ff:
                      pcode=1,
                      sample=1,
                      presel=0,
-                     pa=PA[ii],
+#                     pa=PA[ii],
+                     pa="INDEF",
                      len1='',
                      len2=''))
 
