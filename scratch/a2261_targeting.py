@@ -1,14 +1,18 @@
 import astropy.io.ascii
+import astropy.io.fits
 from astropy.coordinates import ICRS
 from astropy import units
 import pandas as pd
 import numpy as np
+import pydl.pydlutils.spheregroup.spherematch as spherematch
 
 dataDir = "/Users/mgeorge/data/speclens/Keck/catalogs/"
 catFile = dataDir + "A2261_Subaru_mario_photbpz.cat"
 redFile = dataDir + "A2261_redcomb.asc"
 blueFile = dataDir + "A2261_bluecomb.asc"
+sbpFile = dataDir + "a2261_selected.fits"
 
+# Read CLASH + Keiichi Umetsu's catalogs
 # use astropy to ingest file since it handles the header well
 # then convert to pandas dataframe
 df = pd.DataFrame(astropy.io.ascii.read(catFile)._data).set_index('id')
@@ -19,13 +23,13 @@ widths = [10, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14]
 red = pd.read_fwf(redFile, index_col=0, names=wlCols, widths=widths)
 blue = pd.read_fwf(blueFile, index_col=0, names=wlCols, widths=widths)
 
+# Combine CLASH + Umetsu's catalog
 copyCols = ["g1", "g2", "weight", "rg"]
 fullCat = df.join(red[copyCols].join(blue[copyCols], how='outer',
                                      lsuffix='_red', rsuffix='_blue'))
 
 # could try other ways to append columns like df['g1'] = red['g1'] but want
 # to combine red and blue first ...
-
 
 # once fullCat is made, slice on color/photoz/size etc for target selection
 
@@ -40,20 +44,65 @@ fullCat = df.join(red[copyCols].join(blue[copyCols], how='outer',
 minRg = 0. # gaussian size (units?)
 minRC = 18. # R mag (used as primary band)
 maxRC = 24. # R mag (used as primary band)
-minZb = 0.6 # photoz
+minZb = 0.5 # photoz
 maxZb = 1.2 # photoz
 minOdds = 0.8 # odds cut used by Umetsu
 
 sel = ((fullCat.RC > minRC) &
        (fullCat.RC < maxRC) &
        (fullCat.zb > minZb) &
-       (fullCat.zb < maxZb) &
-       ((fullCat.rg_red > minRg) | (fullCat.rg_blue > minRg)) &
-       (fullCat.odds > minOdds))
+       (fullCat.zb < maxZb)
+#       ((fullCat.rg_red > minRg) | (fullCat.rg_blue > minRg)) &
+#       (fullCat.odds > minOdds)
+      )
 
 print "Sample size after cuts: ", len(fullCat[sel])
 
 cat = fullCat[sel]
+
+
+
+# Rmatchingead Eric Huff's catalog for SBP fits
+sbpCols = ["NUMBER", "MAG_AUTO", "ALPHA_J2000", "DELTA_J2000", "FLAGS",
+           "FLUX_POINTSOURCE", "FLUX_SPHEROID", "FLUX_DISK",
+           "DISK_SCALE_IMAGE", "DISK_INCLINATION", "DISK_THETA_J2000"]
+
+sbpRec = astropy.io.fits.getdata(sbpFile, 1)
+
+# fits tables are stored as big endian, but pandas prefers little
+# must swap endianness in each column in recarray before DataFrame construction
+# endian fix from
+# https://github.com/aringlis/sunpy/commit/7bc5e222023c8a661c47ce718dc3cd092684fd6f
+sbpTable = {}
+for i, col in enumerate(sbpRec.columns[1:-1]):
+    #temporary patch for big-endian data bug on pandas 0.13
+    if sbpRec.field(i+1).dtype.byteorder == '>':
+        sbpTable[col.name] = sbpRec.field(i + 1).byteswap().newbyteorder()
+    else:
+        sbpTable[col.name] = sbpRec.field(i + 1)
+
+sbpNames = sbpRec.dtype.names
+sbp = pd.DataFrame.from_records(sbpTable,
+                                exclude=set(sbpNames) - set(sbpCols), coerce_float=True)
+
+sep = 1./3600 # 1 arcsecond
+m1, m2, d12 = spherematch(cat.RA.values, cat.Dec.values,
+                          sbp.ALPHA_J2000.values, sbp.DELTA_J2000.values,
+                          sep, maxmatch=1)
+
+# Keep only the matches
+print "Sample size after matching: ", len(m1)
+cat = cat.iloc[m1]
+sbp = sbp.iloc[m2]
+
+# Further cuts
+sel = ((sbp.FLUX_DISK > sbp.FLUX_SPHEROID) &
+       (sbp.FLUX_DISK > sbp.FLUX_POINTSOURCE)
+      )
+print "Sample size after morph cuts: ", len(sbp[sel])
+
+sbp = sbp[sel]
+cat = cat[sel.values] # kludge since indices aren't joined
 
 
 # Compute position angle
@@ -108,7 +157,7 @@ for mask in maskList:
                         band='r',
                         pcode=-2,
                         sample=1,
-                        presel=0,
+                        presel=1,
                         pa="INDEF",
                         len1='',
                         len2=''))
