@@ -231,20 +231,20 @@ for mask, maskPA in zip(maskList, maskPAs):
             pa = cat['DISK_THETA_J2000'].iloc[ii]
             if (np.abs(pa - maskPA) < 30.): # use major axis
                 halfslit = cat['DISK_SCALE_IMAGE'].iloc[ii] * 0.2 * 2.2 + extralen
-                halfslit = np.min([halfslit, 20.])
-                halfslit = np.max([halfslit, 8.])
+                halfslit = np.min([halfslit, 10.])
+                halfslit = np.max([halfslit, 4.])
                 nMajor += 1
             elif (np.abs(pa - ((maskPA + 90 + 90) % 180 - 90)) < 30.): # use minor axis
                 pa = pa + 90
                 halfslit = cat['DISK_SCALE_IMAGE'].iloc[ii] * 0.2 * 2.2 * np.sqrt(1. - np.sin(cat['DISK_INCLINATION'].iloc[ii])**2 * (1. - qz**2)) + extralen
-                halfslit = np.min([halfslit, 12.])
-                halfslit = np.max([halfslit, 6.])
+                halfslit = np.min([halfslit, 6.])
+                halfslit = np.max([halfslit, 3.])
                 nMinor += 1
             else:
                 pa = maskPA + 5. # small offset from mask PA for better lsf sampling
                 halfslit = cat['DISK_SCALE_IMAGE'].iloc[ii] * 0.2 * 2.2 + extralen
-                halfslit = np.min([halfslit, 20.])
-                halfslit = np.max([halfslit, 8.])
+                halfslit = np.min([halfslit, 10.])
+                halfslit = np.max([halfslit, 4.])
                 nOther += 1
 
             ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
