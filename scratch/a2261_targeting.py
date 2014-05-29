@@ -8,7 +8,6 @@ dataDir = "/Users/mgeorge/data/speclens/Keck/catalogs/"
 catFile = dataDir + "A2261_Subaru_mario_photbpz.cat"
 redFile = dataDir + "A2261_redcomb.asc"
 blueFile = dataDir + "A2261_bluecomb.asc"
-starFile = dataDir + "sdss_stars.csv"
 
 # use astropy to ingest file since it handles the header well
 # then convert to pandas dataframe
@@ -19,7 +18,6 @@ wlCols = ["ID", "RA", "Dec", "X", "Y", "g1", "g2", "weight", "rg", "mag",
 widths = [10, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14]
 red = pd.read_fwf(redFile, index_col=0, names=wlCols, widths=widths)
 blue = pd.read_fwf(blueFile, index_col=0, names=wlCols, widths=widths)
-starCat = pd.read_csv(starFile, names=["ra","dec","mag"])
 
 copyCols = ["g1", "g2", "weight", "rg"]
 fullCat = df.join(red[copyCols].join(blue[copyCols], how='outer',
@@ -81,46 +79,71 @@ coords = ICRS(cat.RA, cat.Dec, unit=(units.deg, units.deg))
 raStr = coords.ra.to_string(unit=units.hour, sep=':')
 decStr = coords.dec.to_string(unit=units.deg, sep=':')
 
-starCoords = ICRS(starCat.ra, starCat.dec, unit=(units.deg, units.deg))
-starRaStr = starCoords.ra.to_string(unit=units.hour, sep=':')
-starDecStr = starCoords.dec.to_string(unit=units.deg, sep=':')
+maskList = ('a','b','c','d')
+for mask in maskList:
+    alignFile = dataDir + "align_{}.csv".format(mask)
+    guideFile = dataDir + "guide_{}.csv".format(mask)
+    alignCat = pd.read_csv(alignFile, names=["ra","dec","mag"]).dropna()
+    guideCat = pd.read_csv(guideFile, names=["ra","dec","mag"]).dropna()
 
-objFilename = dataDir + "a2261_targets.dat"
-with open(objFilename, 'w') as ff:
-    ff.write("# OBJNAME         RA          DEC        EQX   MAG band PCODE "
-             "LIST SEL? PA L1 L2\n")
-    for ii in range(len(starCat)):
-        ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
-                 "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
-                     name=str(starCat.iloc[ii].name + 99000).zfill(5),
-                     ra=starRaStr[ii],
-                     dec=starDecStr[ii],
-                     eqx=2000.0,
-                     mag=starCat['mag'].iloc[ii],
-                     band='r',
-                     pcode=-2,
-                     sample=1,
-                     presel=0,
-                     pa="INDEF",
-                     len1='',
-                     len2=''))
-    for ii in range(len(cat)):
-        ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
+    alignCoords = ICRS(alignCat.ra, alignCat.dec, unit=(units.deg, units.deg))
+    alignRaStr = alignCoords.ra.to_string(unit=units.hour, sep=':')
+    alignDecStr = alignCoords.dec.to_string(unit=units.deg, sep=':')
+    guideCoords = ICRS(guideCat.ra, guideCat.dec, unit=(units.deg, units.deg))
+    guideRaStr = guideCoords.ra.to_string(unit=units.hour, sep=':')
+    guideDecStr = guideCoords.dec.to_string(unit=units.deg, sep=':')
+
+    objFilename = dataDir + "a2261_targets_{}.dat".format(mask)
+    with open(objFilename, 'w') as ff:
+        ff.write("# OBJNAME         RA          DEC        EQX   MAG band PCODE "
+                 "LIST SEL? PA L1 L2\n")
+        for ii in range(len(alignCat)):
+            ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
+                    "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
+                        name=str(alignCat.iloc[ii].name + 98000).zfill(5),
+                        ra=alignRaStr[ii],
+                        dec=alignDecStr[ii],
+                        eqx=2000.0,
+                        mag=alignCat['mag'].iloc[ii],
+                        band='r',
+                        pcode=-2,
+                        sample=1,
+                        presel=0,
+                        pa="INDEF",
+                        len1='',
+                        len2=''))
+        for ii in range(len(guideCat)):
+            ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
+                    "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
+                        name=str(guideCat.iloc[ii].name + 99000).zfill(5),
+                        ra=guideRaStr[ii],
+                        dec=guideDecStr[ii],
+                        eqx=2000.0,
+                        mag=guideCat['mag'].iloc[ii],
+                        band='r',
+                        pcode=-1,
+                        sample=2,
+                        presel=1,
+                        pa="INDEF",
+                        len1='',
+                        len2=''))
+        for ii in range(len(cat)):
+            ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
 #                 "{pcode:4} {sample:4} {presel:4} {pa:6.1f} {len1} {len2}\n".format(
-                 "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
-                     name=str(cat.iloc[ii].name).zfill(5),
-                     ra=raStr[ii],
-                     dec=decStr[ii],
-                     eqx=2000.0,
-                     mag=cat['RC'].iloc[ii],
-                     band='R',
-                     pcode=1,
-                     sample=1,
-                     presel=0,
+                     "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
+                        name=str(cat.iloc[ii].name).zfill(5),
+                        ra=raStr[ii],
+                        dec=decStr[ii],
+                        eqx=2000.0,
+                        mag=cat['RC'].iloc[ii],
+                        band='R',
+                        pcode=1,
+                        sample=3,
+                        presel=0,
 #                     pa=PA[ii],
-                     pa="INDEF",
-                     len1='',
-                     len2=''))
+                        pa="INDEF",
+                        len1='',
+                        len2=''))
 
 # Print target list for DS9 region file
 regFilename = dataDir + "a2261_targets.reg"
