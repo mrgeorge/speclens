@@ -147,7 +147,7 @@ rad[blueSel] = cat[blueSel]['rg_blue']
 ################################################################################
 
 
-catRec = astropy.io.fits.getdata(dataDir + "mcat_disk_flux_cut.fits", 1)
+catRec = astropy.io.fits.getdata(dataDir + "mcat_disk_flux_cut_slightly_relaxed.fits", 1)
 catRecSwap = {}
 for i, col in enumerate(catRec.columns[1:-1]):
     #temporary patch for big-endian data bug on pandas 0.13
@@ -247,6 +247,11 @@ for mask, maskPA in zip(maskList, maskPAs):
                 halfslit = np.max([halfslit, 4.])
                 nOther += 1
 
+            # assign priorities
+            # goal is to get bright objects near z ~ 0.8
+            # but not to prioritize any individual object too heavily
+            pcode = (30. - cat['RCMAG'].iloc[ii]) - 2.*np.abs(cat['ZPHOT'].iloc[ii] - 0.8)
+
             ff.write("{name:10} {ra:16} {dec:16} {eqx:8.1f} {mag:6.2f} {band:4} "
                      "{pcode:4} {sample:4} {presel:4} {pa:6.1f} {len1:6.1f} {len2:6.1f}\n".format(
 #                     "{pcode:4} {sample:4} {presel:4} {pa:8s} {len1} {len2}\n".format(
@@ -256,7 +261,7 @@ for mask, maskPA in zip(maskList, maskPAs):
                         eqx=2000.0,
                         mag=cat['RCMAG'].iloc[ii],
                         band='R',
-                        pcode=1,
+                        pcode=pcode,
                         sample=3,
                         presel=0,
                         pa=pa,
